@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HTML5 Mobile Shooter</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            color: white;
+            font-family: Arial, sans-serif;
+            touch-action: none; /* 禁止浏览器默认的触摸行为（滚动等） */
+        }
+        canvas {
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            pointer-events: none;
+            user-select: none;
+        }
+        /* 虚拟摇杆提示 */
+        .joystick-hint {
+            position: absolute;
+            bottom: 50px;
+            width: 120px;
+            height: 120px;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            pointer-events: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            text-align: center;
+        }
+        #left-hint { left: 50px; }
+        #right-hint { right: 50px; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h1>Mobile Shooter</h1>
+        <p>Left Stick: Move | Right Stick: Aim & Shoot</p>
+        <h2 id="score">Score: 0</h2>
+    </div>
+
+    <!-- 视觉辅助：显示摇杆大概位置 -->
+    <div id="left-hint" class="joystick-hint">MOVE</div>
+    <div id="right-hint" class="joystick-hint">SHOOT</div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+
+        // 适配视网膜屏幕
+        const dpr = window.devicePixelRatio || 1;
+        
+        function resize() {
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 游戏宽高度（逻辑坐标）
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        // 游戏状态
+        const STATE = {
+            MENU: 0,
+            PLAYING: 1,
+            GAMEOVER: 2
+        };
+        let currentState = STATE.MENU;
+        let score = 0;
+
+        // 玩家
+        const player = {
+            x: width / 2,
+            y: height / 2,
+            radius: 15,
+            color: 'white',
+            speed: 4,
+            angle: 0
+        };
+
+        // 虚拟摇杆状态
+        const joystickLeft = {
+            active: false,
+            originX: 0, originY: 0, // 触摸起始点
+            currentX: 0, currentY: 0, // 当前触摸点
+            dx: 0, dy: 0, // 偏移量 (-1 到 1)
+            id: -1 // 触摸 ID
+        };
+
+        const joystickRight = {
+            active: false,
+            originX: 0, originY: 0,
+            currentX: 0, currentY: 0,
+            dx: 0, dy: 0,
+            angle: 0,
+            id: -1
+        };
+
+        let shootTimer = 0; // 射击计时器
+
+        // 游戏对象
+        let bullets = [];
+        let enemies = [];
+        let particles = [];
+
+        // 触摸事件处理
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (currentState === STATE.MENU || currentState === STATE.GAMEOVER) {
+                resetGame();
+                return;
+            }
+
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                // 左半屏控制移动
+                if (t.clientX < width / 2) {
+                    if (!joystickLeft.active) {
+                        joystickLeft.active = true;
+                        joystickLeft.id = t.identifier;
+                        joystickLeft.originX = t.clientX;
+                        joystickLeft.originY = t.clientY;
+                        joystickLeft.currentX = t.clientX;
+                        joystickLeft.currentY = t.clientY;
+                        joystickLeft.dx = 0;
+                        joystickLeft.dy = 0;
+                    }
+                } 
+                // 右半屏控制瞄准射击
+                else {
+                    if (!joystickRight.active) {
+                        joystickRight.active = true;
+                        joystickRight.id = t.identifier;
+                        joystickRight.originX = t.clientX;
+                        joystickRight.originY = t.clientY;
+                        joystickRight.currentX = t.clientX;
+                        joystickRight.currentY = t.clientY;
+                    }
+                }
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                
+                if (t.identifier === joystickLeft.id) {
+                    joystickLeft.currentX = t.clientX;
+                    joystickLeft.currentY = t.clientY;
+                    
+                    // 计算偏移量
+                    const dx = t.clientX - joystickLeft.originX;
+                    const dy = t.clientY - joystickLeft.originY;
+                    const dist = Math.hypot(dx, dy);
+                    const maxDist = 50; // 摇杆最大半径
+
+                    // 归一化方向向量
+                    if (dist > 0) {
+                        const scale = Math.min(dist, maxDist) / maxDist;
+                        joystickLeft.dx = (dx / dist) * scale;
+                        joystickLeft.dy = (dy / dist) * scale;
+                    }
+                }
+
+                if (t.identifier === joystickRight.id) {
+                    joystickRight.currentX = t.clientX;
+                    joystickRight.currentY = t.clientY;
+                    
+                    const dx = t.clientX - joystickRight.originX;
+                    const dy = t.clientY - joystickRight.originY;
+                    joystickRight.angle = Math.atan2(dy, dx);
+                }
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.identifier === joystickLeft.id) {
+                    joystickLeft.active = false;
+                    joystickLeft.dx = 0;
+                    joystickLeft.dy = 0;
+                }
+                if (t.identifier === joystickRight.id) {
+                    joystickRight.active = false;
+                }
+            }
+        });
+
+        function resetGame() {
+            player.x = width / 2;
+            player.y = height / 2;
+            bullets = [];
+            enemies = [];
+            particles = [];
+            score = 0;
+            scoreEl.innerText = 'Score: 0';
+            currentState = STATE.PLAYING;
+            
+            if (window.spawnInterval) clearInterval(window.spawnInterval);
+            startSpawning();
+        }
+
+        function startSpawning() {
+            window.spawnInterval = setInterval(() => {
+                if (currentState !== STATE.PLAYING) return;
+
+                const radius = 20 + Math.random() * 20;
+                let x, y;
+
+                if (Math.random() < 0.5) {
+                    x = Math.random() < 0.5 ? 0 - radius : width + radius;
+                    y = Math.random() * height;
+                } else {
+                    x = Math.random() * width;
+                    y = Math.random() < 0.5 ? 0 - radius : height + radius;
+                }
+
+                const color = `hsl(${Math.random() * 360}, 50%, 50%)`;
+                const angle = Math.atan2(player.y - y, player.x - x);
+                const velocity = {
+                    x: Math.cos(angle),
+                    y: Math.sin(angle)
+                };
+
+                enemies.push({
+                    x, y, radius, color, velocity,
+                    speed: 1 + Math.random()
+                });
+            }, 1000);
+        }
+
+        function update() {
+            if (currentState !== STATE.PLAYING) return;
+
+            // 1. 玩家移动 (摇杆控制)
+            if (joystickLeft.active) {
+                player.x += joystickLeft.dx * player.speed;
+                player.y += joystickLeft.dy * player.speed;
+
+                // 限制在屏幕内
+                player.x = Math.max(player.radius, Math.min(width - player.radius, player.x));
+                player.y = Math.max(player.radius, Math.min(height - player.radius, player.y));
+            }
+
+            // 2. 玩家瞄准 & 射击 (右摇杆)
+            if (joystickRight.active) {
+                player.angle = joystickRight.angle;
+                
+                // 自动射击 (每10帧发一发)
+                shootTimer++;
+                if (shootTimer > 8) {
+                    shootTimer = 0;
+                    bullets.push({
+                        x: player.x,
+                        y: player.y,
+                        radius: 5,
+                        color: 'yellow',
+                        velocity: {
+                            x: Math.cos(player.angle) * 10,
+                            y: Math.sin(player.angle) * 10
+                        }
+                    });
+                }
+            } else {
+                shootTimer = 0;
+            }
+
+            // 3. 更新子弹
+            bullets.forEach((bullet, index) => {
+                bullet.x += bullet.velocity.x;
+                bullet.y += bullet.velocity.y;
+
+                if (bullet.x < 0 || bullet.x > width || bullet.y < 0 || bullet.y > height) {
+                    setTimeout(() => bullets.splice(index, 1), 0);
+                }
+            });
+
+            // 4. 更新敌人
+            enemies.forEach((enemy, index) => {
+                const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+                enemy.velocity.x = Math.cos(angle) * enemy.speed;
+                enemy.velocity.y = Math.sin(angle) * enemy.speed;
+                
+                enemy.x += enemy.velocity.x;
+                enemy.y += enemy.velocity.y;
+
+                // 碰撞检测
+                const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+                if (dist - enemy.radius - player.radius < 1) {
+                    currentState = STATE.GAMEOVER;
+                }
+
+                bullets.forEach((bullet, bIndex) => {
+                    const dist = Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y);
+                    if (dist - enemy.radius - bullet.radius < 1) {
+                        // 粒子效果
+                        for (let i = 0; i < 8; i++) {
+                            particles.push({
+                                x: bullet.x, y: bullet.y,
+                                radius: Math.random() * 3,
+                                color: enemy.color,
+                                velocity: { x: (Math.random()-0.5)*8, y: (Math.random()-0.5)*8 },
+                                alpha: 1
+                            });
+                        }
+
+                        if (enemy.radius > 15) {
+                            enemy.radius -= 10;
+                            setTimeout(() => bullets.splice(bIndex, 1), 0);
+                            score += 5;
+                        } else {
+                            setTimeout(() => {
+                                enemies.splice(index, 1);
+                                bullets.splice(bIndex, 1);
+                            }, 0);
+                            score += 10;
+                        }
+                        scoreEl.innerText = `Score: ${score}`;
+                    }
+                });
+            });
+
+            // 5. 更新粒子
+            particles.forEach((particle, index) => {
+                if (particle.alpha <= 0) particles.splice(index, 1);
+                else {
+                    particle.x += particle.velocity.x *= 0.95;
+                    particle.y += particle.velocity.y *= 0.95;
+                    particle.alpha -= 0.05;
+                }
+            });
+        }
+
+        function draw() {
+            requestAnimationFrame(draw);
+            update();
+
+            // 背景
+            ctx.fillStyle = 'rgba(30, 30, 30, 0.3)';
+            ctx.fillRect(0, 0, width, height);
+
+            // 绘制 UI 提示
+            if (currentState === STATE.MENU) {
+                ctx.fillStyle = 'white';
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('TAP TO START', width/2, height/2);
+                return;
+            }
+            if (currentState === STATE.GAMEOVER) {
+                ctx.fillStyle = 'red';
+                ctx.font = '40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', width/2, height/2);
+                ctx.fillStyle = 'white';
+                ctx.font = '20px Arial';
+                ctx.fillText('Tap to Restart', width/2, height/2 + 50);
+                return;
+            }
+
+            // 绘制摇杆 (视觉反馈)
+            if (joystickLeft.active) {
+                ctx.beginPath();
+                ctx.arc(joystickLeft.originX, joystickLeft.originY, 50, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(joystickLeft.currentX, joystickLeft.currentY, 20, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.fill();
+            }
+
+            if (joystickRight.active) {
+                ctx.beginPath();
+                ctx.arc(joystickRight.originX, joystickRight.originY, 50, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(joystickRight.currentX, joystickRight.currentY, 20, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                ctx.fill();
+            }
+
+            // 绘制玩家
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            ctx.rotate(player.angle);
+            ctx.beginPath();
+            ctx.arc(0, 0, player.radius, 0, Math.PI*2);
+            ctx.fillStyle = player.color;
+            ctx.fill();
+            ctx.fillStyle = 'red';
+            ctx.fillRect(10, -5, 20, 10);
+            ctx.restore();
+
+            // 绘制子弹和敌人
+            bullets.forEach(b => {
+                ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2);
+                ctx.fillStyle = b.color; ctx.fill();
+            });
+            enemies.forEach(e => {
+                ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2);
+                ctx.fillStyle = e.color; ctx.fill();
+            });
+            particles.forEach(p => {
+                ctx.save(); ctx.globalAlpha = p.alpha;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
+                ctx.fillStyle = p.color; ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        draw();
+    </script>
+</body>
+</html>

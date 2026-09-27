@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HTML5 Unified Shooter</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            color: white;
+            font-family: Arial, sans-serif;
+            touch-action: none; /* 禁止移动端默认触摸行为 */
+        }
+        canvas {
+            display: block;
+            position: absolute; /* 让两个 Canvas 重叠 */
+            top: 0;
+            left: 0;
+        }
+        #trailCanvas {
+            pointer-events: none; /* 让轨迹画布不阻挡点击 */
+            z-index: 0; /* 在游戏画布下方 */
+        }
+        #gameCanvas {
+            z-index: 1; /* 在轨迹画布上方 */
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10; /* UI 在最上层 */
+            pointer-events: none;
+            user-select: none;
+        }
+        /* 颜色选择器 */
+        #color-picker {
+            pointer-events: auto;
+            margin-top: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            display: inline-block;
+        }
+        #color-picker label {
+            font-size: 14px;
+            margin-right: 5px;
+        }
+        #player-color {
+            cursor: pointer;
+        }
+        /* 结果展示弹窗 */
+        #result-modal {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 20, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #444;
+            text-align: center;
+            z-index: 100;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+        }
+        #result-img {
+            max-width: 100%;
+            border: 1px solid #666;
+            margin: 10px 0;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        button:hover { background: #45a049; }
+        
+        /* 移动端摇杆提示 (默认隐藏) */
+        .joystick-hint {
+            position: absolute;
+            bottom: 50px;
+            width: 120px;
+            height: 120px;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            pointer-events: none;
+            display: none; /* 默认隐藏，JS检测到触摸后再显示 */
+            justify-content: center;
+            align-items: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            text-align: center;
+        }
+        #left-hint { left: 50px; }
+        #right-hint { right: 50px; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h1>Unified Shooter</h1>
+        <p id="control-hint">Detecting input method...</p>
+        <h2 id="score">Score: 0</h2>
+        <div id="color-picker">
+            <label for="player-color">Trail Color:</label>
+            <input type="color" id="player-color" value="#ffffff">
+        </div>
+    </div>
+
+    <!-- 结果展示弹窗 -->
+    <div id="result-modal">
+        <h2>Your Game Trail</h2>
+        <p>This is the unique art you created!</p>
+        <img id="result-img" alt="Game Trail">
+        <br>
+        <button id="download-btn">Save Image</button>
+        <button id="restart-btn">Play Again</button>
+    </div>
+
+    <!-- 移动端摇杆提示 -->
+    <div id="left-hint" class="joystick-hint">MOVE</div>
+    <div id="right-hint" class="joystick-hint">SHOOT</div>
+
+    <!-- 两个 Canvas：底层画轨迹，顶层画游戏 -->
+    <canvas id="trailCanvas"></canvas>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const trailCanvas = document.getElementById('trailCanvas');
+        const trailCtx = trailCanvas.getContext('2d');
+        
+        const scoreEl = document.getElementById('score');
+        const hintEl = document.getElementById('control-hint');
+        const colorInput = document.getElementById('player-color');
+        
+        const resultModal = document.getElementById('result-modal');
+        const resultImg = document.getElementById('result-img');
+        const downloadBtn = document.getElementById('download-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        const leftHint = document.getElementById('left-hint');
+        const rightHint = document.getElementById('right-hint');
+
+        // === 音频系统 (AudioContext) ===
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        // 简单的合成音效函数
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'shoot') {
+                // 射击：高频短促的衰减音 (类似激光)
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'hit') {
+                // 击中：低频噪音 (模拟爆炸/撞击)
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            }
+        }
+
+        // === 设备检测 ===
+        let isMobile = false;
+        // 简单的UA检测 + 触摸能力检测
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 'ontouchstart' in window) {
+            isMobile = true;
+            hintEl.innerText = "Mobile Mode: Left Stick to Move | Right Stick to Aim";
+            leftHint.style.display = 'flex';
+            rightHint.style.display = 'flex';
+        } else {
+            hintEl.innerText = "Desktop Mode: WASD to Move | Mouse to Aim | Click to Shoot";
+        }
+
+        // === 适配视网膜屏幕 ===
+        const dpr = window.devicePixelRatio || 1;
+        let width, height;
+        
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+
+            trailCanvas.width = width * dpr;
+            trailCanvas.height = height * dpr;
+            trailCtx.scale(dpr, dpr);
+            trailCanvas.style.width = width + 'px';
+            trailCanvas.style.height = height + 'px';
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // === 颜色管理 ===
+        let trailColor = '#ffffff';
+        colorInput.addEventListener('input', (e) => {
+            trailColor = e.target.value;
+            player.color = e.target.value;
+        });
+
+        // === 游戏状态 ===
+        const STATE = {
+            MENU: 0,
+            PLAYING: 1,
+            GAMEOVER: 2,
+            RESULT: 3 // 新增：结果展示状态
+        };
+        let currentState = STATE.MENU;
+        let score = 0;
+
+        // === 玩家对象 ===
+        const player = {
+            x: width / 2,
+            y: height / 2,
+            radius: 15,
+            color: trailColor,
+            speed: isMobile ? 4 : 5, // 手机稍微慢一点好控制
+            angle: 0
+        };
+
+        // === 结果处理 ===
+        function showResult() {
+            currentState = STATE.RESULT;
+            
+            // 1. 生成轨迹图片
+            const dataURL = trailCanvas.toDataURL('image/png');
+            resultImg.src = dataURL;
+            
+            // 2. 显示弹窗
+            resultModal.style.display = 'block';
+            document.getElementById('ui').style.display = 'none'; // 隐藏 UI
+            
+            // 3. 绑定按钮事件
+            downloadBtn.onclick = () => {
+                const a = document.createElement('a');
+                a.href = dataURL;
+                a.download = `shooter-trail-${Date.now()}.png`;
+                a.click();
+            };
+            
+            restartBtn.onclick = () => {
+                resultModal.style.display = 'none';
+                document.getElementById('ui').style.display = 'block';
+                resetGame();
+            };
+        }
+
+        // === 输入状态管理 ===
+        // PC端输入
+        const keys = { w: false, a: false, s: false, d: false };
+        const mouse = { x: width / 2, y: height / 2 };
+        
+        // 移动端输入 (虚拟摇杆)
+        const joystickLeft = {
+            active: false,
+            originX: 0, originY: 0,
+            currentX: 0, currentY: 0,
+            dx: 0, dy: 0,
+            id: -1
+        };
+        const joystickRight = {
+            active: false,
+            originX: 0, originY: 0,
+            currentX: 0, currentY: 0,
+            dx: 0, dy: 0,
+            angle: 0,
+            id: -1
+        };
+
+        let shootTimer = 0; // 用于移动端自动连发
+
+        // === 游戏对象容器 ===
+        let bullets = [];
+        let enemies = [];
+        let particles = [];
+
+        // === 事件监听 (统一处理) ===
+
+        // 1. PC 键盘鼠标
+        if (!isMobile) {
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'w' || e.key === 'W') keys.w = true;
+                if (e.key === 'a' || e.key === 'A') keys.a = true;
+                if (e.key === 's' || e.key === 'S') keys.s = true;
+                if (e.key === 'd' || e.key === 'D') keys.d = true;
+                if (currentState === STATE.GAMEOVER && e.code === 'Space') {
+                    showResult();
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (e.key === 'w' || e.key === 'W') keys.w = false;
+                if (e.key === 'a' || e.key === 'A') keys.a = false;
+                if (e.key === 's' || e.key === 'S') keys.s = false;
+                if (e.key === 'd' || e.key === 'D') keys.d = false;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+            });
+
+            window.addEventListener('mousedown', () => {
+                if (currentState === STATE.MENU) {
+                    resetGame();
+                } else if (currentState === STATE.PLAYING) {
+                    shoot(player.angle);
+                } else if (currentState === STATE.GAMEOVER) {
+                    showResult();
+                }
+            });
+        }
+
+        // 2. 移动端触摸 (双摇杆)
+        if (isMobile) {
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (currentState !== STATE.PLAYING) {
+                    resetGame();
+                    return;
+                }
+
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    // 左半屏移动
+                    if (t.clientX < width / 2) {
+                        if (!joystickLeft.active) {
+                            joystickLeft.active = true;
+                            joystickLeft.id = t.identifier;
+                            joystickLeft.originX = t.clientX;
+                            joystickLeft.originY = t.clientY;
+                            joystickLeft.currentX = t.clientX;
+                            joystickLeft.currentY = t.clientY;
+                            joystickLeft.dx = 0; joystickLeft.dy = 0;
+                        }
+                    } 
+                    // 右半屏射击
+                    else {
+                        if (!joystickRight.active) {
+                            joystickRight.active = true;
+                            joystickRight.id = t.identifier;
+                            joystickRight.originX = t.clientX;
+                            joystickRight.originY = t.clientY;
+                            joystickRight.currentX = t.clientX;
+                            joystickRight.currentY = t.clientY;
+                        }
+                    }
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    
+                    if (t.identifier === joystickLeft.id) {
+                        joystickLeft.currentX = t.clientX;
+                        joystickLeft.currentY = t.clientY;
+                        const dx = t.clientX - joystickLeft.originX;
+                        const dy = t.clientY - joystickLeft.originY;
+                        const dist = Math.hypot(dx, dy);
+                        const maxDist = 50;
+                        if (dist > 0) {
+                            const scale = Math.min(dist, maxDist) / maxDist;
+                            joystickLeft.dx = (dx / dist) * scale;
+                            joystickLeft.dy = (dy / dist) * scale;
+                        }
+                    }
+
+                    if (t.identifier === joystickRight.id) {
+                        joystickRight.currentX = t.clientX;
+                        joystickRight.currentY = t.clientY;
+                        const dx = t.clientX - joystickRight.originX;
+                        const dy = t.clientY - joystickRight.originY;
+                        joystickRight.angle = Math.atan2(dy, dx);
+                    }
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    if (t.identifier === joystickLeft.id) {
+                        joystickLeft.active = false;
+                        joystickLeft.dx = 0; joystickLeft.dy = 0;
+                    }
+                    if (t.identifier === joystickRight.id) {
+                        joystickRight.active = false;
+                    }
+                }
+            });
+        }
+
+        // === 游戏逻辑 ===
+
+        function resetGame() {
+            player.x = width / 2;
+            player.y = height / 2;
+            bullets = [];
+            enemies = [];
+            particles = [];
+            score = 0;
+            scoreEl.innerText = 'Score: 0';
+            
+            // 重置游戏时，清空轨迹画布
+            trailCtx.clearRect(0, 0, width * dpr, height * dpr);
+            
+            currentState = STATE.PLAYING;
+            
+            if (window.spawnInterval) clearInterval(window.spawnInterval);
+            startSpawning();
+        }
+
+        function shoot(angle) {
+            playSound('shoot'); // 播放射击音效
+            const velocity = {
+                x: Math.cos(angle) * 10,
+                y: Math.sin(angle) * 10
+            };
+            bullets.push({
+                x: player.x,
+                y: player.y,
+                radius: 5,
+                color: 'yellow',
+                velocity: velocity
+            });
+        }
+
+        function startSpawning() {
+            window.spawnInterval = setInterval(() => {
+                if (currentState !== STATE.PLAYING) return;
+
+                const radius = 20 + Math.random() * 20;
+                let x, y;
+                if (Math.random() < 0.5) {
+                    x = Math.random() < 0.5 ? 0 - radius : width + radius;
+                    y = Math.random() * height;
+                } else {
+                    x = Math.random() * width;
+                    y = Math.random() < 0.5 ? 0 - radius : height + radius;
+                }
+
+                const color = `hsl(${Math.random() * 360}, 50%, 50%)`;
+                const angle = Math.atan2(player.y - y, player.x - x);
+                const velocity = {
+                    x: Math.cos(angle),
+                    y: Math.sin(angle)
+                };
+
+                enemies.push({
+                    x, y, radius, color, velocity,
+                    speed: 1 + Math.random()
+                });
+            }, 1000);
+        }
+
+        function update() {
+            if (currentState !== STATE.PLAYING) return;
+
+            // 1. 玩家移动逻辑 (统一处理)
+            const prevX = player.x;
+            const prevY = player.y;
+
+            if (isMobile) {
+                // 移动端：摇杆控制
+                if (joystickLeft.active) {
+                    player.x += joystickLeft.dx * player.speed;
+                    player.y += joystickLeft.dy * player.speed;
+                }
+                // 移动端：瞄准 & 自动射击
+                if (joystickRight.active) {
+                    player.angle = joystickRight.angle;
+                    shootTimer++;
+                    if (shootTimer > 8) { // 射速控制
+                        shootTimer = 0;
+                        shoot(player.angle);
+                    }
+                } else {
+                    shootTimer = 0;
+                }
+            } else {
+                // PC端：键盘控制
+                if (keys.w) player.y -= player.speed;
+                if (keys.s) player.y += player.speed;
+                if (keys.a) player.x -= player.speed;
+                if (keys.d) player.x += player.speed;
+                
+                // PC端：鼠标瞄准
+                player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+            }
+
+            // 限制边界
+            player.x = Math.max(player.radius, Math.min(width - player.radius, player.x));
+            player.y = Math.max(player.radius, Math.min(height - player.radius, player.y));
+
+            // === 绘制轨迹 ===
+            // 只有当玩家实际移动时才绘制
+            if (Math.abs(player.x - prevX) > 0.1 || Math.abs(player.y - prevY) > 0.1) {
+                trailCtx.beginPath();
+                trailCtx.strokeStyle = player.color;
+                trailCtx.lineWidth = player.radius * 2;
+                trailCtx.lineCap = 'round';
+                trailCtx.globalAlpha = 0.05; // 极低的透明度，产生细腻的叠加效果
+                trailCtx.moveTo(prevX, prevY);
+                trailCtx.lineTo(player.x, player.y);
+                trailCtx.stroke();
+            }
+
+            // 2. 子弹更新
+            bullets.forEach((b, i) => {
+                b.x += b.velocity.x;
+                b.y += b.velocity.y;
+                if (b.x < 0 || b.x > width || b.y < 0 || b.y > height) setTimeout(() => bullets.splice(i, 1), 0);
+            });
+
+            // 3. 敌人更新 & 碰撞
+            enemies.forEach((e, i) => {
+                const angle = Math.atan2(player.y - e.y, player.x - e.x);
+                e.velocity.x = Math.cos(angle) * e.speed;
+                e.velocity.y = Math.sin(angle) * e.speed;
+                e.x += e.velocity.x;
+                e.y += e.velocity.y;
+
+                // 撞玩家
+                if (Math.hypot(player.x - e.x, player.y - e.y) - e.radius - player.radius < 1) {
+                    currentState = STATE.GAMEOVER;
+                }
+
+                // 被子弹打
+                bullets.forEach((b, bi) => {
+                    if (Math.hypot(b.x - e.x, b.y - e.y) - e.radius - b.radius < 1) {
+                        playSound('hit'); // 播放击中音效
+                        // 粒子特效
+                        for (let k = 0; k < 8; k++) {
+                            particles.push({
+                                x: b.x, y: b.y, radius: Math.random()*3, color: e.color,
+                                velocity: {x:(Math.random()-0.5)*8, y:(Math.random()-0.5)*8}, alpha: 1
+                            });
+                        }
+                        // 击杀逻辑
+                        if (e.radius > 15) {
+                            e.radius -= 10;
+                            setTimeout(() => bullets.splice(bi, 1), 0);
+                            score += 5;
+                        } else {
+                            setTimeout(() => { enemies.splice(i, 1); bullets.splice(bi, 1); }, 0);
+                            score += 10;
+                        }
+                        scoreEl.innerText = `Score: ${score}`;
+                    }
+                });
+            });
+
+            // 4. 粒子更新
+            particles.forEach((p, i) => {
+                if (p.alpha <= 0) particles.splice(i, 1);
+                else {
+                    p.x += p.velocity.x *= 0.95;
+                    p.y += p.velocity.y *= 0.95;
+                    p.alpha -= 0.05;
+                }
+            });
+        }
+
+        function draw() {
+            requestAnimationFrame(draw);
+            update();
+
+            // 背景
+            ctx.fillStyle = 'rgba(30, 30, 30, 0.3)';
+            ctx.fillRect(0, 0, width, height);
+
+            // 绘制 UI 状态
+            if (currentState === STATE.MENU) {
+                ctx.fillStyle = 'white';
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(isMobile ? 'TAP TO START' : 'CLICK TO START', width/2, height/2);
+                return;
+            }
+            if (currentState === STATE.GAMEOVER) {
+                ctx.fillStyle = 'red';
+                ctx.font = '40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', width/2, height/2);
+                ctx.fillStyle = 'white';
+                ctx.font = '20px Arial';
+                ctx.fillText(isMobile ? 'Tap to Restart' : 'Press SPACE to Restart', width/2, height/2 + 50);
+                return;
+            }
+
+            // 绘制摇杆 (仅移动端)
+            if (isMobile) {
+                if (joystickLeft.active) {
+                    ctx.beginPath(); ctx.arc(joystickLeft.originX, joystickLeft.originY, 50, 0, Math.PI*2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(joystickLeft.currentX, joystickLeft.currentY, 20, 0, Math.PI*2);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'; ctx.fill();
+                }
+                if (joystickRight.active) {
+                    ctx.beginPath(); ctx.arc(joystickRight.originX, joystickRight.originY, 50, 0, Math.PI*2);
+                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(joystickRight.currentX, joystickRight.currentY, 20, 0, Math.PI*2);
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'; ctx.fill();
+                }
+            }
+
+            // 绘制实体
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            ctx.rotate(player.angle);
+            ctx.beginPath(); ctx.arc(0, 0, player.radius, 0, Math.PI*2);
+            ctx.fillStyle = player.color; ctx.fill();
+            ctx.fillStyle = 'red'; ctx.fillRect(10, -5, 20, 10);
+            ctx.restore();
+
+            bullets.forEach(b => {
+                ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2);
+                ctx.fillStyle = b.color; ctx.fill();
+            });
+            enemies.forEach(e => {
+                ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2);
+                ctx.fillStyle = e.color; ctx.fill();
+            });
+            particles.forEach(p => {
+                ctx.save(); ctx.globalAlpha = p.alpha;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
+                ctx.fillStyle = p.color; ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        draw();
+    </script>
+</body>
+</html>

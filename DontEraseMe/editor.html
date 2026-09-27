@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skin Editor - Dont Erase Me!</title>
+    <link rel="stylesheet" href="/src/style.css">
+    <style>
+        body {
+            background-color: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .editor-container {
+            display: flex;
+            gap: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+            border: 2px solid #444;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .toolbar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 200px;
+        }
+
+        .tool-section {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .tool-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #aaa;
+            text-transform: uppercase;
+        }
+
+        #drawing-canvas {
+            background-color: transparent;
+            /* A subtle checkerboard pattern to show transparency */
+            background-image: 
+                linear-gradient(45deg, #333 25%, transparent 25%), 
+                linear-gradient(-45deg, #333 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #333 75%), 
+                linear-gradient(-45deg, transparent 75%, #333 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            border: 3px solid #fff;
+            border-radius: 10px;
+            cursor: crosshair;
+        }
+
+        .color-picker {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .color-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .color-btn.active {
+            border-color: white;
+            transform: scale(1.2);
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        .action-btn {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #555;
+        }
+
+        .action-btn.primary {
+            background: #2196F3;
+            border-color: #2196F3;
+        }
+
+        .action-btn.primary:hover {
+            background: #1976D2;
+        }
+        
+        .action-btn.danger {
+            background: #f44336;
+            border-color: #f44336;
+        }
+
+        .action-btn.danger:hover {
+            background: #d32f2f;
+        }
+
+        .header-controls {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-controls">
+        <button class="btn" id="back-btn" style="padding: 10px 20px; font-size: 16px;">← Back to Menu</button>
+        <h1 class="title" style="font-size: 32px; margin: 0; animation: none; background: white; -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Skin Creator</h1>
+        <div style="width: 150px;"></div> <!-- Spacer -->
+    </div>
+
+    <div class="editor-container">
+        <!-- Canvas for drawing (200x200 is a good size for a character sprite) -->
+        <canvas id="drawing-canvas" width="200" height="200"></canvas>
+
+        <div class="toolbar">
+            <div class="tool-section">
+                <h3>Colors</h3>
+                <div class="color-picker" id="color-picker">
+                    <!-- Injected by JS -->
+                </div>
+            </div>
+
+            <div class="tool-section">
+                <h3>Brush Size: <span id="brush-size-label">5</span>px</h3>
+                <input type="range" id="brush-size" min="1" max="30" value="5" style="width: 100%;">
+            </div>
+
+            <div class="tool-section">
+                <h3>Tools</h3>
+                <button class="action-btn" id="eraser-btn">🧽 Eraser</button>
+                <button class="action-btn danger" id="clear-btn">🗑️ Clear All</button>
+            </div>
+
+            <div class="tool-section" style="margin-top: auto;">
+                <h3>Part</h3>
+                <select id="part-select" class="action-btn" style="background:#222; border-color:#555;">
+                    <option value="skin">Whole Body (single)</option>
+                    <option value="player_part_head">Head (spine)</option>
+                    <option value="player_part_body">Body (spine)</option>
+                    <option value="player_part_arm_r">Arm R</option>
+                    <option value="player_part_forearm_r">Forearm R</option>
+                </select>
+                <button class="action-btn" id="save-part-btn">💾 Save Part</button>
+                <button class="action-btn primary" id="save-btn" style="font-size: 18px; padding: 15px;">💾 Save & Use Skin</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/src/editor.ts"></script>
+</body>
+</html>

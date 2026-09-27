@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HTML5 Unified Shooter</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            color: white;
+            font-family: Arial, sans-serif;
+            touch-action: none; /* 禁止移动端默认触摸行为 */
+        }
+        canvas {
+            display: block;
+            position: absolute; /* 让两个 Canvas 重叠 */
+            top: 0;
+            left: 0;
+        }
+        #trailCanvas {
+            pointer-events: none; /* 让轨迹画布不阻挡点击 */
+            z-index: 0; /* 在游戏画布下方 */
+        }
+        #gameCanvas {
+            z-index: 1; /* 在轨迹画布上方 */
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10; /* UI 在最上层 */
+            pointer-events: none;
+            user-select: none;
+        }
+        /* 颜色选择器 (已废弃，移至暂停菜单) */
+        #color-picker { display: none; }
+
+        /* 暂停/设置菜单 */
+        #pause-menu {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 20, 0.95);
+            padding: 30px;
+            border-radius: 10px;
+            border: 2px solid #444;
+            text-align: left;
+            z-index: 100;
+            min-width: 300px;
+            color: white;
+            /* 确保在移动端触摸不会穿透 */
+            touch-action: auto; 
+        }
+        #pause-menu h2 { margin-top: 0; text-align: center; }
+        .setting-group { margin-bottom: 20px; }
+        .setting-group label { display: block; margin-bottom: 5px; color: #aaa; }
+        .setting-group input[type="range"] { width: 100%; }
+        /* 自定义颜色选择器样式 */
+        .color-palette {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        .color-swatch {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid rgba(255,255,255,0.2);
+            transition: transform 0.1s, border-color 0.1s;
+        }
+        .color-swatch.active {
+            transform: scale(1.2);
+            border-color: white;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        /* 迷你地图 (可选) */
+        #minimap {
+            position: absolute;
+            top: 10px;
+            right: 10px; /* 强制靠右 */
+            left: auto;  /* 确保不会被其他样式覆盖 */
+            width: 150px;
+            height: 150px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.5);
+            z-index: 90;
+        }
+
+        /* 结果展示弹窗 */
+        #result-modal {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 20, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #444;
+            text-align: center;
+            z-index: 100;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+        }
+        #result-img {
+            max-width: 100%;
+            border: 1px solid #666;
+            margin: 10px 0;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        button:hover { background: #45a049; }
+        
+        /* 移动端摇杆提示 (默认隐藏) */
+        .joystick-hint {
+            position: absolute;
+            bottom: 30px; /* 调整为更靠下，适应横屏 */
+            width: 100px;
+            height: 100px;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            pointer-events: none;
+            display: none; /* 默认隐藏，JS检测到触摸后再显示 */
+            justify-content: center;
+            align-items: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            text-align: center;
+        }
+        #left-hint { left: 40px; bottom: 40px; } /* 左下角 */
+        #right-hint { right: 40px; bottom: 40px; } /* 右下角 */
+
+        /* 技能按钮 (PC/Mobile 通用) */
+        #skill-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70px; /* 稍微缩小一点 */
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(255, 0, 0, 0.6);
+            border: 4px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            z-index: 90;
+            transition: transform 0.1s;
+            touch-action: manipulation;
+        }
+
+        #skill-btn.cooldown { 
+            background: rgba(100, 100, 100, 0.6); 
+            border-color: rgba(150, 150, 150, 0.5);
+            cursor: not-allowed;
+        }
+
+        /* 切换武器按钮 (移动端) */
+        #switch-btn {
+            position: absolute;
+            bottom: 20px;
+            left: calc(50% + 60px); /* 位于技能按钮右侧 */
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255, 165, 0, 0.6);
+            border: 4px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            font-weight: bold;
+            font-size: 10px;
+            display: none; /* 默认隐藏，移动端显示 */
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            z-index: 90;
+            text-align: center;
+            touch-action: manipulation;
+        }
+        
+        /* 暂停/设置按钮 (齿轮) */
+        #pause-btn {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            color: white;
+            font-size: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 95;
+            user-select: none;
+            touch-action: manipulation;
+        }
+        #pause-btn:active { background: rgba(255, 255, 255, 0.2); }
+        
+        /* 强制横屏提示 (竖屏时显示) */
+        #orientation-warning {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            color: white;
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+        }
+        @media screen and (orientation: portrait) {
+            #orientation-warning { display: flex !important; }
+        }
+    </style>
+</head>
+<body>
+    <div id="orientation-warning">
+        <h1>Please Rotate Your Device ↻</h1>
+        <p>Landscape mode is required for best experience</p>
+    </div>
+
+    <!-- 暂停/设置按钮 -->
+    <div id="pause-btn">⚙️</div>
+
+    <div id="ui">
+        <h1>Unified Shooter</h1>
+        <p id="control-hint">Detecting input method...</p>
+        <h2 id="score">Score: 0</h2>
+        <div id="weapon-display" style="font-size: 16px; color: yellow; margin-top: 5px; font-weight: bold;">WEAPON: PISTOL</div>
+        <div id="fever-display" style="font-size: 20px; color: #ff00ff; margin-top: 5px; font-weight: bold; display: none; text-shadow: 0 0 5px white;">FEVER TIME!</div>
+        <p style="font-size: 14px; color: #aaa;">Click Gear or Press P to Pause | Press SPACE for Skill | 1-5 Switch Weapon</p>
+    </div>
+
+    <!-- 迷你地图 -->
+    <canvas id="minimap"></canvas>
+
+    <!-- 技能按钮 -->
+    <div id="skill-btn">BOOM!</div>
+    <!-- 切换武器按钮 -->
+    <div id="switch-btn">SWITCH<br>GUN</div>
+
+    <!-- 暂停/设置菜单 -->
+    <div id="pause-menu">
+        <h2>PAUSED</h2>
+        
+        <div class="setting-group">
+            <label>Brush Color (角色颜色)</label>
+            <div id="custom-color-palette" class="color-palette">
+                <!-- JS 会自动填充颜色块 -->
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <label>Brush Size (角色大小): <span id="size-val">15</span></label>
+            <input type="range" id="setting-size" min="10" max="40" value="15">
+        </div>
+
+        <div class="setting-group">
+            <label>Opacity (轨迹浓度): <span id="alpha-val">5%</span></label>
+            <input type="range" id="setting-alpha" min="1" max="50" value="5">
+        </div>
+
+        <button id="resume-btn" style="width: 100%; background: #2196F3;">Resume Game</button>
+    </div>
+
+    <!-- 结果展示弹窗 -->
+    <div id="result-modal">
+        <h2>Your Game Trail</h2>
+        <p>This is the unique art you created!</p>
+        <img id="result-img" alt="Game Trail">
+        <br>
+        <button id="download-btn">Save Image</button>
+        <button id="restart-btn">Play Again</button>
+    </div>
+
+    <!-- 移动端摇杆提示 -->
+    <div id="left-hint" class="joystick-hint">MOVE</div>
+    <div id="right-hint" class="joystick-hint">SHOOT</div>
+
+    <!-- 两个 Canvas：底层画轨迹，顶层画游戏 -->
+    <canvas id="trailCanvas"></canvas>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const trailCanvas = document.getElementById('trailCanvas');
+        const trailCtx = trailCanvas.getContext('2d');
+        
+        const scoreEl = document.getElementById('score');
+        const hintEl = document.getElementById('control-hint');
+        const colorInput = document.getElementById('player-color');
+        
+        const resultModal = document.getElementById('result-modal');
+        const resultImg = document.getElementById('result-img');
+        const downloadBtn = document.getElementById('download-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        // === 新增：UI 元素 ===
+        const pauseMenu = document.getElementById('pause-menu');
+        const customColorPalette = document.getElementById('custom-color-palette');
+        const settingSize = document.getElementById('setting-size');
+        const settingAlpha = document.getElementById('setting-alpha');
+        const sizeVal = document.getElementById('size-val');
+        const alphaVal = document.getElementById('alpha-val');
+        const resumeBtn = document.getElementById('resume-btn');
+        const minimapCanvas = document.getElementById('minimap');
+        const minimapCtx = minimapCanvas.getContext('2d');
+        const skillBtn = document.getElementById('skill-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const weaponDisplay = document.getElementById('weapon-display');
+        const feverDisplay = document.getElementById('fever-display');
+        const switchBtn = document.getElementById('switch-btn');
+
+        const leftHint = document.getElementById('left-hint');
+        const rightHint = document.getElementById('right-hint');
+
+        // === 音频系统 (AudioContext) ===
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        // 简单的合成音效函数
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'shoot') {
+                // 射击：高频短促的衰减音 (类似激光)
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'hit') {
+                // 击中：低频噪音 (模拟爆炸/撞击)
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'boom') {
+                // 自爆：强烈的低频轰鸣
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+            }
+        }
+
+        // === 设备检测 ===
+        let isMobile = false;
+        // 简单的UA检测 + 触摸能力检测
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 'ontouchstart' in window) {
+            isMobile = true;
+            hintEl.innerText = "Mobile Mode: Left Stick to Move | Right Stick to Aim";
+            leftHint.style.display = 'flex';
+            rightHint.style.display = 'flex';
+            switchBtn.style.display = 'flex'; // 显示切换按钮
+        } else {
+            hintEl.innerText = "Desktop Mode: WASD to Move | Mouse to Aim | Click to Shoot";
+        }
+
+        // === 地图与摄像机系统 ===
+        const MAP_SIZE = 3000; // 超大地图
+        const camera = { x: 0, y: 0 };
+        
+        // === 适配与初始化 ===
+        const dpr = window.devicePixelRatio || 1;
+        let viewWidth, viewHeight;
+        
+        function resize() {
+            viewWidth = window.innerWidth;
+            viewHeight = window.innerHeight;
+            
+            canvas.width = viewWidth * dpr;
+            canvas.height = viewHeight * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = viewWidth + 'px';
+            canvas.style.height = viewHeight + 'px';
+
+            // 轨迹画布大小 = 整个大地图大小 (离屏绘制)
+            // 注意：如果地图太大，可能需要分块，这里 3000 还好
+            trailCanvas.width = MAP_SIZE * dpr;
+            trailCanvas.height = MAP_SIZE * dpr;
+            trailCtx.scale(dpr, dpr);
+            // trailCanvas 不再通过 style 显示，而是作为离屏 Canvas
+            trailCanvas.style.display = 'none';
+
+            // 迷你地图
+            minimapCanvas.width = 150 * dpr;
+            minimapCanvas.height = 150 * dpr;
+            minimapCtx.scale(dpr, dpr);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // === 游戏设置 (从暂停菜单控制) ===
+        const settings = {
+            color: '#ffffff',
+            size: 15,
+            alpha: 0.05
+        };
+
+        // 绑定设置事件
+        // 初始化颜色盘
+        const colors = [
+            '#ffffff', '#ff0000', '#00ff00', '#0000ff', 
+            '#ffff00', '#ff00ff', '#00ffff', '#ffa500',
+            '#000000' // 新增黑色
+        ];
+        
+        colors.forEach(color => {
+            const swatch = document.createElement('div');
+            swatch.className = 'color-swatch';
+            swatch.style.backgroundColor = color;
+            swatch.dataset.color = color;
+            
+            if (color === settings.color) swatch.classList.add('active');
+            
+            swatch.addEventListener('click', (e) => {
+                // 更新设置
+                settings.color = color;
+                player.color = color;
+                player.baseColor = color; // 更新基础颜色
+                
+                // 更新 UI 选中状态
+                document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+                swatch.classList.add('active');
+            });
+            
+            // 防止触摸穿透
+            swatch.addEventListener('touchend', (e) => {
+                e.stopPropagation(); // 阻止冒泡，防止触发恢复游戏
+            });
+            
+            customColorPalette.appendChild(swatch);
+        });
+
+        settingSize.addEventListener('input', (e) => {
+            const v = parseInt(e.target.value);
+            settings.size = v;
+            player.radius = v;
+            sizeVal.innerText = v;
+        });
+        settingAlpha.addEventListener('input', (e) => {
+            const v = parseInt(e.target.value);
+            settings.alpha = v / 100;
+            alphaVal.innerText = v + '%';
+        });
+        resumeBtn.onclick = togglePause;
+
+        // === 游戏状态 ===
+        const STATE = {
+            MENU: 0,
+            PLAYING: 1,
+            GAMEOVER: 2,
+            RESULT: 3,
+            PAUSED: 4 // 新增暂停状态
+        };
+        
+        // === 武器系统 ===
+        const WEAPONS = [
+            { name: "Pistol (Brush)", id: 0, fireRate: 15, speed: 10, damage: 10, count: 1, spread: 0, color: 'yellow', radius: 5, type: 'standard' },
+            { name: "Shotgun (Spray)", id: 1, fireRate: 60, speed: 12, damage: 8, count: 8, spread: 0.4, color: 'orange', radius: 3, type: 'shotgun' },
+            { name: "Sniper (Pen)", id: 2, fireRate: 80, speed: 25, damage: 50, count: 1, spread: 0, color: 'cyan', radius: 2, type: 'sniper' },
+            { name: "Rocket (Bucket)", id: 3, fireRate: 120, speed: 8, damage: 0, count: 1, spread: 0, color: 'red', radius: 8, type: 'rocket' },
+            { name: "Vortex (Blender)", id: 4, fireRate: 300, speed: 6, damage: 0, count: 1, spread: 0, color: '#9900ff', radius: 10, type: 'gravity' }
+        ];
+
+        let currentState = STATE.MENU;
+        let score = 0;
+
+        // === 玩家对象 ===
+        const player = {
+            x: MAP_SIZE / 2, // 出生在地图中心
+            y: MAP_SIZE / 2,
+            radius: settings.size,
+            color: settings.color,
+            baseColor: settings.color, // 保存原始颜色
+            speed: isMobile ? 4 : 5,
+            angle: 0,
+            weaponIndex: 0,
+            weaponCooldown: 0,
+            
+            // Fever 系统
+            comboCount: 0,
+            comboTimer: 0,
+            isFever: false,
+            feverTimer: 0
+        };
+        
+        function addCombo() {
+            player.comboCount++;
+            player.comboTimer = 180; // 3秒连击判定时间
+            
+            if (player.comboCount >= 100 && !player.isFever) {
+                startFever();
+            }
+        }
+        
+        function startFever() {
+            player.isFever = true;
+            player.feverTimer = 600; // 10秒狂热时间
+            player.comboCount = 0;
+            feverDisplay.style.display = 'block';
+            playSound('boom'); // 提示音
+        }
+        
+        function endFever() {
+            player.isFever = false;
+            player.color = player.baseColor; // 恢复颜色
+            feverDisplay.style.display = 'none';
+        }
+
+        function switchWeapon(index) {
+            if (index < 0 || index >= WEAPONS.length) return;
+            player.weaponIndex = index;
+            // 切换武器时，重置冷却时间，但为了防止利用切换武器来取消后摇，
+            // 我们可以设置一个极短的公共CD，或者直接重置为0（更爽快）
+            // 考虑到 5号武器 CD 很长，如果切到 4号 还要等 5号的CD确实不合理
+            // 这里我们直接重置为 20 (稍微一点点延迟，防止瞬间连发)
+            player.weaponCooldown = 20; 
+            
+            const w = WEAPONS[index];
+            weaponDisplay.innerText = `WEAPON: ${w.name.toUpperCase()}`;
+            weaponDisplay.style.color = w.color;
+        }
+
+        function togglePause() {
+            if (currentState === STATE.PLAYING) {
+                currentState = STATE.PAUSED;
+                pauseMenu.style.display = 'block';
+                // 同步当前设置到 UI
+                // settingColor.value = player.color; // 已移除
+                
+                // 更新颜色选中状态
+                document.querySelectorAll('.color-swatch').forEach(s => {
+                    if (s.dataset.color === player.color) s.classList.add('active');
+                    else s.classList.remove('active');
+                });
+
+                settingSize.value = player.radius;
+                settingAlpha.value = Math.round(settings.alpha * 100);
+            } else if (currentState === STATE.PAUSED) {
+                currentState = STATE.PLAYING;
+                pauseMenu.style.display = 'none';
+            }
+        }
+
+        // 绑定暂停按钮点击
+        pauseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            togglePause();
+        });
+        // 兼容移动端触摸
+        pauseBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            togglePause();
+        });
+
+        // 移除旧的双击暂停逻辑
+        /*
+        let lastTap = 0;
+        document.addEventListener('touchend', (e) => {
+            // ...
+        });
+        */
+
+        // === 结果处理 ===
+        function showResult() {
+            currentState = STATE.RESULT;
+            
+            // 生成完整地图的截图会很大，我们只截取有内容的区域或者缩放
+            // 这里为了演示，直接生成整个大地图的缩略图
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            // 生成 800x800 的缩略图
+            tempCanvas.width = 800;
+            tempCanvas.height = 800;
+            
+            // 绘制黑色背景
+            tempCtx.fillStyle = '#222';
+            tempCtx.fillRect(0,0,800,800);
+            
+            // 把大地图绘制上去 (缩放)
+            tempCtx.drawImage(trailCanvas, 0, 0, MAP_SIZE*dpr, MAP_SIZE*dpr, 0, 0, 800, 800);
+            
+            const dataURL = tempCanvas.toDataURL('image/png');
+            resultImg.src = dataURL;
+            
+            resultModal.style.display = 'block';
+            document.getElementById('ui').style.display = 'none';
+            minimapCanvas.style.display = 'none';
+            
+            downloadBtn.onclick = () => {
+                const a = document.createElement('a');
+                a.href = dataURL;
+                a.download = `shooter-art-${Date.now()}.png`;
+                a.click();
+            };
+            
+            restartBtn.onclick = () => {
+                resultModal.style.display = 'none';
+                document.getElementById('ui').style.display = 'block';
+                minimapCanvas.style.display = 'block';
+                resetGame();
+            };
+        }
+
+        // === 输入状态管理 ===
+        // PC端输入
+        const keys = { w: false, a: false, s: false, d: false };
+        const mouse = { x: viewWidth / 2, y: viewHeight / 2 };
+        
+        // 移动端输入 (虚拟摇杆)
+        const joystickLeft = {
+            active: false,
+            originX: 0, originY: 0,
+            currentX: 0, currentY: 0,
+            dx: 0, dy: 0,
+            id: -1
+        };
+        const joystickRight = {
+            active: false,
+            originX: 0, originY: 0,
+            currentX: 0, currentY: 0,
+            dx: 0, dy: 0,
+            angle: 0,
+            id: -1
+        };
+
+        let shootTimer = 0; // 用于移动端自动连发
+        
+        // === 技能系统 ===
+        let skillCooldown = 0;
+        const SKILL_COOLDOWN_TIME = 300; // 5秒 (60fps)
+
+        function useSkill() {
+            if (skillCooldown > 0 || currentState !== STATE.PLAYING) return;
+            
+            skillCooldown = SKILL_COOLDOWN_TIME;
+            skillBtn.classList.add('cooldown');
+            skillBtn.innerText = '5.0';
+            
+            playSound('boom');
+
+            // 1. 画布上的颜料喷溅效果
+            // 随机生成 20-30 个颜料点，模拟泼墨
+            const splatterCount = 20 + Math.random() * 10;
+            for (let i = 0; i < splatterCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * 150; // 爆炸半径 150
+                const size = 5 + Math.random() * 20;
+                
+                const sx = player.x + Math.cos(angle) * dist;
+                const sy = player.y + Math.sin(angle) * dist;
+
+                trailCtx.beginPath();
+                trailCtx.arc(sx, sy, size, 0, Math.PI * 2);
+                trailCtx.fillStyle = player.color;
+                trailCtx.globalAlpha = 0.8; // 浓墨重彩
+                trailCtx.fill();
+                
+                // 连线到中心，模拟飞溅痕迹
+                trailCtx.beginPath();
+                trailCtx.moveTo(player.x, player.y);
+                trailCtx.lineTo(sx, sy);
+                trailCtx.strokeStyle = player.color;
+                trailCtx.lineWidth = size / 2;
+                trailCtx.stroke();
+            }
+            
+            // 2. 范围伤害逻辑
+            // 清除周围 200 范围内的所有敌人
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                const dist = Math.hypot(player.x - e.x, player.y - e.y);
+                if (dist < 200) {
+                    // 产生大量粒子
+                    for (let k = 0; k < 15; k++) {
+                        particles.push({
+                            x: e.x, y: e.y, radius: Math.random()*5, color: e.color,
+                            velocity: {x:(Math.random()-0.5)*15, y:(Math.random()-0.5)*15}, alpha: 1
+                        });
+                    }
+                    
+                    // 技能击杀：留下血迹
+                    drawBlood(e.x, e.y, e.color);
+                    drawBlood(e.x + 5, e.y - 5, e.color);
+
+                    enemies.splice(i, 1);
+                    score += 50; // 技能杀敌分更高
+                }
+            }
+            scoreEl.innerText = `Score: ${score}`;
+            
+            // 3. 屏幕震动效果 (通过移动摄像机模拟)
+        const shake = setInterval(() => {
+            camera.x += (Math.random() - 0.5) * 20;
+            camera.y += (Math.random() - 0.5) * 20;
+        }, 16);
+        setTimeout(() => clearInterval(shake), 200);
+    }
+
+    // === 新增：绘制血迹函数 ===
+    function drawBlood(x, y, color) {
+        // 随机生成 5-10 个不规则的圆形，模拟一滩血迹
+        const drops = 5 + Math.random() * 5;
+        trailCtx.fillStyle = color;
+        trailCtx.globalAlpha = 0.6; // 半透明，方便叠加
+        
+        for(let i=0; i<drops; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * 25; // 分散范围 (由 15 -> 25)
+            const radius = 5 + Math.random() * 12; // 血滴大小 (由 2-10 -> 5-17)
+            
+            trailCtx.beginPath();
+            trailCtx.arc(x + Math.cos(angle)*dist, y + Math.sin(angle)*dist, radius, 0, Math.PI*2);
+            trailCtx.fill();
+        }
+    }
+
+    // 绑定技能按钮点击 (移动端/鼠标)
+        skillBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation(); // 防止触发射击
+            useSkill();
+        });
+        
+        // 绑定切换武器按钮
+        const handleSwitch = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            let next = (player.weaponIndex + 1) % WEAPONS.length;
+            switchWeapon(next);
+        };
+        switchBtn.addEventListener('touchstart', handleSwitch);
+        switchBtn.addEventListener('mousedown', handleSwitch);
+
+        skillBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            useSkill();
+        });
+
+        // === 游戏对象容器 ===
+        let bullets = [];
+        let enemies = [];
+        let particles = [];
+
+        // === 事件监听 (统一处理) ===
+
+        // 1. PC 键盘鼠标
+        if (!isMobile) {
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'w' || e.key === 'W') keys.w = true;
+                if (e.key === 'a' || e.key === 'A') keys.a = true;
+                if (e.key === 's' || e.key === 'S') keys.s = true;
+                if (e.key === 'd' || e.key === 'D') keys.d = true;
+                
+                // P键暂停
+                if (e.key === 'p' || e.key === 'P') togglePause();
+                
+                // 切换武器
+                if (e.key === '1') switchWeapon(0);
+                if (e.key === '2') switchWeapon(1);
+                if (e.key === '3') switchWeapon(2);
+                if (e.key === '4') switchWeapon(3);
+                if (e.key === '5') switchWeapon(4); // 修复：添加5号武器切换
+
+                // 空格键放技能
+                if (e.code === 'Space') {
+                    if (currentState === STATE.GAMEOVER) showResult();
+                    else if (currentState === STATE.PLAYING) useSkill();
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (e.key === 'w' || e.key === 'W') keys.w = false;
+                if (e.key === 'a' || e.key === 'A') keys.a = false;
+                if (e.key === 's' || e.key === 'S') keys.s = false;
+                if (e.key === 'd' || e.key === 'D') keys.d = false;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+            });
+
+            window.addEventListener('mousedown', () => {
+                if (currentState === STATE.MENU) {
+                    resetGame();
+                } else if (currentState === STATE.PLAYING) {
+                    // 修正：使用当前计算好的 player.angle 发射
+                    shoot(player.angle);
+                } else if (currentState === STATE.GAMEOVER) {
+                    showResult();
+                }
+            });
+        }
+
+        // 2. 移动端触摸 (双摇杆)
+        if (isMobile) {
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (currentState === STATE.MENU) {
+                    resetGame();
+                    return;
+                }
+                if (currentState === STATE.GAMEOVER) {
+                    showResult();
+                    return;
+                }
+                if (currentState !== STATE.PLAYING) return;
+
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    // 左半屏移动
+                    if (t.clientX < viewWidth / 2) {
+                        if (!joystickLeft.active) {
+                            joystickLeft.active = true;
+                            joystickLeft.id = t.identifier;
+                            joystickLeft.originX = t.clientX;
+                            joystickLeft.originY = t.clientY;
+                            joystickLeft.currentX = t.clientX;
+                            joystickLeft.currentY = t.clientY;
+                            joystickLeft.dx = 0; joystickLeft.dy = 0;
+                        }
+                    } 
+                    // 右半屏射击
+                    else {
+                        if (!joystickRight.active) {
+                            joystickRight.active = true;
+                            joystickRight.id = t.identifier;
+                            joystickRight.originX = t.clientX;
+                            joystickRight.originY = t.clientY;
+                            joystickRight.currentX = t.clientX;
+                            joystickRight.currentY = t.clientY;
+                        }
+                    }
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (currentState !== STATE.PLAYING) return;
+                
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    
+                    if (t.identifier === joystickLeft.id) {
+                        joystickLeft.currentX = t.clientX;
+                        joystickLeft.currentY = t.clientY;
+                        const dx = t.clientX - joystickLeft.originX;
+                        const dy = t.clientY - joystickLeft.originY;
+                        const dist = Math.hypot(dx, dy);
+                        const maxDist = 50;
+                        if (dist > 0) {
+                            const scale = Math.min(dist, maxDist) / maxDist;
+                            joystickLeft.dx = (dx / dist) * scale;
+                            joystickLeft.dy = (dy / dist) * scale;
+                        }
+                    }
+
+                    if (t.identifier === joystickRight.id) {
+                        joystickRight.currentX = t.clientX;
+                        joystickRight.currentY = t.clientY;
+                        const dx = t.clientX - joystickRight.originX;
+                        const dy = t.clientY - joystickRight.originY;
+                        joystickRight.angle = Math.atan2(dy, dx);
+                    }
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    if (t.identifier === joystickLeft.id) {
+                        joystickLeft.active = false;
+                        joystickLeft.dx = 0; joystickLeft.dy = 0;
+                    }
+                    if (t.identifier === joystickRight.id) {
+                        joystickRight.active = false;
+                    }
+                }
+            });
+        }
+
+        // === 游戏逻辑 ===
+
+        function resetGame() {
+            player.x = MAP_SIZE / 2;
+            player.y = MAP_SIZE / 2;
+            bullets = [];
+            enemies = [];
+            particles = [];
+            score = 0;
+            scoreEl.innerText = 'Score: 0';
+            
+            // 重置游戏时，清空轨迹画布
+            trailCtx.clearRect(0, 0, MAP_SIZE * dpr, MAP_SIZE * dpr);
+            
+            currentState = STATE.PLAYING;
+            
+            if (window.spawnInterval) clearInterval(window.spawnInterval);
+            startSpawning();
+        }
+
+        function shoot(angle) {
+            if (player.weaponCooldown > 0) return;
+            
+            const w = WEAPONS[player.weaponIndex];
+            player.weaponCooldown = w.fireRate;
+            
+            playSound(w.type === 'rocket' ? 'hit' : 'shoot'); 
+
+            // 狙击枪：瞬发射线，穿透所有敌人
+            if (w.type === 'sniper') {
+                const endX = player.x + Math.cos(angle) * MAP_SIZE; // 射程无限(地图尽头)
+                const endY = player.y + Math.sin(angle) * MAP_SIZE;
+
+                // 绘制射线 (在轨迹层)
+                trailCtx.beginPath();
+                trailCtx.moveTo(player.x, player.y);
+                trailCtx.lineTo(endX, endY);
+                trailCtx.strokeStyle = player.color; // 狙击枪颜色跟随玩家
+                trailCtx.lineWidth = 1; // 极细的线
+                trailCtx.globalAlpha = 0.5;
+                trailCtx.stroke();
+                trailCtx.globalAlpha = 1.0; // 恢复
+                
+                // 瞬间渲染一帧亮线在游戏层 (通过添加一个临时粒子或特效对象来实现，或者直接在这里画)
+                // 为了简单，我们添加一个特殊的“射线”对象到 particles 数组，只存活一帧
+                particles.push({
+                    type: 'beam',
+                    sx: player.x, sy: player.y,
+                    ex: endX, ey: endY,
+                    alpha: 1,
+                    color: 'white'
+                });
+
+                // 穿透检测
+                // 计算点到线段的距离
+                for (let i = enemies.length - 1; i >= 0; i--) {
+                    const e = enemies[i];
+                    if (e.dead) continue;
+
+                    // 向量计算距离
+                    const dx = endX - player.x;
+                    const dy = endY - player.y;
+                    const t = ((e.x - player.x) * dx + (e.y - player.y) * dy) / (dx * dx + dy * dy);
+                    
+                    // 只有在射线前方的敌人才会受伤
+                    if (t >= 0 && t <= 1) {
+                        const closestX = player.x + t * dx;
+                        const closestY = player.y + t * dy;
+                        const dist = Math.hypot(e.x - closestX, e.y - closestY);
+                        
+                        if (dist < e.radius + 5) { // 稍微宽一点的判定
+                            e.radius -= w.damage;
+                            playSound('hit');
+                            
+                            // 粒子
+                            for (let k = 0; k < 5; k++) {
+                                particles.push({
+                                    x: e.x, y: e.y, radius: Math.random()*3, color: e.color,
+                                    velocity: {x:(Math.random()-0.5)*10, y:(Math.random()-0.5)*10}, alpha: 1
+                                });
+                            }
+
+                            if (e.radius <= 5) {
+                                e.dead = true;
+                                addCombo(); // 连击
+                                score += 20;
+                                // 狙击枪是普通武器，不留痕迹
+                            } else {
+                                score += 10;
+                            }
+                        }
+                    }
+                }
+                scoreEl.innerText = `Score: ${score}`;
+                return; // 狙击枪不生成实体子弹
+            }
+
+            for(let i=0; i<w.count; i++) {
+                const spread = (Math.random() - 0.5) * w.spread;
+                const finalAngle = angle + spread;
+                const velocity = {
+                    x: Math.cos(finalAngle) * w.speed,
+                    y: Math.sin(finalAngle) * w.speed
+                };
+                
+                // 黑洞子弹特殊处理
+                let bColor = w.color;
+                if (w.type === 'rocket') bColor = player.color;
+                if (w.type === 'gravity') bColor = 'white';
+
+                bullets.push({
+                    x: player.x,
+                    y: player.y,
+                    radius: w.radius,
+                    color: w.type === 'shotgun' ? player.color : bColor, // 散弹枪颜色跟随玩家
+                    velocity: velocity,
+                    type: w.type,
+                    damage: w.damage,
+                    life: w.type === 'gravity' ? 120 : (w.type === 'shotgun' ? 30 : 0) // 散弹只有30帧寿命(短射程)，黑洞120帧
+                });
+            }
+        }
+
+        function createBlackHole(x, y) {
+            // 添加一个黑洞粒子到 particles 数组，或者单独的数组
+            // 这里我们用 particles，给个特殊类型
+            particles.push({
+                type: 'blackhole',
+                x: x, y: y,
+                radius: 5,
+                maxRadius: 150, // 吸附范围
+                duration: 180, // 3秒
+                alpha: 1,
+                color: '#9900ff'
+            });
+            playSound('boom'); // 暂时用boom音效
+        }
+
+        function explode(x, y, radius, color) {
+            playSound('boom');
+            // 爆炸残留颜料 (模拟油漆桶)
+            const splatterCount = 10 + Math.random() * 5;
+            for (let i = 0; i < splatterCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * radius * 0.8; 
+                const size = 5 + Math.random() * 10;
+                
+                const sx = x + Math.cos(angle) * dist;
+                const sy = y + Math.sin(angle) * dist;
+
+                trailCtx.beginPath();
+                trailCtx.arc(sx, sy, size, 0, Math.PI * 2);
+                trailCtx.fillStyle = color; 
+                trailCtx.globalAlpha = 0.8; 
+                trailCtx.fill();
+            }
+
+            // 范围伤害
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                const dist = Math.hypot(x - e.x, y - e.y);
+                if (dist < radius + e.radius) {
+                    // 爆炸粒子
+                    for (let k = 0; k < 10; k++) {
+                        particles.push({
+                            x: e.x, y: e.y, radius: Math.random()*4, color: e.color,
+                            velocity: {x:(Math.random()-0.5)*10, y:(Math.random()-0.5)*10}, alpha: 1
+                        });
+                    }
+                    
+                    // 只有爆炸会导致敌人留下血迹/痕迹
+                    drawBlood(e.x, e.y, e.color);
+
+                    e.dead = true;
+                    addCombo(); // 连击
+                    score += 20;
+                }
+            }
+            scoreEl.innerText = `Score: ${score}`;
+            
+            // 震动
+             const shake = setInterval(() => {
+                camera.x += (Math.random() - 0.5) * 5;
+                camera.y += (Math.random() - 0.5) * 5;
+            }, 16);
+            setTimeout(() => clearInterval(shake), 100);
+        }
+
+        function startSpawning() {
+            window.spawnInterval = setInterval(() => {
+                if (currentState !== STATE.PLAYING) return;
+
+                const radius = 20 + Math.random() * 20;
+                let x, y;
+                // 敌人生成逻辑改为：在玩家周围生成，而不是地图边缘
+                // 生成在玩家视野外 (viewWidth/2 + padding)
+                const spawnDist = Math.max(viewWidth, viewHeight) / 2 + 100;
+                const spawnAngle = Math.random() * Math.PI * 2;
+                
+                x = player.x + Math.cos(spawnAngle) * spawnDist;
+                y = player.y + Math.sin(spawnAngle) * spawnDist;
+                
+                // 限制在地图内
+                x = Math.max(radius, Math.min(MAP_SIZE - radius, x));
+                y = Math.max(radius, Math.min(MAP_SIZE - radius, y));
+
+                // 10% 概率生成“橡皮擦”敌人
+                const isEraser = Math.random() < 0.1;
+                let color, speed, hp, type;
+                
+                if (isEraser) {
+                    color = '#ffffff'; // 白色橡皮擦
+                    speed = 2 + Math.random(); // 稍微快一点
+                    hp = 50; // 血厚一点
+                    type = 'eraser';
+                } else {
+                    color = `hsl(${Math.random() * 360}, 50%, 50%)`;
+                    speed = 1 + Math.random();
+                    hp = 10;
+                    type = 'normal';
+                }
+
+                const angle = Math.atan2(player.y - y, player.x - x);
+                const velocity = {
+                    x: Math.cos(angle),
+                    y: Math.sin(angle)
+                };
+
+                enemies.push({
+                    x, y, radius: isEraser ? 25 : radius, // 橡皮擦稍大
+                    color, velocity,
+                    speed,
+                    hp,
+                    maxHp: hp,
+                    type
+                });
+            }, 1000);
+        }
+
+        function update() {
+            if (currentState !== STATE.PLAYING) return;
+
+            // 0. 更新技能冷却
+            if (skillCooldown > 0) {
+                skillCooldown--;
+                skillBtn.innerText = (skillCooldown / 60).toFixed(1);
+                if (skillCooldown <= 0) {
+                    skillBtn.classList.remove('cooldown');
+                    skillBtn.innerText = 'BOOM!';
+                }
+            }
+
+            // 0.1 更新武器冷却
+            // Fever模式下冷却速度翻倍
+            const cooldownSpeed = player.isFever ? 2 : 1;
+            if (player.weaponCooldown > 0) player.weaponCooldown -= cooldownSpeed;
+
+            // 0.2 Fever 逻辑
+            if (player.isFever) {
+                player.feverTimer--;
+                feverDisplay.innerText = `FEVER TIME! ${(player.feverTimer/60).toFixed(1)}s`;
+                // 彩虹色
+                const hue = (Date.now() / 10) % 360;
+                player.color = `hsl(${hue}, 100%, 50%)`;
+                
+                if (player.feverTimer <= 0) {
+                    endFever();
+                }
+            } else {
+                if (player.comboTimer > 0) {
+                    player.comboTimer--;
+                    if (player.comboTimer <= 0) player.comboCount = 0;
+                }
+            }
+
+            // 1. 玩家移动逻辑 (统一处理)
+            const prevX = player.x;
+            const prevY = player.y;
+
+            if (isMobile) {
+                // 移动端：摇杆控制
+                if (joystickLeft.active) {
+                    player.x += joystickLeft.dx * player.speed;
+                    player.y += joystickLeft.dy * player.speed;
+                }
+                // 移动端：瞄准 & 自动射击
+                if (joystickRight.active) {
+                    player.angle = joystickRight.angle;
+                    shootTimer++;
+                    if (shootTimer > 8) { // 射速控制
+                        shootTimer = 0;
+                        shoot(player.angle);
+                    }
+                } else {
+                    shootTimer = 0;
+                }
+            } else {
+                // PC端：键盘控制
+                if (keys.w) player.y -= player.speed;
+                if (keys.s) player.y += player.speed;
+                if (keys.a) player.x -= player.speed;
+                if (keys.d) player.x += player.speed;
+                
+                // PC端：鼠标瞄准
+                // 修正：现在有了摄像机，鼠标在屏幕上的位置 + 摄像机位置 = 游戏世界位置
+                // 但是玩家也被摄像机平移了，所以这里有两种算法：
+                // 1. 世界坐标减法：(mouseX + camX) - playerX
+                // 2. 屏幕坐标减法：mouseX - (playerX - camX)
+                // 由于 playerX - camX 实际上就是玩家在屏幕上的位置
+                // 而我们让玩家大概在屏幕中心，所以：
+                const screenPlayerX = player.x - camera.x;
+                const screenPlayerY = player.y - camera.y;
+                player.angle = Math.atan2(mouse.y - screenPlayerY, mouse.x - screenPlayerX);
+            }
+
+            // 限制边界
+            player.x = Math.max(player.radius, Math.min(MAP_SIZE - player.radius, player.x));
+            player.y = Math.max(player.radius, Math.min(MAP_SIZE - player.radius, player.y));
+
+            // === 摄像机跟随 ===
+            // 目标位置：让玩家保持在屏幕中心
+            // camera.x = player.x - viewWidth / 2;
+            // camera.y = player.y - viewHeight / 2;
+            
+            // 增加平滑跟随 (Lerp)
+            const targetCamX = player.x - viewWidth / 2;
+            const targetCamY = player.y - viewHeight / 2;
+            camera.x += (targetCamX - camera.x) * 0.1;
+            camera.y += (targetCamY - camera.y) * 0.1;
+
+            // 限制摄像机不超出地图边界
+            camera.x = Math.max(0, Math.min(MAP_SIZE - viewWidth, camera.x));
+            camera.y = Math.max(0, Math.min(MAP_SIZE - viewHeight, camera.y));
+
+            // === 绘制轨迹 ===
+            // 只有当玩家实际移动时才绘制
+            if (Math.abs(player.x - prevX) > 0.1 || Math.abs(player.y - prevY) > 0.1) {
+                trailCtx.beginPath();
+                trailCtx.strokeStyle = player.color;
+                trailCtx.lineWidth = player.radius * 2;
+                trailCtx.lineCap = 'round';
+                trailCtx.globalAlpha = settings.alpha; // 使用设置的透明度
+                trailCtx.moveTo(prevX, prevY);
+                trailCtx.lineTo(player.x, player.y);
+                trailCtx.stroke();
+            }
+
+            // 2. 子弹更新
+            bullets.forEach((b, i) => {
+                b.x += b.velocity.x;
+                b.y += b.velocity.y;
+                
+                // 火箭筒撞墙爆炸
+                if (b.type === 'rocket' && (b.x <= 0 || b.x >= MAP_SIZE || b.y <= 0 || b.y >= MAP_SIZE)) {
+                     explode(b.x, b.y, 100, b.color);
+                     setTimeout(() => bullets.splice(i, 1), 0);
+                     return;
+                }
+                
+                // 散弹枪喷涂效果 & 射程限制
+                if (b.type === 'shotgun') {
+                    b.life--;
+                    if (b.life <= 0) {
+                        setTimeout(() => bullets.splice(i, 1), 0);
+                        return;
+                    }
+
+                    // 每一帧都有 20% 的概率在画布上留下一点颜料
+                    if (Math.random() < 0.2) {
+                        trailCtx.beginPath();
+                        trailCtx.arc(b.x, b.y, b.radius + Math.random()*2, 0, Math.PI * 2);
+                        // 使用子弹的颜色（玩家颜色），但非常淡，模拟喷雾
+                        trailCtx.fillStyle = player.color; 
+                        trailCtx.globalAlpha = 0.1; 
+                        trailCtx.fill();
+                        trailCtx.globalAlpha = 1.0; // 恢复
+                    }
+                }
+                
+                // 黑洞子弹飞行一段距离后展开
+                if (b.type === 'gravity') {
+                    b.life--;
+                    // 速度递减，停下来
+                    b.velocity.x *= 0.95;
+                    b.velocity.y *= 0.95;
+                    if (b.life <= 0 || (Math.abs(b.velocity.x) < 0.1 && Math.abs(b.velocity.y) < 0.1)) {
+                        createBlackHole(b.x, b.y);
+                        setTimeout(() => bullets.splice(i, 1), 0);
+                        return;
+                    }
+                }
+
+                if (b.x < 0 || b.x > MAP_SIZE || b.y < 0 || b.y > MAP_SIZE) setTimeout(() => bullets.splice(i, 1), 0);
+            });
+
+            // 3. 敌人更新 & 碰撞
+            for (let i = 0; i < enemies.length; i++) {
+                const e = enemies[i];
+                if (e.dead) continue;
+
+                const angle = Math.atan2(player.y - e.y, player.x - e.x);
+                e.velocity.x = Math.cos(angle) * e.speed;
+                e.velocity.y = Math.sin(angle) * e.speed;
+                e.x += e.velocity.x;
+                e.y += e.velocity.y;
+
+                // 橡皮擦功能：擦除路径上的颜料
+                if (e.type === 'eraser') {
+                    trailCtx.save();
+                    trailCtx.globalCompositeOperation = 'destination-out';
+                    trailCtx.beginPath();
+                    trailCtx.arc(e.x, e.y, e.radius + 10, 0, Math.PI * 2);
+                    trailCtx.fillStyle = 'rgba(0,0,0,1)';
+                    trailCtx.fill();
+                    trailCtx.restore();
+                }
+
+                // 撞玩家
+                if (Math.hypot(player.x - e.x, player.y - e.y) - e.radius - player.radius < 1) {
+                    currentState = STATE.GAMEOVER;
+                }
+
+                // 被子弹打
+                for (let bi = bullets.length - 1; bi >= 0; bi--) {
+                    const b = bullets[bi];
+                    if (Math.hypot(b.x - e.x, b.y - e.y) - e.radius - b.radius < 1) {
+                        
+                        // 火箭筒击中敌人：爆炸
+                        if (b.type === 'rocket') {
+                            explode(b.x, b.y, 100, b.color);
+                            bullets.splice(bi, 1);
+                            break; 
+                        }
+
+                        playSound('hit');
+                        // 粒子特效
+                        for (let k = 0; k < 8; k++) {
+                            particles.push({
+                                x: b.x, y: b.y, radius: Math.random()*3, color: e.color,
+                                velocity: {x:(Math.random()-0.5)*8, y:(Math.random()-0.5)*8}, alpha: 1
+                            });
+                        }
+                        
+                        // 伤害计算
+                        let damage = b.damage || 10;
+                        e.hp -= damage; // 使用血量计算
+
+                        bullets.splice(bi, 1);
+
+                        if (e.hp <= 0) {
+                             e.dead = true;
+                             addCombo(); // 连击
+                             score += (e.type === 'eraser' ? 50 : 10); // 橡皮擦分更高
+                             // 普通武器击杀不留痕迹
+                             break; 
+                        } else {
+                            // 受伤动画：橡皮擦变红一下
+                            if (e.type === 'eraser') e.color = '#ffaaaa'; 
+                            setTimeout(() => { if(!e.dead && e.type==='eraser') e.color = '#ffffff'; }, 100);
+                            score += 5;
+                        }
+                        scoreEl.innerText = `Score: ${score}`;
+                    }
+                }
+            }
+            
+            // 清理死亡敌人
+            enemies = enemies.filter(e => !e.dead);
+
+            // 4. 粒子更新
+            for(let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                if (p.type === 'blackhole') {
+                    p.duration--;
+                    // 吸附效果
+                    enemies.forEach(e => {
+                        const dx = p.x - e.x;
+                        const dy = p.y - e.y;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist < p.maxRadius && dist > 10) {
+                            e.x += (dx / dist) * 3; // 吸引力
+                            e.y += (dy / dist) * 3;
+                        }
+                    });
+                    
+                    if (p.duration <= 0) particles.splice(i, 1);
+                } else if (p.type === 'beam') {
+                    // 射线只存活一帧 (或者几帧淡出)
+                    p.alpha -= 0.1;
+                    if (p.alpha <= 0) particles.splice(i, 1);
+                } else {
+                    if (p.alpha <= 0) particles.splice(i, 1);
+                    else {
+                        p.x += p.velocity.x *= 0.95;
+                        p.y += p.velocity.y *= 0.95;
+                        p.alpha -= 0.05;
+                    }
+                }
+            }
+        }
+
+        function draw() {
+            requestAnimationFrame(draw);
+            update();
+            
+            // === 渲染层 ===
+            // 恢复“残影”效果：
+            // 不完全清空屏幕，而是覆盖一层半透明的黑色
+            // 这会让上一帧的画面保留一点点，形成动态拖尾
+            ctx.fillStyle = 'rgba(34, 34, 34, 0.3)'; // 背景色 #222 的半透明版本
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 背景色 (不再需要全覆盖，否则会挡住残影)
+            // ctx.fillStyle = '#222';
+            // ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 应用摄像机变换
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // 1. 绘制轨迹层 (只绘制摄像机可见区域，优化性能)
+            // drawImage(source, sx, sy, sw, sh, dx, dy, dw, dh)
+            // 这里我们简单粗暴地把整个大图绘制过来，实际上只绘制了可视部分
+            // 注意：trailCanvas 是离屏 Canvas
+            // 修正：drawImage 的参数单位是像素，需要考虑 dpr
+            ctx.drawImage(
+                trailCanvas, 
+                camera.x * dpr, camera.y * dpr, viewWidth * dpr, viewHeight * dpr, // 源区域 (在大地图上的位置)
+                camera.x, camera.y, viewWidth, viewHeight // 目标区域 (在世界坐标系中的位置)
+            );
+            
+            // 绘制网格辅助线 (可选，增加空间感)
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = 0; x <= MAP_SIZE; x += 100) {
+                ctx.moveTo(x, 0); ctx.lineTo(x, MAP_SIZE);
+            }
+            for (let y = 0; y <= MAP_SIZE; y += 100) {
+                ctx.moveTo(0, y); ctx.lineTo(MAP_SIZE, y);
+            }
+            ctx.stroke();
+
+            // 2. 绘制实体 (玩家、敌人、子弹) - 都在世界坐标系
+            
+            // 绘制子弹
+            bullets.forEach(b => {
+                ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2);
+                ctx.fillStyle = b.color; ctx.fill();
+            });
+            
+            // 绘制敌人
+                enemies.forEach(e => {
+                    ctx.beginPath(); 
+                    if (e.type === 'eraser') {
+                        ctx.rect(e.x - e.radius, e.y - e.radius, e.radius*2, e.radius*2);
+                        ctx.fillStyle = e.color; 
+                        ctx.fill();
+                        ctx.strokeStyle = '#000';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    } else {
+                        ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2);
+                        ctx.fillStyle = e.color; 
+                        ctx.fill();
+                    }
+                });
+            
+            // 绘制玩家
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            ctx.rotate(player.angle);
+            ctx.beginPath(); ctx.arc(0, 0, player.radius, 0, Math.PI*2);
+            ctx.fillStyle = player.color; ctx.fill();
+            ctx.fillStyle = 'red'; ctx.fillRect(10, -5, 20, 10);
+            ctx.restore();
+
+            // 绘制粒子
+            particles.forEach(p => {
+                ctx.save(); ctx.globalAlpha = p.alpha;
+                if (p.type === 'beam') {
+                    ctx.beginPath();
+                    ctx.moveTo(p.sx, p.sy);
+                    ctx.lineTo(p.ex, p.ey);
+                    ctx.strokeStyle = p.color;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                } else if (p.type === 'blackhole') {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = 'black';
+                    ctx.fill();
+                    ctx.strokeStyle = '#9900ff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    // 漩涡特效
+                    ctx.beginPath();
+                    const t = Date.now() / 100;
+                    ctx.arc(p.x, p.y, p.maxRadius * (Math.sin(t)+1)/2, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(153, 0, 255, 0.2)`;
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
+                    ctx.fillStyle = p.color; ctx.fill();
+                }
+                ctx.restore();
+            });
+
+            // 绘制边界红线
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 5;
+            ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
+
+            ctx.restore(); // 结束摄像机变换
+
+            // === UI 层 (不受摄像机影响) ===
+            
+            // 绘制迷你地图
+            if (currentState === STATE.PLAYING) {
+                // 清空迷你地图
+                minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                minimapCtx.fillRect(0, 0, 150, 150);
+                
+                // 缩放比例
+                const mapScale = 150 / MAP_SIZE;
+                
+                // 绘制玩家点
+                minimapCtx.fillStyle = player.color;
+                minimapCtx.beginPath();
+                minimapCtx.arc(player.x * mapScale, player.y * mapScale, 3, 0, Math.PI*2);
+                minimapCtx.fill();
+                
+                // 绘制敌人红点
+                minimapCtx.fillStyle = 'red';
+                enemies.forEach(e => {
+                    minimapCtx.beginPath();
+                    minimapCtx.arc(e.x * mapScale, e.y * mapScale, 2, 0, Math.PI*2);
+                    minimapCtx.fill();
+                });
+                
+                // 绘制摄像机视野框
+                minimapCtx.strokeStyle = 'white';
+                minimapCtx.lineWidth = 1;
+                minimapCtx.strokeRect(camera.x * mapScale, camera.y * mapScale, viewWidth * mapScale, viewHeight * mapScale);
+            }
+
+            if (currentState === STATE.MENU) {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(0,0,viewWidth,viewHeight);
+                ctx.fillStyle = 'white';
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(isMobile ? 'TAP TO START' : 'CLICK TO START', viewWidth/2, viewHeight/2);
+            }
+            else if (currentState === STATE.GAMEOVER) {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(0,0,viewWidth,viewHeight);
+                ctx.fillStyle = 'red';
+                ctx.font = '40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', viewWidth/2, viewHeight/2);
+                ctx.fillStyle = 'white';
+                ctx.font = '20px Arial';
+                ctx.fillText(isMobile ? 'Tap to Restart' : 'Press SPACE to Restart', viewWidth/2, viewHeight/2 + 50);
+            }
+            else if (currentState === STATE.PAUSED) {
+                // 暂停时背景变暗
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(0,0,viewWidth,viewHeight);
+            }
+            
+            // 移动端摇杆绘制 (同上，略)
+            if (isMobile) {
+                if (joystickLeft.active) {
+                    ctx.beginPath(); ctx.arc(joystickLeft.originX, joystickLeft.originY, 50, 0, Math.PI*2);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(joystickLeft.currentX, joystickLeft.currentY, 20, 0, Math.PI*2);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'; ctx.fill();
+                }
+                if (joystickRight.active) {
+                    ctx.beginPath(); ctx.arc(joystickRight.originX, joystickRight.originY, 50, 0, Math.PI*2);
+                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)'; ctx.lineWidth = 2; ctx.stroke();
+                    ctx.beginPath(); ctx.arc(joystickRight.currentX, joystickRight.currentY, 20, 0, Math.PI*2);
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'; ctx.fill();
+                }
+            }
+        }
+
+        draw();
+    </script>
+</body>
+</html>

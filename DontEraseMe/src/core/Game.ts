@@ -1,0 +1,1505 @@
+import { Entity } from './Entity';
+import { System } from './System';
+import { InputManager } from './InputManager';
+import { InputSystem } from '../systems/InputSystem';
+import { MovementSystem } from '../systems/MovementSystem';
+import { RenderSystem } from '../systems/RenderSystem';
+import { TrailSystem } from '../systems/TrailSystem';
+import { WeaponSystem } from '../systems/WeaponSystem';
+import { UISystem } from '../systems/UISystem';
+import { EnemySystem } from '../systems/EnemySystem';
+import { CollisionSystem } from '../systems/CollisionSystem';
+import { ParticleSystem } from '../systems/ParticleSystem';
+import { WaveSystem } from '../systems/WaveSystem';
+import { MinimapSystem } from '../systems/MinimapSystem';
+import { SkillSystem } from '../systems/SkillSystem';
+import { QuestSystem } from '../systems/QuestSystem';
+import { GraffitiSystem } from '../systems/GraffitiSystem';
+import { DamageTextSystem } from '../systems/DamageTextSystem';
+import { PlayerFactory } from '../entities/PlayerFactory';
+import { EnemyFactory } from '../entities/EnemyFactory';
+import { SkeletonSystem } from '../systems/SkeletonSystem';
+import { ObjectiveSystem } from '../systems/ObjectiveSystem';
+import { LevelSystem } from '../systems/LevelSystem';
+import { SummonSystem } from '../systems/SummonSystem';
+import { Experience } from '../components/Experience';
+import { Weapon } from '../components/Weapon';
+import { Transform } from '../components/Transform';
+import { Health } from '../components/Health';
+import { Velocity } from '../components/Velocity';
+import { Score } from '../components/Score';
+import { Quest } from '../components/Quest';
+import { StoryState } from '../components/StoryState';
+import { Renderable } from '../components/Renderable';
+import { PrologueSystem } from '../systems/PrologueSystem';
+import { CHARACTERS } from '../config/EndlessConfig';
+import { WEAPONS } from '../components/Weapon';
+import { PlayerStats } from '../components/PlayerStats';
+
+import { SKILLS, SkillCategory } from '../config/EndlessConfig';
+import type { SkillConfig } from '../config/EndlessConfig';
+
+import { setLang, getLang, t } from '../i18n/index';
+
+export enum GameState {
+    MENU,
+    PLAYING,
+    GAMEOVER,
+    STUDIO,
+    SELECTION // 新增状态：选人界面
+}
+
+type PlayMode = 'story' | 'endless';
+
+export class Game {
+    public entities: Map<string, Entity> = new Map();
+    public systems: System[] = [];
+    public lastTime: number = 0;
+    public isRunning: boolean = false;
+    public state: GameState = GameState.MENU; // Default state
+    
+    public gameCanvas: HTMLCanvasElement;
+    public gameCtx: CanvasRenderingContext2D;
+    public trailCanvas: HTMLCanvasElement;
+    public trailCtx: CanvasRenderingContext2D;
+    public minimapCanvas: HTMLCanvasElement;
+    public minimapCtx: CanvasRenderingContext2D;
+    
+    // UI Elements
+    private mainMenu: HTMLElement;
+    private selectionScreen: HTMLElement;
+    private gameOverMenu: HTMLElement;
+    private gameUI: HTMLElement;
+    private scoreDisplay: HTMLElement;
+    private levelUpScreen: HTMLElement;
+
+    // Selected Data
+    public selectedCharacterId: string | null = null;
+    public selectedWeaponId: number | null = null;
+    public showDamageNumbers: boolean = true;
+    public autoAttackEnabled: boolean = false;
+
+    public width: number = window.innerWidth;
+    public height: number = window.innerHeight;
+    public worldWidth: number = 3000;  //max 4000
+    public worldHeight: number = 2000;
+    public camera: { x: number, y: number, shakeX: number, shakeY: number, shakeTimer: number } = { x: 0, y: 0, shakeX: 0, shakeY: 0, shakeTimer: 0 };
+
+    // Systems references
+    private waveSystem!: WaveSystem;
+
+    public inputManager: InputManager;
+    public currentMode: PlayMode = 'endless';
+    private studioTimeLeft: number = 0;
+    private lastRatingTick: number = 0;
+    private lastBuffTime: number = 0;
+    private lastEliteTime: number = 0;
+    private ratingCanvas: HTMLCanvasElement;
+    private ratingCtx: CanvasRenderingContext2D;
+    private ratingInterval: number = 1;
+
+    constructor() {
+        // Setup canvases
+        this.gameCanvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
+        this.trailCanvas = document.getElementById('trailCanvas') as HTMLCanvasElement;
+        this.minimapCanvas = document.getElementById('minimapCanvas') as HTMLCanvasElement;
+        
+        // Setup UI
+        this.mainMenu = document.getElementById('main-menu')!;
+        this.selectionScreen = document.getElementById('selection-screen')!;
+        this.gameOverMenu = document.getElementById('game-over')!;
+        this.gameUI = document.getElementById('ui')!;
+        this.scoreDisplay = document.getElementById('final-score')!;
+        this.levelUpScreen = document.getElementById('level-up-screen')!;
+
+        if (!this.gameCanvas || !this.trailCanvas || !this.minimapCanvas) {
+            throw new Error('Canvas elements not found');
+        }
+
+        this.gameCtx = this.gameCanvas.getContext('2d')!;
+        this.trailCtx = this.trailCanvas.getContext('2d')!;
+        this.minimapCtx = this.minimapCanvas.getContext('2d')!;
+        
+        // 关闭平滑抗锯齿，增强像素风
+        this.gameCtx.imageSmoothingEnabled = false;
+        this.trailCtx.imageSmoothingEnabled = false;
+        
+        this.ratingCanvas = document.createElement('canvas');
+        this.ratingCanvas.width = 64;
+        this.ratingCanvas.height = 64;
+        this.ratingCtx = this.ratingCanvas.getContext('2d')!;
+
+        // Debug: Log canvas sizes and z-indexes
+        console.log('GameCanvas:', this.gameCanvas.width, this.gameCanvas.height, this.gameCanvas.style.zIndex);
+        console.log('TrailCanvas:', this.trailCanvas.width, this.trailCanvas.height, this.trailCanvas.style.zIndex);
+        
+        // Ensure gameCanvas is on top
+        this.gameCanvas.style.zIndex = '10';
+        this.trailCanvas.style.zIndex = '1';
+
+        this.inputManager = new InputManager();
+
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+
+        this.setupSystems();
+        
+        // Initial load of frames to main menu
+        this.loadFramesToMenu();
+        // Entities are setup on Start Game now
+        // this.setupEntities();
+
+        // Bind Buttons
+        const storyBtn = document.getElementById('story-btn');
+        if (storyBtn) storyBtn.addEventListener('click', () => this.startGame('story'));
+        
+        const endlessBtn = document.getElementById('endless-btn');
+        if (endlessBtn) endlessBtn.addEventListener('click', () => this.showSelectionScreen());
+        
+        const startRunBtn = document.getElementById('start-run-btn');
+        if (startRunBtn) startRunBtn.addEventListener('click', () => this.startGame('endless'));
+
+        const backToMenuBtn = document.getElementById('back-to-menu-btn');
+        if (backToMenuBtn) backToMenuBtn.addEventListener('click', () => {
+            this.state = GameState.MENU;
+            this.selectionScreen.style.display = 'none';
+            this.mainMenu.style.display = 'flex';
+        });
+        
+        const editorBtn = document.getElementById('editor-btn');
+        if (editorBtn) editorBtn.addEventListener('click', () => {
+            window.location.href = '/editor.html';
+        });
+
+        const restartBtn = document.getElementById('restart-btn');
+        if (restartBtn) restartBtn.addEventListener('click', () => this.startGame(this.currentMode));
+
+        // Save Button
+        const saveBtn = document.getElementById('save-btn');
+        if (saveBtn) saveBtn.addEventListener('click', () => {
+            // Show frame selection modal instead of downloading immediately
+            const modal = document.getElementById('frame-save-modal');
+            if (modal) modal.style.display = 'flex';
+        });
+        
+        // Frame Selection Modal Listeners
+        const frameBtns = document.querySelectorAll('.frame-select-btn');
+        frameBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const index = parseInt((e.target as HTMLElement).getAttribute('data-index') || '1');
+                this.saveImageToFrame(index);
+                const modal = document.getElementById('frame-save-modal');
+                if (modal) modal.style.display = 'none';
+            });
+        });
+        
+        const cancelFrameBtn = document.getElementById('cancel-frame-save');
+        if (cancelFrameBtn) {
+            cancelFrameBtn.addEventListener('click', () => {
+                const modal = document.getElementById('frame-save-modal');
+                if (modal) modal.style.display = 'none';
+            });
+        }
+
+        window.addEventListener('add-entity', (e: any) => {
+            this.addEntity(e.detail.entity);
+        });
+        window.addEventListener('explosion', (e: any) => {
+            this.handleExplosion(e.detail.x, e.detail.y, e.detail.radius, e.detail.damage);
+        });
+        window.addEventListener('start-act1', () => {
+            this.startAct1();
+        });
+
+        // Pause Listener
+        window.addEventListener('game-pause', (e: any) => {
+            if (e.detail.paused) {
+                this.isRunning = false; // Pause loop
+            } else {
+                this.isRunning = true;
+                this.lastTime = performance.now();
+                this.loop(this.lastTime);
+            }
+        });
+        window.addEventListener('game-over', (e: any) => this.gameOver(e.detail?.score, e.detail?.victory));
+        
+        window.addEventListener('player-levelup', (e: any) => this.showLevelUpScreen(e.detail.entityId));
+        window.addEventListener('boss-killed', (e: any) => this.showBossAwakeningScreen(e.detail.bossPhase));
+        
+        const backBtn = document.createElement('button');
+        backBtn.textContent = 'Back to Main Menu';
+        backBtn.id = 'back-main-btn';
+        if (this.gameOverMenu) {
+            this.gameOverMenu.appendChild(backBtn);
+            const restartBtnEl = document.getElementById('restart-btn') as HTMLElement | null;
+            if (restartBtnEl) {
+                backBtn.className = restartBtnEl.className;
+                backBtn.style.cssText = restartBtnEl.getAttribute('style') || backBtn.style.cssText;
+            }
+            backBtn.addEventListener('click', () => {
+                this.stop();
+                this.state = GameState.MENU;
+                if (this.mainMenu) this.mainMenu.style.display = 'flex';
+                if (this.gameOverMenu) this.gameOverMenu.style.display = 'none';
+                if (this.gameUI) this.gameUI.style.display = 'none';
+                if (this.minimapCanvas) this.minimapCanvas.style.display = 'none';
+                if (this.levelUpScreen) this.levelUpScreen.style.display = 'none';
+            });
+        }
+        
+        const exitBtn = document.getElementById('exit-btn');
+        if (exitBtn) {
+            exitBtn.addEventListener('click', () => {
+                try {
+                    window.close();
+                } catch {}
+                setTimeout(() => {
+                    window.location.href = 'about:blank';
+                }, 0);
+            });
+        }
+        
+        // Settings listeners
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settings-modal');
+        const closeSettingsBtn = document.getElementById('close-settings-btn');
+        const langZhBtn = document.getElementById('lang-zh-btn');
+        const langEnBtn = document.getElementById('lang-en-btn');
+
+        if (settingsBtn && settingsModal) {
+            settingsBtn.addEventListener('click', () => {
+                settingsModal.style.display = 'flex';
+            });
+        }
+        if (closeSettingsBtn && settingsModal) {
+            closeSettingsBtn.addEventListener('click', () => {
+                settingsModal.style.display = 'none';
+            });
+        }
+        if (langZhBtn) {
+            langZhBtn.addEventListener('click', () => {
+                setLang('zh');
+                this.updateUITexts();
+            });
+        }
+        if (langEnBtn) {
+            langEnBtn.addEventListener('click', () => {
+                setLang('en');
+                this.updateUITexts();
+            });
+        }
+        
+        // Fullscreen toggle logic
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const windowedBtn = document.getElementById('windowed-btn');
+        
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', () => {
+                // Check if running in electron
+                if ((window as any).require) {
+                    const { ipcRenderer } = (window as any).require('electron');
+                    if (ipcRenderer) ipcRenderer.send('toggle-fullscreen', true);
+                } else if (document.documentElement.requestFullscreen) {
+                    // Browser fallback
+                    document.documentElement.requestFullscreen().catch(e => console.log(e));
+                }
+            });
+        }
+        if (windowedBtn) {
+            windowedBtn.addEventListener('click', () => {
+                if ((window as any).require) {
+                    const { ipcRenderer } = (window as any).require('electron');
+                    if (ipcRenderer) ipcRenderer.send('toggle-fullscreen', false);
+                } else if (document.exitFullscreen) {
+                    // Browser fallback
+                    document.exitFullscreen().catch(e => console.log(e));
+                }
+            });
+        }
+
+        // Initialize UI texts
+        this.updateUITexts();
+        
+        // Frames grid disabled per new design
+        
+        // Frame Preview Listeners
+        const previewModal = document.getElementById('frame-preview-modal');
+        const previewImg = document.getElementById('frame-preview-img') as HTMLImageElement;
+        
+        if (previewModal) {
+            previewModal.addEventListener('click', () => {
+                previewModal.style.display = 'none';
+            });
+        }
+        
+        for (let i = 1; i <= 4; i++) {
+            const frameDiv = document.getElementById(`frame-${i}`);
+            if (frameDiv) {
+                frameDiv.addEventListener('click', () => {
+                    const dataUrl = localStorage.getItem(`art_frame_${i}`);
+                    if (dataUrl && previewModal && previewImg) {
+                        previewImg.src = dataUrl;
+                        previewModal.style.display = 'flex';
+                    }
+                });
+            }
+        }
+        
+        // ESC modal bridge events
+        window.addEventListener('save-art-local', () => {
+            const modal = document.getElementById('frame-save-modal');
+            if (modal) modal.style.display = 'flex';
+        });
+        window.addEventListener('save-art-to-frame', (e: any) => {
+            const idx = e.detail?.index;
+            if (typeof idx !== 'number') return;
+            this.saveImageToFrame(idx);
+        });
+        window.addEventListener('exit-run', () => {
+            this.stop();
+            this.state = GameState.MENU;
+            if (this.mainMenu) this.mainMenu.style.display = 'flex';
+            if (this.gameUI) this.gameUI.style.display = 'none';
+            if (this.minimapCanvas) this.minimapCanvas.style.display = 'none';
+            if (this.levelUpScreen) this.levelUpScreen.style.display = 'none';
+            if (this.gameOverMenu) this.gameOverMenu.style.display = 'none';
+        });
+    }
+
+    private setupSystems(): void {
+        this.addSystem(new InputSystem(this.inputManager, this.camera));
+        this.addSystem(new MovementSystem(this.worldWidth, this.worldHeight, (e) => this.addEntity(e), this.gameCtx, this.trailCtx));
+        this.addSystem(new WeaponSystem(this.inputManager, (entity) => this.addEntity(entity), this.gameCtx, this.trailCtx));
+        this.addSystem(new EnemySystem((entity) => this.addEntity(entity), this.trailCtx));
+        this.addSystem(new CollisionSystem((entity) => this.addEntity(entity), this.trailCtx));
+        
+        this.waveSystem = new WaveSystem((entity) => this.addEntity(entity), this.camera, () => this.currentMode);
+        this.addSystem(this.waveSystem);
+        
+        this.addSystem(new SkillSystem(this.inputManager, this.trailCtx, this.camera, (entity) => this.addEntity(entity), this.worldWidth, this.worldHeight));
+        this.addSystem(new ParticleSystem());
+        this.addSystem(new TrailSystem(this.trailCtx, this.camera));
+        this.addSystem(new SkeletonSystem());
+        this.addSystem(new ObjectiveSystem(this.worldWidth, this.worldHeight, (e) => this.addEntity(e)));
+        this.addSystem(new LevelSystem(() => this.currentMode));
+        this.addSystem(new PrologueSystem(this.worldWidth, this.worldHeight));
+        this.addSystem(new RenderSystem(this.gameCtx, this.camera, this.worldWidth, this.worldHeight));
+        this.addSystem(new MinimapSystem(this.minimapCtx, this.worldWidth, this.worldHeight, this.camera));
+        this.addSystem(new UISystem());
+        this.addSystem(new QuestSystem());
+        const graffitiSystem = new GraffitiSystem(this.trailCtx);
+        graffitiSystem.addEntityCallback = (e) => this.addEntity(e);
+        this.addSystem(graffitiSystem);
+        this.addSystem(new DamageTextSystem(this.gameCtx, this.camera));
+        this.addSystem(new SummonSystem((entity) => this.addEntity(entity)));
+    }
+
+    private setupEntities(): void {
+        const player = PlayerFactory.create(
+            this.width / 2, 
+            this.height / 2, 
+            this.selectedCharacterId || undefined, 
+            this.selectedWeaponId !== null ? this.selectedWeaponId : undefined
+        );
+        this.configurePlayerForMode(player);
+        this.addEntity(player);
+
+        // Remove test enemies to prevent instant death at start
+        // WaveSystem will handle spawning enemies
+    }
+
+    public resize(): void {
+        this.width = window.innerWidth;
+        this.height = window.innerHeight;
+        
+        const dpr = window.devicePixelRatio || 1;
+        
+        this.gameCanvas.width = this.width * dpr;
+        this.gameCanvas.height = this.height * dpr;
+        this.gameCanvas.style.width = `${this.width}px`;
+        this.gameCanvas.style.height = `${this.height}px`;
+        this.gameCtx.scale(dpr, dpr); // Restore scale
+
+        this.trailCanvas.width = this.worldWidth;
+        this.trailCanvas.height = this.worldHeight;
+        this.trailCanvas.style.width = `${this.worldWidth}px`;
+        this.trailCanvas.style.height = `${this.worldHeight}px`;
+        // No scale needed for trailCtx if it's 1:1 with world, but for high DPI screens we might want scaling.
+        // Let's keep it simple: World pixels = Screen pixels at scale 1.
+        // If we want high DPI, we'd need a larger canvas and scale ctx.
+        // For performance on large canvas, let's stick to 1x for now or use dpr if performant.
+        this.trailCtx.scale(1, 1); 
+
+        // Minimap
+        this.minimapCanvas.width = 150 * dpr;
+        this.minimapCanvas.height = 150 * dpr;
+        this.minimapCtx.scale(dpr, dpr);
+    }
+
+    public addEntity(entity: Entity): void {
+        this.entities.set(entity.id, entity);
+        for (const system of this.systems) {
+            system.addEntity(entity);
+        }
+    }
+
+    public removeEntity(entityId: string): void {
+        const entity = this.entities.get(entityId);
+        if (entity) {
+            for (const system of this.systems) {
+                system.removeEntity(entity);
+            }
+            this.entities.delete(entityId);
+        }
+    }
+
+    public addSystem(system: System): void {
+        this.systems.push(system);
+    }
+
+    private configurePlayerForMode(player: Entity): void {
+        const exp = player.getComponent(Experience);
+        const weapon = player.getComponent(Weapon);
+        const quest = player.getComponent(Quest);
+        const story = player.getComponent(StoryState);
+
+        if (weapon) {
+            // Unlocked set should contain the starting weapon
+            weapon.unlocked = new Set([weapon.currentWeaponIndex]);
+            weapon.cooldown = 0;
+            weapon.reloading = false;
+            weapon.reloadTimer = 0;
+        }
+
+        if (quest) {
+            quest.index = 0;
+            for (const step of quest.steps) {
+                step.done = false;
+            }
+        }
+
+        if (this.currentMode === 'story') {
+            if (weapon) {
+                // In prologue, no weapons allowed initially
+                weapon.unlocked = new Set();
+                weapon.currentWeaponIndex = -1;
+            }
+            if (exp) {
+                exp.level = 1;
+                exp.xp = 0;
+                exp.next = Number.MAX_SAFE_INTEGER;
+            }
+            // Spawn player at left side for prologue chase
+            const pTransform = player.getComponent(Transform);
+            if (pTransform) {
+                pTransform.x = 400;
+                pTransform.y = this.worldHeight / 2;
+            }
+            if (quest) {
+                quest.active = true;
+                quest.steps = [
+                    { type: 'announce', text: '【序章：逃亡与生存】' },
+                    { type: 'escape', text: '逃离巨型橡皮擦的抹除！' }, // Wait for PrologueSystem to complete
+                    { type: 'announce', text: '【第一幕：未竟的草图】' },
+                    { type: 'announce', text: '保护地图中心的“画眼”！抵御擦除教团的进攻！' },
+                    { type: 'defend', duration: 120, text: '防守成功！画眼已被激活！' }, // 撑过120秒
+                    { type: 'announce', text: '本测试关卡已通关，你可以继续体验融合技能。' }
+                ];
+                quest.index = 0;
+            }
+            if (story) {
+                story.chapter = 'Prologue';
+                story.flags = {};
+            }
+            
+            // Note: Canvas Eye is now created inside startAct1()
+            
+        } else {
+            if (exp) {
+                exp.level = 1;
+                exp.xp = 0;
+                exp.next = 100;
+            }
+            if (quest) {
+                quest.active = false;
+            }
+            if (story) {
+                story.chapter = 'Endless';
+                story.flags = {};
+            }
+        }
+    }
+
+    public showLevelUpScreen(entityId: string): void {
+        const player = this.entities.get(entityId);
+        if (!player) return;
+        const stats = player.getComponent(PlayerStats);
+        if (!stats) return;
+
+        // Pause the game
+        window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: true } }));
+        this.levelUpScreen.style.display = 'flex';
+
+        // Select 4 random skills that can be upgraded or learned
+        const availableSkills = SKILLS.filter(skill => {
+            const currentLevel = stats.getSkillLevel(skill.id);
+            if (currentLevel >= skill.maxLevel) return false;
+            
+            // 人物觉醒和武器觉醒技能现在由击败BOSS后掉落获取，不再出现在普通升级池中
+            if (skill.category === SkillCategory.WEAPON_MASTERY || skill.category === SkillCategory.CHARACTER_AWAKENING) {
+                return false;
+            }
+
+            if (skill.prerequisites) {
+                for (const prereq of skill.prerequisites) {
+                    if (!stats.hasSkill(prereq)) return false;
+                }
+            }
+            return true;
+        });
+
+        // 完全随机抽取技能
+        let selectedSkills = [];
+        
+        // 打乱可用技能池
+        availableSkills.sort(() => 0.5 - Math.random());
+        
+        // 选取最多 4 个技能
+        selectedSkills = availableSkills.slice(0, 4);
+
+        const container = document.getElementById('level-up-cards');
+        if (container) {
+            container.innerHTML = '';
+            if (selectedSkills.length === 0) {
+                // No more skills to learn
+                const el = document.createElement('div');
+                el.style.cssText = 'color: white; font-size: 24px; padding: 20px;';
+                el.innerText = getLang() === 'zh' ? '所有技能已升至满级！' : 'All skills are fully upgraded!';
+                container.appendChild(el);
+                
+                setTimeout(() => {
+                    this.levelUpScreen.style.display = 'none';
+                    window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));
+                }, 1500);
+                return;
+            }
+
+            selectedSkills.forEach(skill => {
+                const currentLevel = stats.getSkillLevel(skill.id);
+                const nextLevel = currentLevel + 1;
+                const levelConfig = skill.levels.find(l => l.level === nextLevel) || skill.levels[0];
+                
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.cssText = `
+                    background: #333; border: 2px solid #555; border-radius: 8px; padding: 20px; 
+                    cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; 
+                    gap: 10px; flex: 1; min-width: 0; box-sizing: border-box; text-align: center;
+                `;
+                
+                card.onmouseover = () => {
+                    card.style.transform = 'translateY(-5px)';
+                    card.style.borderColor = '#0f766e';
+                    card.style.boxShadow = '0 0 15px rgba(15, 118, 110, 0.5)';
+                };
+                card.onmouseout = () => {
+                    card.style.transform = 'none';
+                    card.style.borderColor = '#555';
+                    card.style.boxShadow = 'none';
+                };
+
+                card.innerHTML = `
+                    <div style="font-size: 12px; color: #888;">${t(skill.category)}</div>
+                    <div style="font-size: 20px; font-weight: bold; color: white;">${t(skill.name)}</div>
+                    <div style="font-size: 14px; color: #0ff;">${currentLevel === 0 ? t('新技能') : `${t('升级至 Lv.')}${nextLevel}`}</div>
+                    <div style="font-size: 14px; color: #ccc; margin-top: 10px; min-height: 40px;">${t(levelConfig.description)}</div>
+                `;
+
+                card.onclick = () => {
+                    // Get old values
+                    const oldLevelConfig = currentLevel > 0 ? skill.levels.find(l => l.level === currentLevel) : null;
+
+                    // Apply skill upgrade
+                    stats.acquiredSkills[skill.id] = nextLevel;
+                    
+                    // Apply immediate stats logic
+                    if (skill.category === '基础属性强化') {
+                        const oldVal = oldLevelConfig ? (oldLevelConfig.value || 0) : 0;
+                        const val = levelConfig.value || 0;
+                        const diff = val - oldVal;
+
+                        if (skill.id === 'base_firerate') stats.fireRateMultiplier += diff;
+                        if (skill.id === 'base_speed') stats.speedMultiplier += diff;
+                        if (skill.id === 'base_dodge') {
+                            stats.dodgeChance += diff;
+                            if (stats.dodgeChance > 0.5) stats.dodgeChance = 0.5;
+                        }
+                        if (skill.id === 'base_health') {
+                            const hp = player.getComponent(Health);
+                            if (hp) {
+                                const bonus = diff * 100; // assuming baseHp was 100, wait, better use maxHp logic
+                                // Let's just update player stats. Wait, Health is separate component!
+                                hp.max += (stats.maxHp * diff); // Or properly apply. We'll leave health for now or fix it if needed.
+                                hp.current += (stats.maxHp * diff);
+                            }
+                        }
+                        if (skill.id === 'base_damage') stats.damageMultiplier += diff;
+                        if (skill.id === 'base_reload') stats.reloadSpeedMultiplier += diff;
+                        if (skill.id === 'base_trail') stats.trailWidthMultiplier += diff;
+                        if (skill.id === 'base_pierce') stats.pierceBonus += diff;
+                        if (skill.id === 'base_crit_chance') stats.critChance += diff;
+                        if (skill.id === 'base_crit_damage') stats.critDamage += diff;
+                    } else if (skill.category === '体型变异系') {
+                        const oldSize = oldLevelConfig && oldLevelConfig.sizeMultiplier !== undefined ? oldLevelConfig.sizeMultiplier : 1.0;
+                        const newSize = levelConfig.sizeMultiplier !== undefined ? levelConfig.sizeMultiplier : 1.0;
+                        
+                        const render = player.getComponent(Renderable);
+                        if (render && render.shape === 'circle') {
+                            render.radius = (render.radius / oldSize) * newSize;
+                        }
+                        
+                        if (skill.id === 'body_enlarge') {
+                            const oldHp = oldLevelConfig && oldLevelConfig.hpMultiplier !== undefined ? oldLevelConfig.hpMultiplier : 1.0;
+                            const newHp = levelConfig.hpMultiplier !== undefined ? levelConfig.hpMultiplier : 1.0;
+                            const hp = player.getComponent(Health);
+                            if (hp) {
+                                const baseMax = hp.max / oldHp;
+                                hp.max = baseMax * newHp;
+                                hp.current += baseMax * (newHp - oldHp);
+                            }
+                        } else if (skill.id === 'body_reduce') {
+                            const oldDodge = oldLevelConfig && oldLevelConfig.dodgeBonus !== undefined ? oldLevelConfig.dodgeBonus : 0.0;
+                            const newDodge = levelConfig.dodgeBonus !== undefined ? levelConfig.dodgeBonus : 0.0;
+                            stats.dodgeChance += (newDodge - oldDodge);
+                            // Clamp dodge chance to 50%
+                            if (stats.dodgeChance > 0.5) stats.dodgeChance = 0.5;
+                        }
+                    }
+
+                    // Hide UI and resume
+                    this.levelUpScreen.style.display = 'none';
+                    window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));
+                };
+
+                container.appendChild(card);
+            });
+        }
+    }
+
+    public showBossAwakeningScreen(bossPhase: number = 1): void {
+        const player = Array.from(this.entities.values()).find(e => e.hasComponent(PlayerStats));
+        if (!player) return;
+        const stats = player.getComponent(PlayerStats);
+        const weaponComp = player.getComponent(Weapon);
+        if (!stats || !weaponComp) return;
+
+        // Pause the game
+        window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: true } }));
+        
+        // Ensure UI elements exist (we can reuse the level-up screen or create a specialized one)
+        this.levelUpScreen.style.display = 'flex';
+        const container = document.getElementById('level-up-cards');
+        if (!container) return;
+        container.innerHTML = '';
+
+        // Add a specialized title if possible, or just reuse the container
+        const titleEl = this.levelUpScreen.querySelector('h1');
+        const oldTitle = titleEl ? titleEl.innerText : '';
+        if (titleEl) {
+            let titleText = getLang() === 'zh' ? 'BOSS 击杀：专属觉醒！' : 'BOSS Kill: Unique Awakening!';
+            if (bossPhase === 1) titleText = getLang() === 'zh' ? 'BOSS 1 击杀：人物觉醒 1' : 'BOSS 1 Kill: Character Awakening 1';
+            else if (bossPhase === 2) titleText = getLang() === 'zh' ? 'BOSS 2 击杀：武器觉醒' : 'BOSS 2 Kill: Weapon Awakening';
+            else if (bossPhase === 3) titleText = getLang() === 'zh' ? 'BOSS 3 击杀：人物觉醒 2' : 'BOSS 3 Kill: Character Awakening 2';
+            titleEl.innerText = titleText;
+        }
+
+        const currentWeaponId = weaponComp.currentWeaponIndex;
+        const currentWeaponType = WEAPONS.find(w => w.id === currentWeaponId)?.type;
+
+        // Select available awakenings
+        const availableSkills = SKILLS.filter(skill => {
+            const currentLevel = stats.getSkillLevel(skill.id);
+            if (currentLevel >= skill.maxLevel) return false;
+            
+            // BOSS 掉落规则：
+            // BOSS1: 人物觉醒1
+            // BOSS2: 武器觉醒
+            // BOSS3: 人物觉醒2
+            if (bossPhase === 1) {
+                return skill.category === SkillCategory.CHARACTER_AWAKENING && skill.requiredCharacter === stats.characterId && skill.id.endsWith('_1');
+            } else if (bossPhase === 2) {
+                return skill.category === SkillCategory.WEAPON_MASTERY && skill.requiredWeapon === currentWeaponType;
+            } else if (bossPhase === 3) {
+                return skill.category === SkillCategory.CHARACTER_AWAKENING && skill.requiredCharacter === stats.characterId && skill.id.endsWith('_2');
+            } else {
+                // 如果是其他阶段，或者没有匹配到，提供剩余未学习的觉醒
+                if (skill.category === SkillCategory.WEAPON_MASTERY) {
+                    return skill.requiredWeapon === currentWeaponType;
+                } else if (skill.category === SkillCategory.CHARACTER_AWAKENING) {
+                    return skill.requiredCharacter === stats.characterId;
+                }
+                return false;
+            }
+        });
+
+        // 打乱可用技能池
+        availableSkills.sort(() => 0.5 - Math.random());
+        
+        // 选取最多 3 个技能
+        const selectedSkills = availableSkills.slice(0, 3);
+
+        const closeScreen = () => {
+            this.levelUpScreen.style.display = 'none';
+            if (titleEl) titleEl.innerText = oldTitle; // Restore old title
+            window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));
+        };
+
+        if (selectedSkills.length === 0) {
+            // No awakenings available, give massive gold and health
+            const el = document.createElement('div');
+            el.style.cssText = 'color: gold; font-size: 24px; padding: 20px; text-align: center;';
+            el.innerHTML = getLang() === 'zh' ? '已无专属觉醒<br><br>获得 500 金币与全面恢复！' : 'No awakenings available<br><br>Received 500 Coins & Full Heal!';
+            container.appendChild(el);
+            
+            stats.gold += 500;
+            const score = player.getComponent(Score);
+            if (score) score.coins += 500;
+            const hp = player.getComponent(Health);
+            if (hp) hp.current = hp.max;
+
+            setTimeout(closeScreen, 2000);
+            return;
+        }
+
+        selectedSkills.forEach(skill => {
+            const currentLevel = stats.getSkillLevel(skill.id);
+            const nextLevel = currentLevel + 1;
+            const levelConfig = skill.levels.find(l => l.level === nextLevel) || skill.levels[0];
+            
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.style.cssText = `
+                background: #4a0000; border: 2px solid #ff4444; border-radius: 8px; padding: 20px; 
+                cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; 
+                gap: 10px; flex: 1; min-width: 0; box-sizing: border-box; text-align: center;
+                box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+            `;
+            
+            card.onmouseover = () => {
+                card.style.transform = 'translateY(-5px)';
+                card.style.borderColor = '#ffaaaa';
+                card.style.boxShadow = '0 0 20px rgba(255, 100, 100, 0.8)';
+            };
+            card.onmouseout = () => {
+                card.style.transform = 'none';
+                card.style.borderColor = '#ff4444';
+                card.style.boxShadow = '0 0 10px rgba(255, 0, 0, 0.5)';
+            };
+
+            card.innerHTML = `
+                <div style="font-size: 14px; color: #ffaaaa; font-weight: bold;">${t(skill.category)}</div>
+                <div style="font-size: 22px; font-weight: bold; color: gold; text-shadow: 0 0 5px red;">${t(skill.name)}</div>
+                <div style="font-size: 14px; color: #0ff;">${currentLevel === 0 ? t('觉醒降临') : `${t('觉醒提升 Lv.')}${nextLevel}`}</div>
+                <div style="font-size: 15px; color: #fff; margin-top: 10px; min-height: 40px;">${t(levelConfig.description)}</div>
+            `;
+
+            card.onclick = () => {
+                stats.acquiredSkills[skill.id] = nextLevel;
+                closeScreen();
+            };
+
+            container.appendChild(card);
+        });
+    }
+
+    public showSelectionScreen(): void {
+        this.state = GameState.SELECTION;
+        this.mainMenu.style.display = 'none';
+        this.selectionScreen.style.display = 'flex';
+        
+        // Populate characters
+        const charList = document.getElementById('character-list');
+        if (charList) {
+            charList.innerHTML = '';
+            CHARACTERS.forEach(char => {
+                const el = document.createElement('div');
+                el.className = `card char-card ${this.selectedCharacterId === char.id ? 'active' : ''}`;
+                el.innerHTML = `
+                    <p class="card-title">${t(char.name)}</p>
+                    <p class="card-desc">${t(char.description)}</p>
+                `;
+                el.onclick = () => {
+                    this.selectedCharacterId = char.id;
+                    this.updateSelectionUI();
+                };
+                charList.appendChild(el);
+            });
+        }
+        
+        // Populate weapons
+        const weapList = document.getElementById('weapon-list');
+        if (weapList) {
+            weapList.innerHTML = '';
+            WEAPONS.forEach(weap => {
+                const el = document.createElement('div');
+                el.className = `card weap-card ${this.selectedWeaponId === weap.id ? 'active' : ''}`;
+                el.innerHTML = `
+                    <p class="card-title" style="color: ${weap.color};">${t(weap.name)}</p>
+                    <p class="card-desc">${getLang() === 'zh' ? '射速' : 'Rate'}: ${Math.round(1000 / weap.fireRate)} | ${getLang() === 'zh' ? '伤害' : 'Dmg'}: ${weap.damage}</p>
+                `;
+                el.onclick = () => {
+                    this.selectedWeaponId = weap.id;
+                    this.updateSelectionUI();
+                };
+                weapList.appendChild(el);
+            });
+        }
+        
+        // Auto-select first if none
+        if (!this.selectedCharacterId && CHARACTERS.length > 0) this.selectedCharacterId = CHARACTERS[0].id;
+        if (this.selectedWeaponId === null && WEAPONS.length > 0) this.selectedWeaponId = WEAPONS[0].id;
+        
+        this.updateSelectionUI();
+    }
+    
+    private updateSelectionUI(): void {
+        // Update active classes
+        document.querySelectorAll('.char-card').forEach((el, i) => {
+            el.classList.toggle('active', CHARACTERS[i].id === this.selectedCharacterId);
+        });
+        document.querySelectorAll('.weap-card').forEach((el, i) => {
+            el.classList.toggle('active', WEAPONS[i].id === this.selectedWeaponId);
+        });
+        
+        // Update details panel
+        const charDetail = document.getElementById('char-detail');
+        const weapDetail = document.getElementById('weap-detail');
+        const startBtn = document.getElementById('start-run-btn') as HTMLButtonElement;
+        
+        const selectedChar = CHARACTERS.find(c => c.id === this.selectedCharacterId);
+        if (charDetail && selectedChar) {
+            const hpLbl = getLang() === 'zh' ? '基础生命' : 'Base HP';
+            const spdLbl = getLang() === 'zh' ? '移速' : 'Speed';
+            const skillLbl = getLang() === 'zh' ? '专属技能' : 'Unique Skill';
+            charDetail.innerHTML = `
+                <h4 style="margin-top: 0; color: #0f766e;">${t(selectedChar.name)}</h4>
+                <p style="color: #aaa; font-size: 14px; margin-bottom: 5px;">${t(selectedChar.description)}</p>
+                <p style="color: #fff; font-size: 13px; margin-bottom: 5px;">${hpLbl}: ${selectedChar.baseHp} | ${spdLbl}: ${selectedChar.baseSpeed}</p>
+                <p style="color: #0ff; font-size: 13px; margin: 0;">${skillLbl}: [${t(selectedChar.uniqueSkillName)}] ${t(selectedChar.uniqueSkillDesc)}</p>
+            `;
+        }
+        
+        const selectedWeap = WEAPONS.find(w => w.id === this.selectedWeaponId);
+        if (weapDetail && selectedWeap) {
+            const isMelee = selectedWeap.type === 'melee';
+            const typeStr = getLang() === 'zh' ? (isMelee ? '近战武器' : '远程武器') : (isMelee ? 'Melee Weapon' : 'Ranged Weapon');
+            const dmgLbl = getLang() === 'zh' ? '伤害' : 'Dmg';
+            const rateLbl = getLang() === 'zh' ? '射速' : 'Rate';
+            const magLbl = getLang() === 'zh' ? '弹匣' : 'Mag';
+            const rldLbl = getLang() === 'zh' ? '装填' : 'Reload';
+            const secLbl = getLang() === 'zh' ? '秒' : 's';
+            
+            weapDetail.innerHTML = `
+                <h4 style="margin-top: 0; color: ${selectedWeap.color};">${t(selectedWeap.name)}</h4>
+                <p style="color: #aaa; font-size: 14px; margin-bottom: 5px;">${typeStr}</p>
+                <p style="color: #fff; font-size: 13px; margin-bottom: 5px;">${dmgLbl}: ${selectedWeap.damage} | ${rateLbl}: ${Math.round(1000 / selectedWeap.fireRate)}</p>
+                <p style="color: #fff; font-size: 13px; margin: 0;">${magLbl}: ${selectedWeap.magSize} | ${rldLbl}: ${(selectedWeap.reloadTime / 60).toFixed(1)}${secLbl}</p>
+            `;
+        }
+        
+        if (startBtn) {
+            startBtn.disabled = !this.selectedCharacterId || this.selectedWeaponId === null;
+        }
+    }
+
+    public startGame(mode: PlayMode = 'endless'): void {
+        this.currentMode = mode;
+        // 暂时屏蔽皮肤绘制提示，直接使用默认皮肤进入无尽模式
+        /*
+        const savedSkin = localStorage.getItem('player_custom_skin');
+        if (!savedSkin) {
+            const goEditor = window.confirm('检测到你还没有绘制角色皮肤。是否现在去绘制？选择“取消”将使用默认外观进入游戏。');
+            if (goEditor) {
+                window.location.href = '/editor.html';
+                return;
+            }
+        }
+        */
+        this.reset();
+        this.setupEntities();
+        this.state = GameState.PLAYING;
+        
+        if (this.mainMenu) this.mainMenu.style.display = 'none';
+        if (this.selectionScreen) this.selectionScreen.style.display = 'none';
+        if (this.gameOverMenu) this.gameOverMenu.style.display = 'none';
+        if (this.gameUI) this.gameUI.style.display = 'block';
+        if (this.minimapCanvas) this.minimapCanvas.style.display = 'block';
+        
+        // 设置局内地面特效透明度为0.1，避免视觉花眼
+        if (this.trailCanvas) this.trailCanvas.style.opacity = '0.1';
+        
+        // Show Pause Button
+        const pauseBtn = document.getElementById('pause-btn');
+        if (pauseBtn) pauseBtn.style.display = 'block';
+
+        if (!this.isRunning) {
+            this.start();
+        }
+    }
+    
+    public gameOver(score: number = 0, victory: boolean = false): void {
+        this.state = GameState.GAMEOVER;
+        
+        const titleEl = this.gameOverMenu?.querySelector('h1');
+        if (titleEl) {
+            if (victory) {
+                titleEl.innerText = 'VICTORY';
+                titleEl.style.color = 'gold';
+            } else {
+                titleEl.innerText = 'GAME OVER';
+                titleEl.style.color = '#ff4444';
+            }
+        }
+        
+        if (this.scoreDisplay) this.scoreDisplay.innerText = `Final Score: ${score}`;
+        
+        if (this.gameUI) this.gameUI.style.display = 'none';
+        if (this.minimapCanvas) this.minimapCanvas.style.display = 'none';
+        
+        // Hide Pause Button
+        const pauseBtn = document.getElementById('pause-btn');
+        if (pauseBtn) pauseBtn.style.display = 'none';
+        
+        // 游戏结束结算，将地面画作透明度还原为1.0
+        if (this.trailCanvas) this.trailCanvas.style.opacity = '1.0';
+        
+        if (this.gameOverMenu) this.gameOverMenu.style.display = 'flex';
+    }
+
+    public saveImage(): void {
+        const level = (() => {
+            for (const [, e] of this.entities) {
+                if (!e.tags.has('player')) continue;
+                const ex = e.getComponent(Experience);
+                return ex ? ex.level : 0;
+            }
+            return 0;
+        })();
+        try {
+            const dataUrl = this.trailCanvas.toDataURL('image/png');
+            const b64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+            const bytes = base64ToBytes(b64);
+            const out = injectTextChunks(bytes, [
+                ['Software', 'DontEraseMe'],
+                ['Version', '1'],
+                ['CreationTime', new Date().toISOString()],
+                ['Level', String(level)],
+                ['WorldSize', `${this.worldWidth}x${this.worldHeight}`]
+            ]);
+            const ab = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer;
+            const blob = new Blob([ab], { type: 'image/png' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `art-${Date.now()}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            try {
+                const fallback = this.trailCanvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = fallback;
+                a.download = `art-${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } catch {}
+        }
+        
+        function base64ToBytes(b64: string): Uint8Array {
+            const bin = atob(b64);
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            return arr;
+        }
+        function injectTextChunks(png: Uint8Array, pairs: [string, string][]): Uint8Array {
+            const sig = png.slice(0, 8);
+            let pos = 8;
+            const ihdrLen = readUint32(png, pos);
+            const ihdrType = readType(png, pos + 4);
+            const ihdrEnd = pos + 8 + ihdrLen + 4;
+            const head = png.slice(0, ihdrEnd);
+            const rest = png.slice(ihdrEnd);
+            const chunks: Uint8Array[] = [head];
+            for (const [key, val] of pairs) {
+                chunks.push(makeTextChunk(key, val));
+            }
+            chunks.push(rest);
+            return concat(chunks);
+        }
+        function makeTextChunk(keyword: string, text: string): Uint8Array {
+            const enc = (s: string) => new TextEncoder().encode(s);
+            const keyBytes = enc(keyword);
+            const textBytes = enc(text);
+            const data = new Uint8Array(keyBytes.length + 1 + textBytes.length);
+            data.set(keyBytes, 0);
+            data[keyBytes.length] = 0;
+            data.set(textBytes, keyBytes.length + 1);
+            const type = enc('tEXt');
+            const crcInput = new Uint8Array(type.length + data.length);
+            crcInput.set(type, 0);
+            crcInput.set(data, type.length);
+            const crc = crc32(crcInput);
+            const chunk = new Uint8Array(4 + 4 + data.length + 4);
+            writeUint32(chunk, 0, data.length);
+            chunk.set(type, 4);
+            chunk.set(data, 8);
+            writeUint32(chunk, 8 + data.length, crc);
+            return chunk;
+        }
+        function readUint32(b: Uint8Array, i: number): number {
+            return (b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | (b[i + 3]);
+        }
+        function writeUint32(b: Uint8Array, i: number, v: number) {
+            b[i] = (v >>> 24) & 0xff;
+            b[i + 1] = (v >>> 16) & 0xff;
+            b[i + 2] = (v >>> 8) & 0xff;
+            b[i + 3] = v & 0xff;
+        }
+        function readType(b: Uint8Array, i: number): string {
+            return String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3]);
+        }
+        function concat(parts: Uint8Array[]): Uint8Array {
+            let total = 0;
+            for (const p of parts) total += p.length;
+            const out = new Uint8Array(total);
+            let offset = 0;
+            for (const p of parts) {
+                out.set(p, offset);
+                offset += p.length;
+            }
+            return out;
+        }
+        function crc32(bytes: Uint8Array): number {
+            let crc = 0xffffffff;
+            for (let i = 0; i < bytes.length; i++) {
+                crc = (crc >>> 8) ^ table[(crc ^ bytes[i]) & 0xff];
+            }
+            return (crc ^ 0xffffffff) >>> 0;
+        }
+        const table = (function makeTable() {
+            const t = new Uint32Array(256);
+            for (let i = 0; i < 256; i++) {
+                let c = i;
+                for (let k = 0; k < 8; k++) {
+                    c = c & 1 ? 0xedb88320 ^ (c >>> 1) : (c >>> 1);
+                }
+                t[i] = c >>> 0;
+            }
+            return t;
+        })();
+    }
+
+    private reset(): void {
+        // Clear all entities
+        this.entities.clear();
+        for (const system of this.systems) {
+            system.entities.clear();
+        }
+        
+        // Reset Wave System
+        if (this.waveSystem) {
+            this.waveSystem.reset();
+        }
+
+        // Clear canvases
+        this.trailCtx.clearRect(0, 0, this.worldWidth, this.worldHeight);
+        this.minimapCtx.clearRect(0, 0, this.minimapCanvas.width, this.minimapCanvas.height);
+        
+        // Reset Camera
+        this.camera.x = 0;
+        this.camera.y = 0;
+    }
+
+    public start(): void {
+        if (this.isRunning) return;
+        this.isRunning = true;
+        this.lastTime = performance.now();
+        requestAnimationFrame((time) => this.loop(time));
+    }
+
+    public stop(): void {
+        this.isRunning = false;
+        // Legacy stop, now handled by gameOver()
+    }
+
+    private startAct1(): void {
+        // Create the "Canvas Eye" (The sketch to defend)
+        const canvasEye = new Entity();
+        canvasEye.tags.add('canvas_eye');
+        
+        // Find player to spawn near them, or center of world
+        let spawnX = this.worldWidth / 2;
+        let spawnY = this.worldHeight / 2;
+        for (const entity of this.entities.values()) {
+            if (entity.tags.has('player')) {
+                const t = entity.getComponent(Transform);
+                if (t) {
+                    spawnX = t.x;
+                    spawnY = t.y;
+                }
+                const weapon = entity.getComponent(Weapon);
+                if (weapon) {
+                    weapon.unlocked = new Set([0]); // Give basic pencil back
+                    weapon.currentWeaponIndex = 0;
+                    window.dispatchEvent(new CustomEvent('announce', { detail: { text: '你捡起了一支掉落的【基础画笔】！' } }));
+                }
+                break;
+            }
+        }
+
+        canvasEye.addComponent(new Transform(spawnX, spawnY, 0));
+        const eyeRenderable = new Renderable('rgba(255, 255, 255, 0.8)', 40, 80, 80, 'circle');
+        eyeRenderable.zIndex = 5;
+        canvasEye.addComponent(eyeRenderable);
+        canvasEye.addComponent(new Health(1000));
+        
+        this.addEntity(canvasEye);
+    }
+
+    private handleExplosion(x: number, y: number, radius: number, damage: number): void {
+        for (const entity of this.entities.values()) {
+            if (entity.tags.has('player') || entity.tags.has('enemy') || entity.tags.has('canvas_eye')) {
+                const t = entity.getComponent(Transform);
+                if (t) {
+                    const dx = t.x - x;
+                    const dy = t.y - y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < radius) {
+                        const health = entity.getComponent(Health);
+                        if (health) {
+                            health.current -= damage;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private loop(time: number): void {
+        if (!this.isRunning) return;
+
+        let dt = (time - this.lastTime) / 1000;
+        this.lastTime = time;
+        
+        // Cap dt to prevent huge jumps (e.g. tab switch)
+        if (dt > 0.1) dt = 0.1;
+
+        // 1. Clear canvas first
+        // Effect: Trail / Afterimage
+        // Instead of clearRect, we fill with semi-transparent background
+        // Wait, if we want persistent trails on the GAME canvas (e.g. bullet trails), we use this.
+        // But the user said "player movement trail and attack effect... not leaving traces on canvas".
+        // The TrailSystem draws to trailCtx (trailCanvas).
+        // The RenderSystem draws to gameCtx (gameCanvas).
+        
+        // If trailCanvas is not showing up, maybe it's the CSS transform?
+        // Or maybe it's being cleared somewhere?
+        // We only clear trailCtx in reset().
+        
+        // Let's check the loop.
+        // 1. Clear canvas first
+        this.gameCtx.clearRect(0, 0, this.gameCanvas.width, this.gameCanvas.height);
+
+        // ====== Canvas 时间消隐机制 (Alpha Decay) ======
+        // 仅在游戏中持续消隐背景涂鸦，降低视觉混沌感
+        if (this.state === GameState.PLAYING) {
+            this.trailCtx.save();
+            this.trailCtx.globalCompositeOperation = 'destination-out';
+            // 每秒大约消隐 5%~10% 的透明度 (30秒左右降至20%以下)
+            const fadeAlpha = 0.05 * dt; 
+            this.trailCtx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha})`;
+            this.trailCtx.fillRect(0, 0, this.worldWidth, this.worldHeight);
+            this.trailCtx.restore();
+        }
+        
+        if (this.state === GameState.PLAYING) {
+            this.update(dt);
+        } else if (this.state === GameState.STUDIO) {
+            this.updateStudio(dt);
+        }
+        
+        // 3. Update Trail Canvas Position (Camera + Shake)
+        const shakeX = this.camera.shakeX || 0;
+        const shakeY = this.camera.shakeY || 0;
+        // Use translate3d for performance
+        this.trailCanvas.style.transform = `translate3d(${-this.camera.x + shakeX}px, ${-this.camera.y + shakeY}px, 0)`;
+
+        // 4. Request next frame
+        requestAnimationFrame((t) => this.loop(t));
+    }
+
+    private update(dt: number): void {
+        try {
+            for (const system of this.systems) {
+                // console.log('Running system:', system.constructor.name);
+                system.update(dt);
+            }
+        } catch (e) {
+            console.error('System update failed:', e);
+        }
+        
+        // Global cleanup of inactive entities
+        // Iterate through all entities and remove those marked as inactive
+        for (const [id, entity] of this.entities) {
+            if (!entity.active) {
+                this.removeEntity(id);
+            }
+            if (entity.tags.has('player')) {
+                const stats = entity.getComponent(PlayerStats);
+                if (stats) {
+                    stats.survivalTime += dt;
+                }
+            }
+        }
+        
+        this.lastRatingTick += dt;
+        const activeEnemies = (() => {
+            let c = 0;
+            for (const [, e] of this.entities) if (e.tags.has('enemy')) c++;
+            return c;
+        })();
+        this.ratingInterval = (activeEnemies > 40 || dt > 0.02) ? 3 : 1;
+        if (this.lastRatingTick >= this.ratingInterval) {
+            this.lastRatingTick = 0;
+            this.evaluateRating();
+        }
+    }
+
+    private render(): void {
+        // Clear game canvas
+        this.gameCtx.clearRect(0, 0, this.width, this.height);
+        
+        // Update Trail Canvas Position (Camera + Shake)
+        const shakeX = this.camera.shakeX || 0;
+        const shakeY = this.camera.shakeY || 0;
+        this.trailCanvas.style.transform = `translate(${-this.camera.x + shakeX}px, ${-this.camera.y + shakeY}px)`;
+        
+        // Render logic will be handled by RenderSystem
+    }
+    
+    private evaluateRating(): void {
+        const x = Math.max(0, Math.min(this.worldWidth - this.width, this.camera.x));
+        const y = Math.max(0, Math.min(this.worldHeight - this.height, this.camera.y));
+        const w = Math.min(this.width, this.worldWidth - x);
+        const h = Math.min(this.height, this.worldHeight - y);
+        this.ratingCtx.clearRect(0, 0, 64, 64);
+        this.ratingCtx.drawImage(this.trailCanvas, x, y, w, h, 0, 0, 64, 64);
+        let density = 0;
+        let contrast = 0;
+        let edges = 0;
+        const img = this.ratingCtx.getImageData(0, 0, 64, 64);
+        const data = img.data;
+        let prev = 0;
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+            if (a > 10) density++;
+            const lum = (r * 0.2126 + g * 0.7152 + b * 0.0722);
+            contrast += Math.abs(lum - 128);
+            const diff = Math.abs(lum - prev);
+            if (diff > 25) edges++;
+            prev = lum;
+        }
+        const totalPixels = (data.length / 4) || 1;
+        const dScore = Math.min(100, (density / totalPixels) * 120);
+        const cScore = Math.min(100, (contrast / totalPixels) * 0.8);
+        const eScore = Math.min(100, (edges / totalPixels) * 1.2);
+        const rating = Math.floor((dScore * 0.4) + (cScore * 0.3) + (eScore * 0.3));
+        for (const [, e] of this.entities) {
+            if (!e.tags.has('player')) continue;
+            const sc = e.getComponent(Score);
+            if (sc) sc.rating = rating;
+        }
+        if (rating >= 70 && (performance.now() - this.lastBuffTime > 10000)) {
+            this.lastBuffTime = performance.now();
+            for (const [, e] of this.entities) {
+                if (!e.tags.has('player')) continue;
+                const wpn = e.getComponent(Weapon);
+                if (wpn) {
+                    wpn.critChance = Math.min(0.8, wpn.critChance + 0.15);
+                    setTimeout(() => {
+                        wpn.critChance = Math.max(0, wpn.critChance - 0.15);
+                    }, 8000);
+                }
+            }
+            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `评分加成：暴击提升` } }));
+        }
+        if (rating >= 85 && (performance.now() - this.lastEliteTime > 15000)) {
+            this.lastEliteTime = performance.now();
+            let px = 0, py = 0;
+            for (const [, e] of this.entities) {
+                if (!e.tags.has('player')) continue;
+                const t = e.getComponent(Transform);
+                if (t) { px = t.x; py = t.y; }
+            }
+            const elite = EnemyFactory.create('shield', px + 120, py);
+            const hp = elite.getComponent(Health);
+            const vel = elite.getComponent(Velocity);
+            if (hp) { hp.max = Math.floor(hp.max * 1.5); hp.current = hp.max; }
+            if (vel) { vel.speed *= 1.3; }
+            this.addEntity(elite);
+            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `精英出现` } }));
+        }
+    }
+    
+    private buyStudioTime(sec: number): void {
+        let coins = 0;
+        for (const [, e] of this.entities) {
+            if (!e.tags.has('player')) continue;
+            const sc = e.getComponent(Score);
+            if (sc) coins = sc.coins;
+        }
+        if (coins < sec) {
+            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `金币不足` } }));
+            return;
+        }
+        for (const [, e] of this.entities) {
+            if (!e.tags.has('player')) continue;
+            const sc = e.getComponent(Score);
+            if (sc) sc.coins -= sec;
+        }
+        this.studioTimeLeft += sec;
+        this.enterStudio();
+    }
+    
+    private enterStudio(): void {
+        this.state = GameState.STUDIO;
+        for (const [, e] of this.entities) {
+            if (e.tags.has('enemy')) e.active = false;
+        }
+        if (this.gameOverMenu) this.gameOverMenu.style.display = 'none';
+        if (this.gameUI) this.gameUI.style.display = 'block';
+        if (!this.isRunning) {
+            this.start();
+        }
+    }
+    
+    private updateStudio(dt: number): void {
+        const allow = new Set(['InputSystem','MovementSystem','SkillSystem','TrailSystem','RenderSystem','UISystem','MinimapSystem']);
+        try {
+            for (const system of this.systems) {
+                const name = (system as any).constructor.name;
+                if (allow.has(name)) system.update(dt);
+            }
+        } catch (e) {
+            console.error('System update failed:', e);
+        }
+        this.studioTimeLeft -= dt;
+        if (this.studioTimeLeft <= 0) {
+            this.studioTimeLeft = 0;
+            for (const [, e] of this.entities) {
+                if (!e.tags.has('player')) continue;
+                const sc = e.getComponent(Score);
+                if (sc) sc.coins = 0;
+            }
+            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `创作时间结束` } }));
+            window.dispatchEvent(new CustomEvent('open-esc'));
+        }
+        
+        const shakeX = this.camera.shakeX || 0;
+        const shakeY = this.camera.shakeY || 0;
+        this.trailCanvas.style.transform = `translate3d(${-this.camera.x + shakeX}px, ${-this.camera.y + shakeY}px, 0)`;
+    }
+    
+    private saveImageToFrame(frameIndex: number): void {
+        // 直接使用 trailCanvas 的内容（包含整个世界的涂鸦，透明背景）
+        const dataUrl = this.trailCanvas.toDataURL('image/png');
+        
+        try {
+            // Save to localStorage using simple keys
+            localStorage.setItem(`art_frame_${frameIndex}`, dataUrl);
+            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `作品已保存至画框 ${frameIndex}！` } }));
+        } catch (e) {
+            console.error('Save to localStorage failed, might be out of quota', e);
+            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `保存失败：本地存储空间不足` } }));
+        }
+        
+        // Update menu frames immediately
+        this.loadFramesToMenu();
+        
+        // 触发本地下载
+        const link = document.createElement('a');
+        link.download = `dont_erase_me_art_${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
+    }
+
+    public loadFramesToMenu(): void {
+        for (let i = 1; i <= 4; i++) {
+            const dataUrl = localStorage.getItem(`art_frame_${i}`);
+            const imgEl = document.getElementById(`frame-img-${i}`) as HTMLImageElement;
+            const spanEl = document.querySelector(`#frame-${i} span`) as HTMLElement;
+            
+            if (imgEl && spanEl) {
+                if (dataUrl) {
+                    imgEl.src = dataUrl;
+                    imgEl.style.display = 'block';
+                    spanEl.style.display = 'none';
+                } else {
+                    imgEl.style.display = 'none';
+                    spanEl.textContent = t(`画框 ${i}`);
+                    spanEl.style.display = 'block';
+                }
+            }
+        }
+    }
+
+    public updateUITexts(): void {
+        const setText = (id: string, textKey: string) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = t(textKey);
+        };
+
+        setText('endless-btn', '开始游戏');
+        setText('settings-btn', '设置');
+        setText('exit-btn', '退出游戏');
+        setText('restart-btn', '再玩一次');
+        setText('save-btn', '保存作品');
+        setText('back-main-btn', '返回主界面');
+        setText('back-to-menu-btn', '返回主界面');
+        setText('start-run-btn', '确认出击');
+        
+        // Character and Weapon Selection
+        const selTitle = document.querySelector('#selection-screen h2') as HTMLElement;
+        if (selTitle) selTitle.textContent = t('出击准备');
+        
+        const charTitle = document.querySelector('.selection-container > div:nth-child(1) h3') as HTMLElement;
+        if (charTitle) charTitle.textContent = t('选择角色');
+        
+        const wpTitle = document.querySelector('.selection-container > div:nth-child(2) h3') as HTMLElement;
+        if (wpTitle) wpTitle.textContent = t('选择初始画笔 (武器)');
+        
+        // Settings texts
+        const settingsTitle = document.querySelector('#settings-modal h2');
+        if (settingsTitle) settingsTitle.textContent = t('设置') + ' (Settings)';
+        
+        const langTitle = document.querySelector('#settings-modal h3:nth-of-type(1)');
+        if (langTitle) langTitle.textContent = getLang() === 'zh' ? '语言 (Language)' : 'Language';
+        const dispTitle = document.querySelector('#settings-modal h3:nth-of-type(2)');
+        if (dispTitle) dispTitle.textContent = getLang() === 'zh' ? '显示 (Display)' : 'Display';
+        
+        setText('fullscreen-btn', '全屏模式 / Fullscreen');
+        setText('windowed-btn', '窗口模式 / Windowed');
+        setText('close-settings-btn', '返回 (Back)');
+
+        // Frames
+        this.loadFramesToMenu();
+        
+        // Re-render selection screen if it's visible
+        if (this.state === GameState.SELECTION) {
+            this.showSelectionScreen();
+        }
+    }
+}

@@ -1,0 +1,16 @@
+# OS and editor metadata
+.DS_Store
+.vscode/
+.idea/
+**/__pycache__/
+*.pyc
+
+# Build dependencies and generated web output
+**/node_modules/
+**/dist/
+
+# Generated Windows distribution. Rebuild from DontEraseMe/ when needed.
+DontEraseMe/release/
+
+# This legacy archive exceeds GitHub's 100 MB per-file Git limit.
+正式版v0.5/DontEraseMe.zip
