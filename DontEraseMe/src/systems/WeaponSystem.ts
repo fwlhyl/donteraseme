@@ -21,6 +21,15 @@ import { ExperienceOrb } from '../components/ExperienceOrb';
 import { Puddle } from '../components/Puddle';
 // removed Physics import
 import { DeathHandler } from './DeathHandler';
+import { signalDoodleAttack } from '../art/DoodleMotion';
+import { emitGameSound, type SoundCue } from '../audio/AudioEvents';
+
+const WEAPON_SHOT_SOUNDS: readonly SoundCue[] = [
+    'shot-brush', 'shot-spray', 'shot-scrape', 'shot-chain',
+    'shot-ruler', 'shot-ribbon', 'shot-vortex', 'shot-bucket',
+    'shot-pen', 'shot-airbrush', 'shot-compass', 'shot-dropper'
+];
+
 export class WeaponSystem extends System {
     constructor(
         private input: InputManager,
@@ -39,6 +48,14 @@ export class WeaponSystem extends System {
             const stats = entity.getComponent(PlayerStats);
             
             if (weapon && transform && renderable) {
+                // Magic Pen manifestations are piloted vehicles. Their combat
+                // system owns the temporary attack while the player's equipped
+                // shop weapon is fully frozen, then resumes untouched on expiry.
+                if (entity.tags.has('player') && entity.tags.has('magic_piloting')) {
+                    entity.attacking = false;
+                    continue;
+                }
+
                 // Handle cooldown
                 if (weapon.cooldown > 0) {
                     weapon.cooldown -= 1; // Assuming 60fps frame based cooldown
@@ -143,6 +160,7 @@ export class WeaponSystem extends System {
 
         // Special continuous tool: Roller
         if (isTryingToShoot && config.type === 'roller' && this.trailCtx) {
+            signalDoodleAttack(player);
             weapon.cooldown = 2;
             this.trailCtx.save();
             this.trailCtx.fillStyle = renderable.color;
@@ -151,6 +169,16 @@ export class WeaponSystem extends System {
             this.trailCtx.arc(transform.x, transform.y, 28, 0, Math.PI * 2);
             this.trailCtx.fill();
             this.trailCtx.restore();
+            window.dispatchEvent(new CustomEvent('player-painted', {
+                detail: {
+                    x: transform.x,
+                    y: transform.y,
+                    rotation: transform.rotation,
+                    range: 56,
+                    width: 56,
+                    type: config.type
+                }
+            }));
         }
         // Shooting
         if (isTryingToShoot && weapon.cooldown <= 0 && !weapon.reloading) {
@@ -169,7 +197,7 @@ export class WeaponSystem extends System {
                         freeShot = true;
                         // 稍微延迟一丁点发射免费子弹，形成“残影连击”视觉效果
                         setTimeout(() => {
-                            if (player.active) {
+                            if (player.active && !player.tags.has('magic_piloting')) {
                                 this.shoot(player, weapon, transform, renderable.color, stats);
                             }
                         }, 50);
@@ -343,6 +371,7 @@ export class WeaponSystem extends System {
     }
 
     private fireDigitalPenAttack(owner: Entity, weapon: Weapon, config: any, transform: Transform, bulletColor: string, stats: PlayerStats): void {
+        emitGameSound(WEAPON_SHOT_SOUNDS[config.id] ?? 'shot-pen', { x: transform.x, y: transform.y, gain: 0.45 });
         let isReaperStrike = false;
         if (stats && stats.killReaperReady) {
             isReaperStrike = true;
@@ -440,6 +469,8 @@ export class WeaponSystem extends System {
                 }
                 hit.hp.current -= dmg;
                 const textColor = isSuperCrit ? '#ff0000' : (isCrit ? '#ff4444' : '#ffffff');
+                const hitTransform = hit.e.getComponent(Transform)!;
+                if (dmg > 0) emitGameSound(isCrit || isSuperCrit ? 'hit-heavy' : 'hit', { x: hitTransform.x, y: hitTransform.y });
                 DamageTextSystem.addDamageText(hit.e.getComponent(Transform)!.x, hit.e.getComponent(Transform)!.y - 15, dmg, textColor, isCrit || isSuperCrit);
                 pierceCount++;
                 if (hit.hp.current <= 0) {
@@ -586,7 +617,7 @@ export class WeaponSystem extends System {
 
         for (let b = 0; b < burstCount; b++) {
             setTimeout(() => {
-                if (!owner.active) return;
+                if (!owner.active || owner.tags.has('magic_piloting')) return;
                 
                 if (config.type === 'shotgun' && burstCount > 1) {
                     const pCtrl = owner.getComponent(PlayerControl);
@@ -706,6 +737,26 @@ export class WeaponSystem extends System {
         const baseFrMultiplier = stats ? weapon.fireRateMul / stats.totalFireRateMultiplier : weapon.fireRateMul;
         const finalFrMultiplier = baseFrMultiplier / (1 + frenzySpeedBonus);
         weapon.cooldown = Math.max(1, Math.round(config.fireRate * finalFrMultiplier));
+        signalDoodleAttack(owner);
+        // One attack cue per trigger, independent of pellets, beams, or burst count.
+        emitGameSound(WEAPON_SHOT_SOUNDS[config.id] ?? 'shot-brush', { x: transform.x, y: transform.y });
+
+        // Guard Mode listens to this one semantic event rather than trying to
+        // infer repair strokes from every individual projectile implementation.
+        // It is harmless in other modes and keeps primary weapon marks aligned
+        // with their actual firing direction.
+        if (owner.tags.has('player')) {
+            window.dispatchEvent(new CustomEvent('player-painted', {
+                detail: {
+                    x: transform.x,
+                    y: transform.y,
+                    rotation: transform.rotation,
+                    range: Math.min(Math.max(config.range || 120, 80), 420),
+                    width: Math.max(22, config.radius * 5 + 14),
+                    type: config.type
+                }
+            }));
+        }
         
         // 换弹灵感判定
         let inspLevel = 0;
@@ -908,6 +959,7 @@ export class WeaponSystem extends System {
                 }
                 
                 hit.hp.current -= dmg;
+                if (dmg > 0) emitGameSound(isCrit ? 'hit-heavy' : 'hit', { x: hit.tt.x, y: hit.tt.y });
                 DamageTextSystem.addDamageText(hit.tt.x, hit.tt.y - 15, dmg, isCrit ? '#ff4444' : '#ffffff', isCrit);
                 
                 // 觉醒后附带极强击退效果
@@ -1121,7 +1173,7 @@ export class WeaponSystem extends System {
 
         for (let b = 0; b < burstCount; b++) {
             setTimeout(() => {
-                if (!owner.active) return;
+                if (!owner.active || owner.tags.has('magic_piloting')) return;
                 
                 if (config.type === 'shotgun' && burstCount > 1) {
                     const pCtrl = owner.getComponent(PlayerControl);
@@ -1247,6 +1299,8 @@ export class WeaponSystem extends System {
         const cfg = weapon.config;
         if (!cfg) return;
         weapon.reloading = true;
+        const reloadTransform = player.getComponent(Transform);
+        emitGameSound('reload', { x: reloadTransform?.x, y: reloadTransform?.y });
         const reloadMul = stats ? weapon.reloadTimeMul / stats.totalReloadMultiplier : weapon.reloadTimeMul;
         const rt = Math.max(1, Math.floor(cfg.reloadTime * reloadMul));
         weapon.reloadTimer = rt;
@@ -1304,6 +1358,7 @@ export class WeaponSystem extends System {
                         // 极快速度：设置极短的帧数（3帧，即0.05秒），实现"唰"一下的瞬间冲刺
                         const isHighLevel = compassDashLevel >= 2;
                         pc.dashFrames = 3;
+                        emitGameSound('dash', { x: transform.x, y: transform.y });
                         pc.dashSpeed = isHighLevel ? (200 / 3) : (100 / 3);
                         
                         // Determine dash direction from movement input or rotation

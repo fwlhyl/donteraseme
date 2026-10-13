@@ -33,6 +33,13 @@ export const WEAPONS: WeaponConfig[] = [
     { name: "Eyedropper (Mine)", id: 11, fireRate: 40, speed: 0, damage: 40, count: 1, spread: 0, color: '#22ff22', radius: 10, type: 'mine', range: 0, magSize: 10, reloadTime: 100 },
 ];
 
+export function getWeaponUnlockPrice(weaponId: number): number {
+    const position = WEAPONS.findIndex(weapon => weapon.id === weaponId);
+    if (position < 0) return Number.POSITIVE_INFINITY;
+    if (position < 3) return 0;
+    return 500 + (position - 3) * 30;
+}
+
 export class Weapon extends Component {
     public currentWeaponIndex: number = 0;
     public cooldown: number = 0;

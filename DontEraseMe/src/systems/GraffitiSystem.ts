@@ -21,6 +21,12 @@ interface GraffitiZone {
     playerStats: PlayerStats;
 }
 
+interface GraffitiSegmentIndex {
+    indexedCount: number;
+    cells: Map<string, number[]>;
+    longSegments: number[];
+}
+
 export class GraffitiSystem extends System {
     private trailCtx?: CanvasRenderingContext2D;
     
@@ -35,6 +41,10 @@ export class GraffitiSystem extends System {
     // Active graffiti zones
     private activeZones: GraffitiZone[] = [];
     private frame: number = 0;
+    // Paths are append-only until replaced on release/loop closure. Weak keys
+    // release the index with the old path without discarding any painted trail.
+    private segmentIndices = new WeakMap<{x: number, y: number}[], GraffitiSegmentIndex>();
+    private readonly segmentCellSize = 96;
     public addEntityCallback?: (entity: Entity) => void;
 
     constructor(trailCtx?: CanvasRenderingContext2D) {
@@ -124,8 +134,54 @@ export class GraffitiSystem extends System {
         // We need at least intersectionSkipPoints to form a valid loop
         if (path.length < this.intersectionSkipPoints) return -1;
 
-        // Check line segment (p1, p2) against all segments in path except the last few
-        for (let i = 0; i < path.length - this.intersectionSkipPoints; i++) {
+        const eligibleCount = path.length - this.intersectionSkipPoints;
+        let candidates: number[] | null = null;
+        if (eligibleCount > 64) {
+            let index = this.segmentIndices.get(path);
+            if (!index || index.indexedCount > eligibleCount) {
+                index = { indexedCount: 0, cells: new Map(), longSegments: [] };
+                this.segmentIndices.set(path, index);
+            }
+            // Only newly eligible segments are inserted as the skipped tail
+            // advances; earlier points and the recorded stroke stay untouched.
+            while (index.indexedCount < eligibleCount) {
+                const i = index.indexedCount++;
+                const bounds = this.segmentCellBounds(path[i], path[i + 1]);
+                const cellCount = (bounds.maxX - bounds.minX + 1) * (bounds.maxY - bounds.minY + 1);
+                if (!Object.values(bounds).every(Number.isSafeInteger) || !Number.isFinite(cellCount) || cellCount > 256) {
+                    index.longSegments.push(i);
+                    continue;
+                }
+                for (let y = bounds.minY; y <= bounds.maxY; y++) {
+                    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+                        const key = `${x},${y}`;
+                        let cell = index.cells.get(key);
+                        if (!cell) index.cells.set(key, cell = []);
+                        cell.push(i);
+                    }
+                }
+            }
+
+            const bounds = this.segmentCellBounds(p1, p2);
+            const cellCount = (bounds.maxX - bounds.minX + 1) * (bounds.maxY - bounds.minY + 1);
+            // Teleports can span the world: retain the linear fallback for
+            // them instead of allocating an enormous rectangle of cells.
+            if (Object.values(bounds).every(Number.isSafeInteger) && Number.isFinite(cellCount) && cellCount < eligibleCount) {
+                const nearby = new Set(index.longSegments);
+                for (let y = bounds.minY; y <= bounds.maxY; y++) {
+                    for (let x = bounds.minX; x <= bounds.maxX; x++) {
+                        const cell = index.cells.get(`${x},${y}`);
+                        if (cell) for (const i of cell) nearby.add(i);
+                    }
+                }
+                // The first intersecting segment defines the original loop.
+                candidates = [...nearby].sort((a, b) => a - b);
+            }
+        }
+
+        // The exact intersection test and its strict endpoint rules are unchanged.
+        for (let candidate = 0; candidate < (candidates?.length ?? eligibleCount); candidate++) {
+            const i = candidates ? candidates[candidate] : candidate;
             const p3 = path[i];
             const p4 = path[i + 1];
 
@@ -134,6 +190,15 @@ export class GraffitiSystem extends System {
             }
         }
         return -1;
+    }
+
+    private segmentCellBounds(p1: {x: number, y: number}, p2: {x: number, y: number}) {
+        return {
+            minX: Math.floor(Math.min(p1.x, p2.x) / this.segmentCellSize),
+            minY: Math.floor(Math.min(p1.y, p2.y) / this.segmentCellSize),
+            maxX: Math.floor(Math.max(p1.x, p2.x) / this.segmentCellSize),
+            maxY: Math.floor(Math.max(p1.y, p2.y) / this.segmentCellSize),
+        };
     }
 
     // Helper: Line intersection

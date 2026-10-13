@@ -16,23 +16,8 @@ import { Quest } from '../components/Quest';
 import type { QuestStep } from '../components/Quest';
 import { PlayerStats } from '../components/PlayerStats';
 import { CHARACTERS } from '../config/EndlessConfig';
-import { SpriteAnimation } from '../components/SpriteAnimation';
-import { PlayerAnimation } from '../components/PlayerAnimation';
-import type { AnimConfig } from '../components/PlayerAnimation';
-
-// 导入测试用的免费素材
-import IdleDownImg from '../ui/CXK/Idle/Idle_Down.png';
-import IdleLeftImg from '../ui/CXK/Idle/Idle_Left.png';
-import IdleRightImg from '../ui/CXK/Idle/Idle_Right.png';
-import IdleUpImg from '../ui/CXK/Idle/Idle_Up.png';
-
-import DashDownImg from '../ui/CXK/Dash/Dash_Down.png';
-import DashLeftImg from '../ui/CXK/Dash/Dash_Left.png';
-import DashRightImg from '../ui/CXK/Dash/Dash_Right.png';
-import DashUpImg from '../ui/CXK/Dash/Dash_Up.png';
-
-import HitLeftImg from '../ui/CXK/Hit/CXKLeftHit.png';
-import HitRightImg from '../ui/CXK/Hit/CXKRightHit.png';
+import { PlayerArtwork } from '../components/PlayerArtwork';
+import { getDoodleHeroes, HERO_FRAMES } from '../art/DoodleArt';
 
 export class PlayerFactory {
     public static create(x: number, y: number, characterId?: string, weaponId?: number): Entity {
@@ -49,70 +34,9 @@ export class PlayerFactory {
         player.addComponent(new Velocity());
         
         const renderable = new Renderable('#ffffff', 20, 40, 40, 'circle', 70);
-        // 放大人物渲染尺寸以匹配逻辑碰撞体积 (原图偏小，可以进行缩放)
-        renderable.scaleX = 1.5;
-        renderable.scaleY = 1.5;
-        
+        // Shared 64px doodle family; visual-only, all collision/stats stay unchanged.
         player.addComponent(renderable);
-
-        // ===== 挂载序列帧动画 =====
-        // 提前预加载所有方向的动画素材
-        const anims: Record<string, AnimConfig> = {};
-        
-        // 自己的美术素材（提供真实的左和右两个方向）
-        // 原图单行 256x32，每帧 32x32
-        const createCXKConfig = (src: string): AnimConfig => {
-            const img = new Image();
-            img.src = src;
-            return {
-                image: img,
-                row: 0,
-                totalFrames: 8,
-                frameWidth: 32,
-                frameHeight: 32
-            };
-        };
-
-        // 受击动画（改为 4 帧）
-        const createHitConfig = (src: string): AnimConfig => {
-            const img = new Image();
-            img.src = src;
-            return {
-                image: img,
-                row: 0,
-                totalFrames: 4,
-                frameWidth: 32,
-                frameHeight: 32
-            };
-        };
-
-        anims['idle_left'] = createCXKConfig(IdleLeftImg);
-        anims['idle_right'] = createCXKConfig(IdleRightImg);
-        anims['dash_left'] = createCXKConfig(DashLeftImg);
-        anims['dash_right'] = createCXKConfig(DashRightImg);
-        anims['hit_left'] = createHitConfig(HitLeftImg);
-        anims['hit_right'] = createHitConfig(HitRightImg);
-
-        // 为了防止旧代码初始化报错，这里随便绑一个
-        anims['idle_down'] = createCXKConfig(IdleLeftImg);
-
-        player.addComponent(new PlayerAnimation(anims));
-
-        // 默认用 idle_left 初始化
-        const initAnim = anims['idle_left'];
-        const spriteAnim = new SpriteAnimation(
-            initAnim.image, 
-            initAnim.frameWidth,
-            initAnim.frameHeight,
-            initAnim.totalFrames,
-            5,     // 播放速度稍微调快一点
-            true,  // 循环播放
-            0.5,   // 轴心点X：中心
-            0.5,   // 轴心点Y：中心
-            initAnim.row
-        );
-        player.addComponent(spriteAnim);
-        // ========================
+        player.addComponent(new PlayerArtwork(getDoodleHeroes(), 64, 20, HERO_FRAMES[charConfig.id], true));
         
         // Add PlayerStats based on selection
         const stats = new PlayerStats();

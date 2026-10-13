@@ -11,6 +11,7 @@ import { Health } from '../components/Health';
 import { Projectile } from '../components/Projectile';
 import { ParticleFactory } from '../entities/ParticleFactory';
 import { DamageTextSystem } from './DamageTextSystem';
+import { emitGameSound } from '../audio/AudioEvents';
 
 export class SummonSystem extends System {
     private addEntityCallback: (entity: Entity) => void;
@@ -181,6 +182,7 @@ export class SummonSystem extends System {
                         
                         if (!entity.tags.has(`hit_${enemy.id}`)) {
                             eHealth.current -= damage;
+                            if (damage > 0) emitGameSound('hit', { x: eTransform.x, y: eTransform.y, gain: 0.5 });
                             DamageTextSystem.addDamageText(eTransform.x, eTransform.y, Math.floor(damage), '#ff0000', false);
                             entity.tags.add(`hit_${enemy.id}`);
                             setTimeout(() => {

@@ -1,6 +1,6 @@
 import { Component } from '../core/Component';
 
-export type ShapeType = 'circle' | 'rect' | 'line' | 'sprite' | 'triangle' | 'diamond' | 'crescent' | 'shockwave' | 'wall_line';
+export type ShapeType = 'circle' | 'rect' | 'line' | 'sprite' | 'triangle' | 'diamond' | 'crescent' | 'shockwave' | 'wall_line' | 'magic_tank' | 'magic_robot' | 'magic_bomber';
 
 export class Renderable extends Component {
     // Animation properties for squash and stretch

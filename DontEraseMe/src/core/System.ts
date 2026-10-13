@@ -3,6 +3,9 @@ import { Entity } from './Entity';
 export abstract class System {
     public entities: Set<Entity> = new Set();
     public abstract update(dt: number): void;
+
+    /** Called between runs when a mode changes the playable world dimensions. */
+    public setWorldSize(_width: number, _height: number): void {}
     
     // Optional methods
     public onEntityAdded(entity: Entity): void {}

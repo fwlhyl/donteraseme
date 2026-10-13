@@ -12,6 +12,7 @@ import { ExperienceOrb } from '../components/ExperienceOrb';
 import { WaterMark } from '../components/WaterMark';
 import { Projectile } from '../components/Projectile';
 import { XPOrbFactory } from '../entities/XPOrbFactory';
+import { emitGameSound } from '../audio/AudioEvents';
 
 export class DeathHandler {
     public static handleEnemyDeath(
@@ -25,12 +26,16 @@ export class DeathHandler {
     ): void {
         if (!enemy.active) return;
         enemy.active = false;
+        if (!enemy.tags.has('ink_dummy')) {
+            emitGameSound('kill', { x, y, gain: enemy.getComponent(EnemyBehavior)?.type.startsWith('boss') ? 1.3 : 1 });
+        }
 
         // --- 替身爆炸 (Ink Dummy Explosion) ---
         if (enemy.tags.has('ink_dummy') && player) {
             const eBeh = enemy.getComponent(EnemyBehavior);
             const pStats = player.getComponent(PlayerStats);
             if (eBeh && eBeh.damageFactor >= 3 && pStats && addEntityCallback) {
+                emitGameSound('explosion', { x, y });
                 window.dispatchEvent(new CustomEvent('announce', { detail: { text: `替身爆炸！` } }));
                 const explosion = new Entity();
                 explosion.addComponent(new Transform(x, y));

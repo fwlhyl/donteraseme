@@ -17,6 +17,11 @@ export class PrologueSystem extends System {
         super();
     }
 
+    public override setWorldSize(width: number, height: number): void {
+        this.worldWidth = width;
+        this.worldHeight = height;
+    }
+
     public update(dt: number): void {
         let player: Entity | null = null;
         let story: StoryState | null = null;

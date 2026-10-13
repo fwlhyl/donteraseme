@@ -16,6 +16,7 @@ import { ExperienceOrb } from '../components/ExperienceOrb';
 import { PlayerStats } from '../components/PlayerStats';
 import { DamageTextSystem } from './DamageTextSystem';
 import { Paperclip } from '../components/Paperclip';
+import { emitGameSound } from '../audio/AudioEvents';
 
 export class SkillSystem extends System {
     constructor(
@@ -53,6 +54,11 @@ export class SkillSystem extends System {
                 this.triggerMoveMirror(dirX, dirY, x, y, entityId);
             }
         });
+    }
+
+    public override setWorldSize(width: number, height: number): void {
+        this.worldWidth = width;
+        this.worldHeight = height;
     }
 
     public update(dt: number): void {
@@ -214,8 +220,10 @@ export class SkillSystem extends System {
                             const d = Math.hypot(tt.x - transform.x, tt.y - transform.y);
                             if (Math.abs(d - r) <= thickness) {
                                 hp.current -= 40;
+                                emitGameSound('hit-heavy', { x: tt.x, y: tt.y });
                                 if (hp.current <= 0) {
                                     target.active = false;
+                                    emitGameSound('kill', { x: tt.x, y: tt.y });
                                     const exp = entity.getComponent(Experience);
                                     if (exp && this.addEntityCallback) {
                                         XPOrbFactory.drop(tt.x, tt.y, 20, this.entities, this.addEntityCallback);
@@ -230,6 +238,7 @@ export class SkillSystem extends System {
                         }
                         skill.curveStage = 0;
                         skill.toolCooldown = conf.cd;
+                        emitGameSound('skill', { x: transform.x, y: transform.y });
                         window.dispatchEvent(new CustomEvent('announce', { detail: { text: `画圆（命中伤害）` } }));
                     }
                 } else if (skill.activeTool === 'symmetry') {
@@ -243,6 +252,7 @@ export class SkillSystem extends System {
                         skill.symmetryFrames = 180;
                         skill.symmetryAxisX = transform.x;
                         skill.toolCooldown = conf.cd;
+                        emitGameSound('skill', { x: transform.x, y: transform.y });
                         window.dispatchEvent(new CustomEvent('announce', { detail: { text: `对称镜像启动` } }));
                     }
                 } else if (skill.activeTool === 'eraser') {
@@ -255,6 +265,7 @@ export class SkillSystem extends System {
                     } else if (skill.toolCooldown <= 0) {
                         skill.eraserShieldFrames = 240;
                         skill.toolCooldown = conf.cd;
+                        emitGameSound('shield', { x: transform.x, y: transform.y });
                         window.dispatchEvent(new CustomEvent('announce', { detail: { text: `橡皮盾开启` } }));
                     }
                 } else if (skill.activeTool === 'pin') {
@@ -278,6 +289,7 @@ export class SkillSystem extends System {
                         }
                         skill.toolCooldown = conf.cd;
                         window.dispatchEvent(new CustomEvent('announce', { detail: { text: `定点钉住` } }));
+                        emitGameSound('skill', { x: transform.x, y: transform.y });
                     }
                 } else if (skill.activeTool === 'explosion') {
                     const conf = this.getToolSettings('explosion');
@@ -315,6 +327,7 @@ export class SkillSystem extends System {
                 if (skill.symmetryFrames === 0) {
                     transform.x = skill.symmetryLastX;
                     transform.y = skill.symmetryLastY;
+                    emitGameSound('dash', { x: transform.x, y: transform.y });
                     window.dispatchEvent(new CustomEvent('announce', { detail: { text: `镜像位移` } }));
                 }
             }
@@ -376,6 +389,7 @@ export class SkillSystem extends System {
         // 直接修改 player 实体的 Transform 组件坐标，它会自动同步给渲染系统
         transform.x = endX;
         transform.y = endY;
+        emitGameSound('dash', { x: transform.x, y: transform.y });
         
         // 由于我们在处理事件时可能已经离开了主循环更新，
         // 或者 Transform 未被完全应用到渲染中，我们可以再通过事件发射一个粒子特效来强调传送
@@ -413,12 +427,14 @@ export class SkillSystem extends System {
             
             if (dist < cutWidth) { // 切割宽度
                 eHealth.current -= baseDamage;
+                if (baseDamage > 0) emitGameSound('hit-heavy', { x: eTransform.x, y: eTransform.y });
                 hitCount++;
                 DamageTextSystem.addDamageText(eTransform.x, eTransform.y - 20, baseDamage, '#ffffff', false);
                 
                 // 处理敌人死亡逻辑
                 if (eHealth.current <= 0) {
                     enemy.active = false;
+                    emitGameSound('kill', { x: eTransform.x, y: eTransform.y });
                     
                     // 增加金币和分数
                     const score = player.getComponent(Score);
@@ -489,6 +505,7 @@ export class SkillSystem extends System {
 
     private activateSkill(player: Entity, skill: Skill, transform: Transform, color: string): void {
         skill.cooldown = skill.maxCooldown;
+        emitGameSound('explosion', { x: transform.x, y: transform.y });
         
         // 1. Visual Effect: Splatter on Trail Canvas (Player Color)
         // User: "Explosion skill player itself leaves no trace".
@@ -515,9 +532,11 @@ export class SkillSystem extends System {
                     // Apply Damage
                     if (health) {
                         health.current -= skill.damage;
+                        if (skill.damage > 0) emitGameSound('hit-heavy', { x: targetTransform.x, y: targetTransform.y });
                         DamageTextSystem.addDamageText(targetTransform.x, targetTransform.y - 15, skill.damage, '#ffffff', false);
                         if (health.current <= 0) {
                             target.active = false;
+                            emitGameSound('kill', { x: targetTransform.x, y: targetTransform.y });
                             
                             // 增加金币和分数
                             const score = player.getComponent(Score);

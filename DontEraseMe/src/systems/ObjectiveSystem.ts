@@ -18,6 +18,11 @@ export class ObjectiveSystem extends System {
         super();
     }
     
+    public override setWorldSize(width: number, height: number): void {
+        this.worldWidth = width;
+        this.worldHeight = height;
+    }
+
     public update(dt: number): void {
         let player: Entity | undefined;
         for (const e of this.entities) {

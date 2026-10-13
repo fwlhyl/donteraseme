@@ -34,6 +34,18 @@ const TIMELINE: TimelineStage[] = [
     { endSecond: Infinity, maxEnemies: 300, spawnInterval: 0.15, weights: [{ type: 'chaser', weight: 28 }, { type: 'eraser', weight: 18 }, { type: 'shooter', weight: 10 }, { type: 'paper_plane', weight: 14 }, { type: 'shield', weight: 15 }, { type: 'summoner', weight: 15 } /* , { type: 'blackhole', weight: 10 } */] }
 ];
 
+// Guard Mode starts threatening the painting immediately.  Erasers are kept
+// below half of the population so the player still has a personal survival
+// problem instead of simply camping the artwork.
+const DEFENSE_TIMELINE: TimelineStage[] = [
+    { endSecond: 120, maxEnemies: 20, spawnInterval: 1.6, weights: [{ type: 'chaser', weight: 78 }, { type: 'eraser', weight: 22 }] },
+    { endSecond: 300, maxEnemies: 44, spawnInterval: 1.0, weights: [{ type: 'chaser', weight: 58 }, { type: 'eraser', weight: 32 }, { type: 'shooter', weight: 10 }] },
+    { endSecond: 600, maxEnemies: 82, spawnInterval: 0.65, weights: [{ type: 'chaser', weight: 45 }, { type: 'eraser', weight: 38 }, { type: 'shooter', weight: 7 }, { type: 'paper_plane', weight: 10 }] },
+    { endSecond: 900, maxEnemies: 120, spawnInterval: 0.48, weights: [{ type: 'chaser', weight: 39 }, { type: 'eraser', weight: 40 }, { type: 'shooter', weight: 8 }, { type: 'paper_plane', weight: 6 }, { type: 'shield', weight: 7 }] },
+    { endSecond: 1200, maxEnemies: 160, spawnInterval: 0.36, weights: [{ type: 'chaser', weight: 34 }, { type: 'eraser', weight: 42 }, { type: 'shooter', weight: 8 }, { type: 'paper_plane', weight: 7 }, { type: 'shield', weight: 9 }] },
+    { endSecond: Infinity, maxEnemies: 190, spawnInterval: 0.28, weights: [{ type: 'chaser', weight: 30 }, { type: 'eraser', weight: 43 }, { type: 'shooter', weight: 9 }, { type: 'paper_plane', weight: 8 }, { type: 'shield', weight: 10 }] }
+];
+
 // BOSS 刷新时间点 (秒)
 const BOSS_SPAWN_TIMES = [300, 600, 900, 1200]; // 5, 10, 15, 20 分钟
 
@@ -48,17 +60,25 @@ export class WaveSystem extends System {
 
     private width: number = window.innerWidth;
     private height: number = window.innerHeight;
+    private worldWidth = 3000;
+    private worldHeight = 2000;
+    private readonly bossTimers = new Set<number>();
 
     constructor(
         private addEntityCallback: (entity: Entity) => void,
         private camera: { x: number, y: number },
-        private getMode: () => 'story' | 'endless' = () => 'endless'
+        private getMode: () => 'story' | 'endless' | 'defense' = () => 'endless'
     ) {
         super();
         window.addEventListener('resize', () => {
             this.width = window.innerWidth;
             this.height = window.innerHeight;
         });
+    }
+
+    public override setWorldSize(width: number, height: number): void {
+        this.worldWidth = width;
+        this.worldHeight = height;
     }
 
     public update(dt: number): void {
@@ -97,8 +117,9 @@ export class WaveSystem extends System {
         }
 
         // 获取当前时间轴阶段配置
-        let currentStage = TIMELINE[0];
-        for (const stage of TIMELINE) {
+        const timeline = this.getMode() === 'defense' ? DEFENSE_TIMELINE : TIMELINE;
+        let currentStage = timeline[0];
+        for (const stage of timeline) {
             if (this.survivalTime <= stage.endSecond) {
                 currentStage = stage;
                 break;
@@ -117,21 +138,37 @@ export class WaveSystem extends System {
             }
         }
 
-        // Spawn Environmental Paint Walls
-        // 根据存活时间缩短颜料墙的生成间隔
-        const wallInterval = Math.max(10, 20 - (this.survivalTime / 60) * 2);
-        this.envWallSpawnTimer -= dt;
-        if (this.envWallSpawnTimer <= 0) {
-            this.envWallSpawnTimer = wallInterval;
-            this.spawnEnvironmentalWall();
+        // 暂停随机颜料障碍墙生成，保留实现供后续恢复；中央区域用作玩法画板。
+        /*
+        if (this.getMode() !== 'defense') {
+            const wallInterval = Math.max(10, 20 - (this.survivalTime / 60) * 2);
+            this.envWallSpawnTimer -= dt;
+            if (this.envWallSpawnTimer <= 0) {
+                this.envWallSpawnTimer = wallInterval;
+                this.spawnEnvironmentalWall();
+            }
         }
+        */
     }
 
     public reset(): void {
+        // A delayed boss from the previous arena must not enter a new run.
+        for (const timer of this.bossTimers) window.clearTimeout(timer);
+        this.bossTimers.clear();
         this.survivalTime = 0;
         this.spawnTimer = 0;
         this.envWallSpawnTimer = 20;
         this.bossSpawnedFlags = [false, false, false, false];
+    }
+
+    private getDefenseSpawnPosition(): { x: number; y: number } {
+        const margin = 60;
+        switch (Math.floor(Math.random() * 4)) {
+            case 0: return { x: Math.random() * this.worldWidth, y: -margin };
+            case 1: return { x: this.worldWidth + margin, y: Math.random() * this.worldHeight };
+            case 2: return { x: Math.random() * this.worldWidth, y: this.worldHeight + margin };
+            default: return { x: -margin, y: Math.random() * this.worldHeight };
+        }
     }
 
     private spawnEnvironmentalWall(): void {
@@ -194,8 +231,9 @@ export class WaveSystem extends System {
         const viewH = this.height;
         
         // 生成在玩家视野正上方稍微远一点的位置，避免直接刷脸
-        const x = viewX + viewW / 2;
-        const y = viewY - 200;
+        const { x, y } = this.getMode() === 'defense'
+            ? this.getDefenseSpawnPosition()
+            : { x: viewX + viewW / 2, y: viewY - 200 };
 
         const warn = new Entity();
         warn.addComponent(new Transform(x, y));
@@ -210,7 +248,9 @@ export class WaveSystem extends System {
 
         window.dispatchEvent(new CustomEvent('announce', { detail: { text: `警告：第 ${bossPhase} 阶段 BOSS ${bossName} 降临！` } }));
         
-        setTimeout(() => {
+        const timer = window.setTimeout(() => {
+            this.bossTimers.delete(timer);
+            warn.active = false;
             let bossType: EnemyType = 'boss_prism';
             if (bossPhase === 2) bossType = 'boss_roller';
             else if (bossPhase === 3) bossType = 'boss_slime';
@@ -226,10 +266,7 @@ export class WaveSystem extends System {
             this.addEntityCallback(boss);
             window.dispatchEvent(new CustomEvent('announce', { detail: { text: `激战开始！击败BOSS获取专属觉醒！` } }));
         }, 1500);
-
-        setTimeout(() => {
-            warn.active = false;
-        }, 1500);
+        this.bossTimers.add(timer);
     }
 
     private spawnSpecificEnemy(type: EnemyType): void {
@@ -241,8 +278,10 @@ export class WaveSystem extends System {
         // 生成在视野外
         const spawnDist = Math.max(viewW, viewH) / 2 + 100;
         const angle = Math.random() * Math.PI * 2;
-        const x = viewX + viewW / 2 + Math.cos(angle) * spawnDist;
-        const y = viewY + viewH / 2 + Math.sin(angle) * spawnDist;
+        const { x, y } = this.getMode() === 'defense'
+            ? this.getDefenseSpawnPosition()
+            : { x: viewX + viewW / 2 + Math.cos(angle) * spawnDist,
+                y: viewY + viewH / 2 + Math.sin(angle) * spawnDist };
 
         const enemy = EnemyFactory.create(type, x, y);
         const hp = enemy.getComponent(Health);
@@ -287,6 +326,12 @@ export class WaveSystem extends System {
                 x = viewX - padding;
                 y = viewY + Math.random() * viewH;
                 break;
+        }
+
+        // Guard waves enter from the arena edges, not the monitor edges. This
+        // keeps approach distance stable on ultrawide and high-resolution screens.
+        if (this.getMode() === 'defense') {
+            ({ x, y } = this.getDefenseSpawnPosition());
         }
         
         // 根据权重选择怪物类型

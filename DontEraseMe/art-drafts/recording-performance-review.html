@@ -1,0 +1,5 @@
+<!doctype html><html lang="zh"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>画作记录性能验证</title>
+<style>body{margin:28px;background:#202b3b;color:#efe6ce;font:15px/1.65 system-ui}h1{font-size:24px}button{font:inherit;padding:8px 16px;margin:4px;border:2px solid #201f25;border-radius:7px;background:#efe6ce;color:#202b3b;cursor:pointer}pre{white-space:pre-wrap;background:#151e2b;padding:18px}#canvases{display:flex;flex-wrap:wrap;gap:18px}canvas{max-width:100%;background:#2c3747;border:1px solid #827e78;width:480px;image-rendering:auto}</style></head><body>
+<h1>创造模式 · 笔迹批处理验证</h1><p>独立开发验证页，不进入游戏、不更改存档。长测试为加速模拟的 5 分钟笔迹流，不是实机游戏帧率。</p>
+<button id="pixels">验证实绘 / 回放像素</button><button id="stress">5 分钟密集笔迹压力测试</button><pre id="result" role="status">等待测试。</pre><div id="canvases"></div>
+<script type="module" src="./recording-performance-review.ts"></script></body></html>

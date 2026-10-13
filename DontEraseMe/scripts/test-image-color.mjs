@@ -1,0 +1,76 @@
+// Runs against an isolated browser profile; never touches the player's library.
+import assert from 'node:assert/strict';
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const page = await context.newPage();
+const errors = [];
+page.on('pageerror', error => errors.push(error.message));
+try {
+    await page.goto(process.env.REPLAY_TEST_URL || 'http://127.0.0.1:5174');
+    await page.waitForFunction(() => Boolean(window.gameInstance));
+    const result = await page.evaluate(async () => {
+        const { convertToStrokes } = await import('/src/core/ImageToStrokes.ts');
+        const { validateArtwork, MAX_ARTWORK_POINTS, MAX_ARTWORK_STROKES } = await import('/src/core/DefenseArtwork.ts');
+        const { ArtworkStore } = await import('/src/core/ArtworkStore.ts');
+        const { ArtReplayRecording } = await import('/src/core/ArtReplayRecording.ts');
+        const check = (condition, message) => { if (!condition) throw Error(message); };
+        const rgb = colour => [1, 3, 5].map(start => parseInt(colour.slice(start, start + 2), 16));
+        const isRed = colour => { const [r, g, b] = rgb(colour); return r > g + 50 && r > b + 50; };
+        const isBlue = colour => { const [r, g, b] = rgb(colour); return b > r + 50 && b > g + 50; };
+        const source = document.createElement('canvas'); source.width = 400; source.height = 300;
+        const ctx = source.getContext('2d');
+        ctx.fillStyle = 'white'; ctx.fillRect(0, 0, 400, 300);
+        // One rectangle, two colours: a straight edge must split at the colour boundary.
+        ctx.fillStyle = '#bb1111'; ctx.fillRect(40, 50, 160, 180);
+        ctx.fillStyle = '#1122bb'; ctx.fillRect(200, 50, 160, 180);
+        const started = performance.now();
+        const coloured = await convertToStrokes(source, { name: '红蓝轮廓', autoCrop: false });
+        check(validateArtwork(coloured), 'coloured document validates');
+        const red = coloured.strokes.filter(stroke => isRed(stroke.color));
+        const blue = coloured.strokes.filter(stroke => isBlue(stroke.color));
+        check(red.length > 0 && blue.length > 0, 'retain both red and blue source colours');
+        check(red.some(stroke => stroke.points.every(point => point.x < 405)), 'red contour matches left source position');
+        check(blue.some(stroke => stroke.points.every(point => point.x > 375)), 'blue contour matches right source position');
+        check(coloured.strokes.every(stroke => Math.max(...rgb(stroke.color)) >= 160), 'dark ink is visible');
+        const crop = await convertToStrokes(source, { crop: { x: 205, y: 20, width: 185, height: 240 }, autoCrop: false });
+        check(crop.strokes.some(stroke => isBlue(stroke.color)), 'crop uses local blue pixels');
+        check(!crop.strokes.some(stroke => isRed(stroke.color)), 'crop must not sample unrelated left-hand red pixels');
+        const mono = await convertToStrokes(source, { preserveColor: false });
+        check(mono.strokes.every(stroke => stroke.color === '#f0e8d8'), 'monochrome opt-out preserves previous ink');
+        const black = document.createElement('canvas'); black.width = 400; black.height = 300;
+        const blackCtx = black.getContext('2d'); blackCtx.fillStyle = 'black'; blackCtx.fillRect(80, 60, 180, 150);
+        const blackArt = await convertToStrokes(black);
+        check(blackArt.strokes.every(stroke => stroke.color === '#f0e8d8'), 'black on transparent remains visible');
+        check(coloured.strokes.length <= MAX_ARTWORK_STROKES && coloured.strokes.reduce((sum, stroke) => sum + stroke.points.length, 0) <= MAX_ARTWORK_POINTS, 'document budgets hold');
+        await ArtworkStore.saveArtwork(coloured);
+        const loaded = await ArtworkStore.getArtwork(coloured.id);
+        check(JSON.stringify(loaded.strokes) === JSON.stringify(coloured.strokes), 'persistent storage retains stroke colours exactly');
+        const recording = new ArtReplayRecording(); recording.start(3000, 2000, true, coloured);
+        check(JSON.stringify(recording.initialArtwork.strokes) === JSON.stringify(coloured.strokes), 'replay retains initial coloured strokes');
+        recording.clear();
+        return { png: source.toDataURL(), strokes: coloured.strokes.length, red: red.length, blue: blue.length, colours: [...new Set(coloured.strokes.map(stroke => stroke.color))], elapsedMs: performance.now() - started };
+    });
+    console.log('Conversion:', { ...result, png: '(red/blue fixture)' });
+    await page.locator('#defense-mode-btn').click();
+    await page.locator('#defense-art-import').click();
+    await page.locator('#defense-image-file').setInputFiles({ name: 'red-blue.png', mimeType: 'image/png', buffer: Buffer.from(result.png.split(',')[1], 'base64') });
+    await page.waitForFunction(() => !document.querySelector('#defense-art-save').disabled);
+    assert.equal(await page.locator('#defense-art-preserve-color').isChecked(), true);
+    assert(await page.locator('#defense-art-import-status').textContent().then(text => text.includes('彩色线稿')));
+    await page.locator('#defense-art-preserve-color').uncheck();
+    await page.waitForFunction(() => !document.querySelector('#defense-art-save').disabled && document.querySelector('#defense-art-import-status').textContent.includes('单色线稿'));
+    await page.locator('#defense-art-preserve-color').check();
+    await page.waitForFunction(() => !document.querySelector('#defense-art-save').disabled && document.querySelector('#defense-art-import-status').textContent.includes('彩色线稿'));
+    await page.locator('#defense-art-save').click();
+    await page.waitForFunction(() => !document.querySelector('#defense-art-import-modal'));
+    const id = await page.evaluate(() => window.gameInstance.artworkPicker.selected.id);
+    await page.reload();
+    await page.waitForFunction(id => window.gameInstance?.artworkPicker.selected.id === id, id);
+    assert(await page.evaluate(() => new Set(window.gameInstance.artworkPicker.selected.strokes.map(stroke => stroke.color)).size > 1));
+    assert.deepEqual(errors, []);
+    console.log('Colour toggle, preview, save and reload passed.');
+} finally {
+    await context.close();
+    await browser.close();
+}

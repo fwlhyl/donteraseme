@@ -15,13 +15,16 @@ import { Stunned } from '../components/Stunned';
 import { Summon } from '../components/Summon';
 import { DeathHandler } from './DeathHandler';
 import { DamageTextSystem } from './DamageTextSystem';
+import type { DefensePainting } from '../core/DefensePainting';
+import { signalDoodleAttack } from '../art/DoodleMotion';
 
 export class EnemySystem extends System {
     private player: Entity | null = null;
 
     constructor(
         private addEntityCallback: (entity: Entity) => void,
-        private trailCtx?: CanvasRenderingContext2D
+        private trailCtx?: CanvasRenderingContext2D,
+        private getDefensePainting: () => DefensePainting | null = () => null
     ) {
         super();
     }
@@ -72,6 +75,8 @@ export class EnemySystem extends System {
                 break;
             }
         }
+
+        const defensePainting = this.getDefensePainting();
 
         // Find active ink dummies for taunt aura
         const tauntingTargets: { entity: Entity, transform: Transform, radiusSq: number }[] = [];
@@ -185,7 +190,8 @@ export class EnemySystem extends System {
                     continue;
                 }
                 
-                // Determine target: If canvas_eye exists, chance to target it instead of player
+                // Determine target. Story's canvas eye remains a separate legacy
+                // objective; Guard Mode uses the actual painting surface instead.
                 let targetX = pTransform.x;
                 let targetY = pTransform.y;
                 
@@ -195,8 +201,32 @@ export class EnemySystem extends System {
                     targetY = canvasEyeTransform.y;
                 }
 
+                const isPaintingEraser = !!defensePainting && enemy.type === 'eraser';
+                if (isPaintingEraser) {
+                    enemy.defenseRetargetFrames--;
+                    const needsTarget = enemy.defenseTargetX === null
+                        || enemy.defenseTargetY === null
+                        || enemy.defenseRetargetFrames <= 0;
+
+                    if (needsTarget) {
+                        const target = defensePainting.getRandomInkTarget();
+                        if (target) {
+                            enemy.defenseTargetX = target.x;
+                            enemy.defenseTargetY = target.y;
+                            // A stable target creates readable intent; a little
+                            // variance prevents every eraser synchronizing.
+                            enemy.defenseRetargetFrames = 150 + Math.floor(Math.random() * 120);
+                        }
+                    }
+
+                    if (enemy.defenseTargetX !== null && enemy.defenseTargetY !== null) {
+                        targetX = enemy.defenseTargetX;
+                        targetY = enemy.defenseTargetY;
+                    }
+                }
+
                 // Check for taunting targets (Overrides normal targeting if within range)
-                if (tauntingTargets.length > 0) {
+                if (tauntingTargets.length > 0 && !isPaintingEraser) {
                     let nearestTarget = null;
                     let minDistSq = Infinity;
                     for (const t of tauntingTargets) {
@@ -277,7 +307,22 @@ export class EnemySystem extends System {
                         velocity.y = (dy / dist) * currentSpeed;
                     }
 
-                    // Erase trail
+                    // Guard Mode erasers make a soft, tick-based pass over the
+                    // pre-existing art. They keep the ordinary trail erasure as
+                    // a visual scar, but no longer delete the objective in one
+                    // frame.
+                    if (defensePainting) {
+                        enemy.defenseEraseCooldown--;
+                        if (enemy.defenseEraseCooldown <= 0) {
+                            const renderable = entity.getComponent(Renderable);
+                            const radius = renderable ? renderable.radius : 30;
+                            defensePainting.eraseAt(transform.x, transform.y, radius + 8, 0.045);
+                            enemy.defenseEraseCooldown = 9;
+                            signalDoodleAttack(entity);
+                        }
+                    }
+
+                    // Erase player trail
                     if (this.trailCtx) {
                         // Only erase if it's active and alive
                         if (entity.active) {
@@ -288,7 +333,7 @@ export class EnemySystem extends System {
                             this.trailCtx.globalCompositeOperation = 'destination-out';
                             this.trailCtx.beginPath();
                             this.trailCtx.arc(transform.x, transform.y, radius + 5, 0, Math.PI * 2);
-                            this.trailCtx.fillStyle = 'rgba(0,0,0,1)';
+                            this.trailCtx.fillStyle = defensePainting ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,1)';
                             this.trailCtx.fill();
                             this.trailCtx.restore();
                         }
@@ -332,6 +377,7 @@ export class EnemySystem extends System {
                         bullet.addComponent(new Velocity(Math.cos(angle) * speed, Math.sin(angle) * speed, speed));
                         this.addEntityCallback(bullet);
                         enemy.shootCooldown = 150; // 大幅降低射速 (原来是75)
+                        signalDoodleAttack(entity);
                     }
                 } else if (enemy.type === 'summoner') {
                     const dx = pTransform.x - transform.x;
@@ -360,6 +406,7 @@ export class EnemySystem extends System {
                             this.addEntityCallback(minion);
                         }
                         enemy.summonCooldown = 360;
+                        signalDoodleAttack(entity);
                         if (this.trailCtx) {
                             this.trailCtx.save();
                             this.trailCtx.globalAlpha = 0.5;
@@ -438,6 +485,7 @@ export class EnemySystem extends System {
                             renderable.color = (stateCycle % 20 < 10) ? '#ff0000' : '#555555';
                         }
                     } else if (stateCycle < 210) {
+                        if (stateCycle === 180) signalDoodleAttack(entity);
                         // 阶段2：极致的横冲直撞 (0.5秒内跨越约半个屏幕)
                         // 将 dashSpeed 调为 35，持续 30 帧 (0.5秒)，冲刺距离约 1050 像素
                         const dashSpeed = 35;
@@ -496,6 +544,7 @@ export class EnemySystem extends System {
 
                     // 发射激光弹幕
                     if (enemy.bossTimer % 60 === 0 && this.addEntityCallback) {
+                        signalDoodleAttack(entity);
                         // 十字形发射四发子弹
                         for (let i = 0; i < 4; i++) {
                             const ang = transform.rotation + (Math.PI / 2) * i;
@@ -518,6 +567,7 @@ export class EnemySystem extends System {
                     
                     // 召唤棱镜分身护盾
                     if (enemy.bossTimer % 400 === 0 && this.addEntityCallback) {
+                        signalDoodleAttack(entity);
                         for (let i = 0; i < 3; i++) {
                             const ang = (Math.PI * 2 / 3) * i;
                             const spawnX = transform.x + Math.cos(ang) * 100;
@@ -543,6 +593,7 @@ export class EnemySystem extends System {
                     enemy.bossTimer++;
                     // 频繁抛射毒沼
                     if (enemy.bossTimer % 90 === 0) {
+                        signalDoodleAttack(entity);
                         if (this.trailCtx && entity.active && this.addEntityCallback) {
                             const targetPuddleX = targetX + (Math.random() * 300 - 150);
                             const targetPuddleY = targetY + (Math.random() * 300 - 150);
@@ -558,6 +609,7 @@ export class EnemySystem extends System {
                     
                     // 周期性分裂大量小怪
                     if (enemy.bossTimer % 300 === 0 && this.addEntityCallback) {
+                        signalDoodleAttack(entity);
                         for(let i=0; i<6; i++) {
                             const minion = EnemyFactory.create('chaser', transform.x + Math.random()*100-50, transform.y + Math.random()*100-50);
                             const mRender = minion.getComponent(Renderable);
@@ -589,6 +641,7 @@ export class EnemySystem extends System {
                         
                         // 召唤精英怪
                         if (enemy.bossTimer % 200 === 0 && this.addEntityCallback) {
+                            signalDoodleAttack(entity);
                             const eliteTypes: EnemyType[] = ['shield', 'shooter', 'summoner'];
                             const type = eliteTypes[Math.floor(Math.random() * eliteTypes.length)];
                             const elite = EnemyFactory.create(type, transform.x + 100, transform.y + 100);
@@ -608,6 +661,7 @@ export class EnemySystem extends System {
                         
                         // 疯狂发射弹幕 (类似螺旋丸)
                         if (stateCycle % 5 === 0 && this.addEntityCallback) {
+                            signalDoodleAttack(entity);
                             for(let i=0; i<3; i++) {
                                 const ang = transform.rotation + (Math.PI*2/3)*i;
                                 const bullet = new Entity();
@@ -635,6 +689,7 @@ export class EnemySystem extends System {
                     transform.rotation = Math.atan2(dy, dx);
                     enemy.bossTimer += 1;
                     if (enemy.bossTimer % 180 === 0) {
+                        signalDoodleAttack(entity);
                         for (let i = 0; i < 12; i++) {
                             const ang = (Math.PI * 2 * i) / 12;
                             const bullet = new Entity();
@@ -647,6 +702,7 @@ export class EnemySystem extends System {
                         }
                     }
                     if (enemy.bossTimer % 420 === 0) {
+                        signalDoodleAttack(entity);
                         for (let i = 0; i < 4; i++) {
                             const minion = new Entity();
                             const ang = (Math.PI / 2) * i;

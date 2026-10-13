@@ -16,6 +16,14 @@ export class EnemyBehavior extends Component {
     public burnDamagePerFrame: number = 0; // 燃烧每帧伤害
     public burnSpread: boolean = false; // 是否引燃周围敌人
 
+    // Guard Mode: an eraser keeps a stable ink target instead of jittering
+    // across the painting every frame. Timers are frame-based like the rest of
+    // this component's combat cooldowns.
+    public defenseTargetX: number | null = null;
+    public defenseTargetY: number | null = null;
+    public defenseRetargetFrames: number = 0;
+    public defenseEraseCooldown: number = 0;
+
     // 存活倒计时（如果是召唤物、临时粒子或替身，大于0时会倒计时并死亡）
     public lifeTimer: number = 0;
     

@@ -7,7 +7,7 @@ import { Skill } from '../components/Skill';
 
 export class LevelSystem extends System {
     constructor(
-        private getMode: () => 'story' | 'endless' = () => 'endless'
+        private getMode: () => 'story' | 'endless' | 'defense' = () => 'endless'
     ) {
         super();
     }

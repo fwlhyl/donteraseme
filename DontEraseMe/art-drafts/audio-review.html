@@ -1,0 +1,12 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DontEraseMe · 声音试听</title>
+<style>body{margin:0;background:#26303d;color:#efe5ca;font:16px system-ui,sans-serif}main{max-width:1050px;margin:40px auto;padding:0 24px}h1{font-size:30px;margin-bottom:8px}p{color:#c3c6c5;line-height:1.7}section{border:1px solid #64635b;border-radius:10px;padding:20px;margin:20px 0}button{font:inherit;border:2px solid #141b26;border-radius:5px;background:#e8d7b1;color:#1d2935;cursor:pointer;padding:12px 18px;margin:4px}button[aria-pressed=true]{background:#8dc7bb}label{display:inline-flex;align-items:center;gap:8px;margin:8px}input{accent-color:#8dc7bb}#effects{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:3px}small{color:#b8b9b8}a{color:#a9dccc}</style></head><body><main>
+<small>DONT ERASE ME / AUDIO STUDY 01</small><h1>夜间涂鸦 · 音乐与打击音效</h1>
+<p>原创程序化音频第一版。点击启用后试听；这里与游戏共用同一套资源、混音与叠音限制，不改进度存档。</p>
+<section><button id="enable">启用声音</button><button id="stop">停止配乐</button><button id="pause">模拟暂停</button>
+<label>试听总音量 <input id="volume" type="range" min="0" max="100" value="65"></label><p id="status">等待点击启用</p></section>
+<section><h2>三种音乐</h2><button data-track="menu">画室 · 菜单</button><button data-track="atelier">夜游涂鸦 · 创造</button><button data-track="ruins">守住最后一笔 · 守卫</button><p>创造模式用拨弦、木质敲击和低音律动；守卫模式用更克制的低音与悬疑和声。切换时交叉淡入淡出。</p></section>
+<section><h2>十二种武器</h2><div id="weapons"></div></section>
+<section><h2>反馈与技能</h2><div id="effects"></div></section>
+<section><h2>混战检查</h2><button id="burst">快速命中 × 40</button><button id="heavy">重击 + 爆炸 + 击杀</button><small>测试限流和重要声音优先。此页不会操作游戏存档。</small></section>
+<p><a href="/">返回游戏</a> · 设置和暂停菜单可独立调整音乐 / 音效。</p>
+</main><script type="module" src="./audio-review.ts"></script></body></html>

@@ -1,0 +1,11 @@
+.audio-controls { box-sizing:border-box; border:1px dashed #75674f; border-radius:4px; color:#352e24; background:#f4ead2; padding:10px 14px; margin:8px 0 18px; width:min(440px,90vw); flex-shrink:0; font:14px system-ui,sans-serif; }
+.audio-controls legend { font-weight:700; padding:0 6px; }
+.audio-controls label { display:grid; grid-template-columns:135px minmax(60px,1fr) 42px; gap:8px; align-items:center; margin:6px 0; }
+.audio-controls input[type=range] { width:100%; accent-color:#3d868d; cursor:pointer; }
+.audio-controls output { text-align:right; font-variant-numeric:tabular-nums; }
+.audio-controls .audio-mute { display:flex; gap:8px; }
+.audio-controls small { display:block; opacity:.75; font-size:12px; }
+#settings-modal:has(.audio-controls) { overflow-y:auto; justify-content:flex-start; padding-block:24px; }
+#settings-modal:has(.audio-controls)>* { flex-shrink:0; }
+.sketch-esc-overlay .audio-controls { margin:0; }
+@media(max-width:500px) { .audio-controls label { grid-template-columns:110px minmax(50px,1fr) 40px; } }

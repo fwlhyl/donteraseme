@@ -4,6 +4,9 @@ import { InputManager } from './InputManager';
 import { InputSystem } from '../systems/InputSystem';
 import { MovementSystem } from '../systems/MovementSystem';
 import { RenderSystem } from '../systems/RenderSystem';
+import { mountDefenseHud, updateDefenseHud as renderDefenseHud } from '../ui/CombatHud';
+import { courtyard } from '../world/CourtyardGeometry';
+import { CourtyardBoundarySystem } from '../systems/CourtyardBoundarySystem';
 import { TrailSystem } from '../systems/TrailSystem';
 import { WeaponSystem } from '../systems/WeaponSystem';
 import { UISystem } from '../systems/UISystem';
@@ -22,6 +25,7 @@ import { SkeletonSystem } from '../systems/SkeletonSystem';
 import { ObjectiveSystem } from '../systems/ObjectiveSystem';
 import { LevelSystem } from '../systems/LevelSystem';
 import { SummonSystem } from '../systems/SummonSystem';
+import { MagicPenSystem } from '../systems/MagicPenSystem';
 import { Experience } from '../components/Experience';
 import { Weapon } from '../components/Weapon';
 import { Transform } from '../components/Transform';
@@ -31,10 +35,21 @@ import { Score } from '../components/Score';
 import { Quest } from '../components/Quest';
 import { StoryState } from '../components/StoryState';
 import { Renderable } from '../components/Renderable';
+import { EnemyBehavior } from '../components/EnemyBehavior';
 import { PrologueSystem } from '../systems/PrologueSystem';
 import { CHARACTERS } from '../config/EndlessConfig';
-import { WEAPONS } from '../components/Weapon';
+import { WEAPONS, getWeaponUnlockPrice } from '../components/Weapon';
 import { PlayerStats } from '../components/PlayerStats';
+import { PlayerProfile, type PlayerProfileData } from './PlayerProfile';
+import { DefensePainting } from './DefensePainting';
+import { ArtReplayRecording } from './ArtReplayRecording';
+import { ArtReplayPlayer } from './ArtReplayPlayer';
+import { DefenseArtworkPicker } from './DefenseArtworkPicker';
+import { DefenseIntro } from './DefenseIntro';
+import { ArtworkStore } from './ArtworkStore';
+import type { DefenseArtwork } from './DefenseArtwork';
+import { CREATE_WORLD, DEFENSE_WORLD } from '../config/WorldConfig';
+import { emitGameSound } from '../audio/AudioEvents';
 
 import { SKILLS, SkillCategory } from '../config/EndlessConfig';
 import type { SkillConfig } from '../config/EndlessConfig';
@@ -46,10 +61,13 @@ export enum GameState {
     PLAYING,
     GAMEOVER,
     STUDIO,
-    SELECTION // 新增状态：选人界面
+    SELECTION, // 新增状态：选人界面
+    REPLAY,
+    DEFENSE_INTRO
 }
 
-type PlayMode = 'story' | 'endless';
+export type PlayMode = 'story' | 'endless' | 'defense';
+type SelectablePlayMode = Exclude<PlayMode, 'story'>;
 
 export class Game {
     public entities: Map<string, Entity> = new Map();
@@ -62,6 +80,7 @@ export class Game {
     public gameCtx: CanvasRenderingContext2D;
     public trailCanvas: HTMLCanvasElement;
     public trailCtx: CanvasRenderingContext2D;
+    public paintingCanvas: HTMLCanvasElement;
     public minimapCanvas: HTMLCanvasElement;
     public minimapCtx: CanvasRenderingContext2D;
     
@@ -72,21 +91,40 @@ export class Game {
     private gameUI: HTMLElement;
     private scoreDisplay: HTMLElement;
     private levelUpScreen: HTMLElement;
+    private defenseHud: HTMLElement;
 
     // Selected Data
     public selectedCharacterId: string | null = null;
     public selectedWeaponId: number | null = null;
     public showDamageNumbers: boolean = true;
     public autoAttackEnabled: boolean = false;
+    private hasSettledCurrentRun: boolean = false;
+    private pendingMode: SelectablePlayMode = 'endless';
 
     public width: number = window.innerWidth;
     public height: number = window.innerHeight;
-    public worldWidth: number = 3000;  //max 4000
-    public worldHeight: number = 2000;
+    public worldWidth: number = CREATE_WORLD.width;
+    public worldHeight: number = CREATE_WORLD.height;
     public camera: { x: number, y: number, shakeX: number, shakeY: number, shakeTimer: number } = { x: 0, y: 0, shakeX: 0, shakeY: 0, shakeTimer: 0 };
 
     // Systems references
     private waveSystem!: WaveSystem;
+    private courtyardBoundary!: CourtyardBoundarySystem;
+    private defensePainting!: DefensePainting;
+    private defenseElapsed: number = 0;
+    private defenseIntegrityTick: number = 0;
+    private lastDefenseRepairAt: number = 0;
+    private defenseFailureMessage: string = '';
+    private readonly artRecording = new ArtReplayRecording();
+    private readonly artReplay = new ArtReplayPlayer();
+    private animationFrame = 0;
+    private readonly defenseIntro = new DefenseIntro();
+    private readonly artworkPicker: DefenseArtworkPicker;
+    private runGeneration = 0;
+    private frameUrls = new Map<number, string>();
+    private frameLoadGeneration = 0;
+    private savingFrame = false;
+    private frameStorageWarningShown = false;
 
     public inputManager: InputManager;
     public currentMode: PlayMode = 'endless';
@@ -102,6 +140,7 @@ export class Game {
         // Setup canvases
         this.gameCanvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
         this.trailCanvas = document.getElementById('trailCanvas') as HTMLCanvasElement;
+        this.paintingCanvas = document.getElementById('paintingCanvas') as HTMLCanvasElement;
         this.minimapCanvas = document.getElementById('minimapCanvas') as HTMLCanvasElement;
         
         // Setup UI
@@ -111,14 +150,23 @@ export class Game {
         this.gameUI = document.getElementById('ui')!;
         this.scoreDisplay = document.getElementById('final-score')!;
         this.levelUpScreen = document.getElementById('level-up-screen')!;
+        this.defenseHud = document.getElementById('defense-hud')!;
+        mountDefenseHud(this.defenseHud);
+        const artworkHost = document.createElement('section');
+        artworkHost.id = 'defense-artwork-section';
+        this.selectionScreen.insertBefore(artworkHost, this.selectionScreen.querySelector('.selection-container'));
+        this.artworkPicker = new DefenseArtworkPicker(artworkHost);
 
-        if (!this.gameCanvas || !this.trailCanvas || !this.minimapCanvas) {
+        if (!this.gameCanvas || !this.trailCanvas || !this.paintingCanvas || !this.minimapCanvas) {
             throw new Error('Canvas elements not found');
         }
 
         this.gameCtx = this.gameCanvas.getContext('2d')!;
-        this.trailCtx = this.trailCanvas.getContext('2d')!;
+        this.trailCtx = this.artRecording.log.wrapContext(this.trailCanvas.getContext('2d')!);
         this.minimapCtx = this.minimapCanvas.getContext('2d')!;
+        this.defensePainting = new DefensePainting(this.paintingCanvas, this.worldWidth, this.worldHeight);
+        this.defensePainting.onErase = (...args) => this.artRecording.log.recordErase(...args);
+        this.defensePainting.onRepair = (...args) => this.artRecording.log.recordRepair(...args);
         
         // 关闭平滑抗锯齿，增强像素风
         this.gameCtx.imageSmoothingEnabled = false;
@@ -135,6 +183,7 @@ export class Game {
         
         // Ensure gameCanvas is on top
         this.gameCanvas.style.zIndex = '10';
+        this.paintingCanvas.style.zIndex = '0';
         this.trailCanvas.style.zIndex = '1';
 
         this.inputManager = new InputManager();
@@ -153,17 +202,23 @@ export class Game {
         const storyBtn = document.getElementById('story-btn');
         if (storyBtn) storyBtn.addEventListener('click', () => this.startGame('story'));
         
-        const endlessBtn = document.getElementById('endless-btn');
-        if (endlessBtn) endlessBtn.addEventListener('click', () => this.showSelectionScreen());
-        
+        const createModeBtn = document.getElementById('create-mode-btn');
+        if (createModeBtn) createModeBtn.addEventListener('click', () => this.showSelectionScreen('endless'));
+
+        const defenseModeBtn = document.getElementById('defense-mode-btn');
+        if (defenseModeBtn) defenseModeBtn.addEventListener('click', () => this.showSelectionScreen('defense'));
+
         const startRunBtn = document.getElementById('start-run-btn');
-        if (startRunBtn) startRunBtn.addEventListener('click', () => this.startGame('endless'));
+        if (startRunBtn) startRunBtn.addEventListener('click', () => this.startGame(this.pendingMode));
 
         const backToMenuBtn = document.getElementById('back-to-menu-btn');
         if (backToMenuBtn) backToMenuBtn.addEventListener('click', () => {
             this.state = GameState.MENU;
             this.selectionScreen.style.display = 'none';
             this.mainMenu.style.display = 'flex';
+            this.paintingCanvas.style.display = 'none';
+            this.setDefenseHudVisible(false);
+            window.scrollTo(0, 0);
         });
         
         const editorBtn = document.getElementById('editor-btn');
@@ -173,6 +228,7 @@ export class Game {
 
         const restartBtn = document.getElementById('restart-btn');
         if (restartBtn) restartBtn.addEventListener('click', () => this.startGame(this.currentMode));
+        document.getElementById('replay-btn')?.addEventListener('click', () => this.openArtReplay());
 
         // Save Button
         const saveBtn = document.getElementById('save-btn');
@@ -185,15 +241,17 @@ export class Game {
         // Frame Selection Modal Listeners
         const frameBtns = document.querySelectorAll('.frame-select-btn');
         frameBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', async (e) => {
                 const index = parseInt((e.target as HTMLElement).getAttribute('data-index') || '1');
-                this.saveImageToFrame(index);
+                const saved = await this.saveImageToFrame(index);
                 const modal = document.getElementById('frame-save-modal');
-                if (modal) modal.style.display = 'none';
+                if (saved && modal) modal.style.display = 'none';
             });
         });
         
         const cancelFrameBtn = document.getElementById('cancel-frame-save');
+        document.getElementById('export-art-png')?.addEventListener('click', () => this.saveImage());
+        window.addEventListener('export-art-png', () => this.saveImage());
         if (cancelFrameBtn) {
             cancelFrameBtn.addEventListener('click', () => {
                 const modal = document.getElementById('frame-save-modal');
@@ -213,15 +271,25 @@ export class Game {
 
         // Pause Listener
         window.addEventListener('game-pause', (e: any) => {
+            if (this.state !== GameState.PLAYING && this.state !== GameState.STUDIO) return;
             if (e.detail.paused) {
-                this.isRunning = false; // Pause loop
+                this.stop();
             } else {
-                this.isRunning = true;
-                this.lastTime = performance.now();
-                this.loop(this.lastTime);
+                this.start();
             }
         });
         window.addEventListener('game-over', (e: any) => this.gameOver(e.detail?.score, e.detail?.victory));
+        window.addEventListener('player-painted', (e: Event) => {
+            this.handleDefenseRepair((e as CustomEvent).detail);
+        });
+        window.addEventListener('magic-pen-drawn', (event: Event) => {
+            const detail = (event as CustomEvent).detail;
+            if (this.state !== GameState.PLAYING || !Array.isArray(detail?.strokes)) return;
+            this.artRecording.log.recordMagicDrawing({
+                type: detail.type, grade: detail.grade, strokes: detail.strokes,
+                width: detail.width || 640, height: detail.height || 360,
+            });
+        });
         
         window.addEventListener('player-levelup', (e: any) => this.showLevelUpScreen(e.detail.entityId));
         window.addEventListener('boss-killed', (e: any) => this.showBossAwakeningScreen(e.detail.bossPhase));
@@ -238,12 +306,18 @@ export class Game {
             }
             backBtn.addEventListener('click', () => {
                 this.stop();
+                this.artReplay.close(false);
+                this.artRecording.clear();
                 this.state = GameState.MENU;
                 if (this.mainMenu) this.mainMenu.style.display = 'flex';
                 if (this.gameOverMenu) this.gameOverMenu.style.display = 'none';
                 if (this.gameUI) this.gameUI.style.display = 'none';
                 if (this.minimapCanvas) this.minimapCanvas.style.display = 'none';
+                this.setCombatFieldNotesVisible(false);
                 if (this.levelUpScreen) this.levelUpScreen.style.display = 'none';
+                if (this.paintingCanvas) this.paintingCanvas.style.display = 'none';
+                this.setDefenseHudVisible(false);
+                window.scrollTo(0, 0);
             });
         }
         
@@ -336,7 +410,7 @@ export class Game {
             const frameDiv = document.getElementById(`frame-${i}`);
             if (frameDiv) {
                 frameDiv.addEventListener('click', () => {
-                    const dataUrl = localStorage.getItem(`art_frame_${i}`);
+                    const dataUrl = this.frameUrls.get(i);
                     if (dataUrl && previewModal && previewImg) {
                         previewImg.src = dataUrl;
                         previewModal.style.display = 'flex';
@@ -356,21 +430,33 @@ export class Game {
             this.saveImageToFrame(idx);
         });
         window.addEventListener('exit-run', () => {
+            if (this.state !== GameState.PLAYING && this.state !== GameState.STUDIO) return;
+            this.settleCurrentRunCoins();
             this.stop();
+            this.artReplay.close(false);
+            this.artRecording.clear();
             this.state = GameState.MENU;
             if (this.mainMenu) this.mainMenu.style.display = 'flex';
             if (this.gameUI) this.gameUI.style.display = 'none';
             if (this.minimapCanvas) this.minimapCanvas.style.display = 'none';
+            this.setCombatFieldNotesVisible(false);
             if (this.levelUpScreen) this.levelUpScreen.style.display = 'none';
             if (this.gameOverMenu) this.gameOverMenu.style.display = 'none';
+            if (this.paintingCanvas) this.paintingCanvas.style.display = 'none';
+            this.setDefenseHudVisible(false);
+            window.scrollTo(0, 0);
         });
     }
 
     private setupSystems(): void {
         this.addSystem(new InputSystem(this.inputManager, this.camera));
-        this.addSystem(new MovementSystem(this.worldWidth, this.worldHeight, (e) => this.addEntity(e), this.gameCtx, this.trailCtx));
+        this.addSystem(new MovementSystem(this.worldWidth, this.worldHeight, (e) => this.addEntity(e), this.gameCtx, this.trailCtx, () => this.currentMode === 'endless'));
         this.addSystem(new WeaponSystem(this.inputManager, (entity) => this.addEntity(entity), this.gameCtx, this.trailCtx));
-        this.addSystem(new EnemySystem((entity) => this.addEntity(entity), this.trailCtx));
+        this.addSystem(new EnemySystem(
+            (entity) => this.addEntity(entity),
+            this.trailCtx,
+            () => this.currentMode === 'defense' && this.defensePainting.active ? this.defensePainting : null
+        ));
         this.addSystem(new CollisionSystem((entity) => this.addEntity(entity), this.trailCtx));
         
         this.waveSystem = new WaveSystem((entity) => this.addEntity(entity), this.camera, () => this.currentMode);
@@ -383,8 +469,11 @@ export class Game {
         this.addSystem(new ObjectiveSystem(this.worldWidth, this.worldHeight, (e) => this.addEntity(e)));
         this.addSystem(new LevelSystem(() => this.currentMode));
         this.addSystem(new PrologueSystem(this.worldWidth, this.worldHeight));
-        this.addSystem(new RenderSystem(this.gameCtx, this.camera, this.worldWidth, this.worldHeight));
-        this.addSystem(new MinimapSystem(this.minimapCtx, this.worldWidth, this.worldHeight, this.camera));
+        this.courtyardBoundary = new CourtyardBoundarySystem(() => this.currentMode === 'endless');
+        this.addSystem(this.courtyardBoundary);
+        this.addSystem(new RenderSystem(this.gameCtx, this.camera, this.worldWidth, this.worldHeight,
+            () => this.currentMode === 'endless', () => this.currentMode === 'defense'));
+        this.addSystem(new MinimapSystem(this.minimapCtx, this.worldWidth, this.worldHeight, this.camera, () => this.currentMode === 'endless'));
         this.addSystem(new UISystem());
         this.addSystem(new QuestSystem());
         const graffitiSystem = new GraffitiSystem(this.trailCtx);
@@ -392,6 +481,10 @@ export class Game {
         this.addSystem(graffitiSystem);
         this.addSystem(new DamageTextSystem(this.gameCtx, this.camera));
         this.addSystem(new SummonSystem((entity) => this.addEntity(entity)));
+        this.addSystem(new MagicPenSystem(
+            (entity) => this.addEntity(entity),
+            () => this.state === GameState.PLAYING && this.isRunning
+        ));
     }
 
     private setupEntities(): void {
@@ -402,6 +495,10 @@ export class Game {
             this.selectedWeaponId !== null ? this.selectedWeaponId : undefined
         );
         this.configurePlayerForMode(player);
+        if(this.currentMode === 'endless') {
+            const t=player.getComponent(Transform)!;
+            t.x=this.worldWidth/2;t.y=this.worldHeight/2;
+        }
         this.addEntity(player);
 
         // Remove test enemies to prevent instant death at start
@@ -420,15 +517,22 @@ export class Game {
         this.gameCanvas.style.height = `${this.height}px`;
         this.gameCtx.scale(dpr, dpr); // Restore scale
 
-        this.trailCanvas.width = this.worldWidth;
-        this.trailCanvas.height = this.worldHeight;
+        // A viewport resize must not clear the world painting or break replay.
+        if (this.trailCanvas.width !== this.worldWidth || this.trailCanvas.height !== this.worldHeight) {
+            this.trailCanvas.width = this.worldWidth;
+            this.trailCanvas.height = this.worldHeight;
+        }
         this.trailCanvas.style.width = `${this.worldWidth}px`;
         this.trailCanvas.style.height = `${this.worldHeight}px`;
         // No scale needed for trailCtx if it's 1:1 with world, but for high DPI screens we might want scaling.
         // Let's keep it simple: World pixels = Screen pixels at scale 1.
         // If we want high DPI, we'd need a larger canvas and scale ctx.
         // For performance on large canvas, let's stick to 1x for now or use dpr if performant.
-        this.trailCtx.scale(1, 1); 
+        this.trailCtx.scale(1, 1);
+
+        if (this.defensePainting) {
+            this.defensePainting.resize(this.worldWidth, this.worldHeight);
+        }
 
         // Minimap
         this.minimapCanvas.width = 150 * dpr;
@@ -520,11 +624,19 @@ export class Game {
                 exp.xp = 0;
                 exp.next = 100;
             }
+            if (this.currentMode === 'defense') {
+                const pTransform = player.getComponent(Transform);
+                if (pTransform) {
+                    // Open on the centered painting, not a point below it.
+                    pTransform.x = this.worldWidth / 2;
+                    pTransform.y = this.worldHeight / 2;
+                }
+            }
             if (quest) {
                 quest.active = false;
             }
             if (story) {
-                story.chapter = 'Endless';
+                story.chapter = this.currentMode === 'defense' ? 'Defense' : 'Endless';
                 story.flags = {};
             }
         }
@@ -812,24 +924,49 @@ export class Game {
         });
     }
 
-    public showSelectionScreen(): void {
+    public showSelectionScreen(mode?: SelectablePlayMode): void {
+        if (mode) this.pendingMode = mode;
         this.state = GameState.SELECTION;
         this.mainMenu.style.display = 'none';
         this.selectionScreen.style.display = 'flex';
-        
+
+        const isDefense = this.pendingMode === 'defense';
+        this.artworkPicker.show(isDefense);
+        const modeLabel = document.getElementById('selection-mode-label');
+        const modeDescription = document.getElementById('selection-mode-description');
+        if (modeLabel) modeLabel.textContent = isDefense ? '守卫模式 · 出击准备' : '创造模式 · 出击准备';
+        if (modeDescription) {
+            modeDescription.textContent = isDefense
+                ? '守住原画，阻止橡皮擦；你的攻击会留下修复痕迹。'
+                : '从空白画布开始，战斗并创造你的作品。';
+        }
+
+        const profile = PlayerProfile.load();
+        if (!this.selectedCharacterId || !profile.unlockedCharacterIds.includes(this.selectedCharacterId)) {
+            this.selectedCharacterId = profile.selectedCharacterId;
+        }
+        if (this.selectedWeaponId === null || !profile.unlockedWeaponIds.includes(this.selectedWeaponId)) {
+            this.selectedWeaponId = WEAPONS.find(weapon => profile.unlockedWeaponIds.includes(weapon.id))?.id ?? null;
+        }
+        this.updateProfileCoins(profile);
+
         // Populate characters
         const charList = document.getElementById('character-list');
         if (charList) {
             charList.innerHTML = '';
             CHARACTERS.forEach(char => {
+                const unlocked = profile.unlockedCharacterIds.includes(char.id);
                 const el = document.createElement('div');
-                el.className = `card char-card ${this.selectedCharacterId === char.id ? 'active' : ''}`;
+                el.className = `card char-card ${this.selectedCharacterId === char.id ? 'active' : ''} ${unlocked ? '' : 'locked'}`;
+                el.style.opacity = unlocked ? '1' : '0.72';
                 el.innerHTML = `
                     <p class="card-title">${t(char.name)}</p>
                     <p class="card-desc">${t(char.description)}</p>
+                    <p style="color: ${unlocked ? '#5eead4' : '#ffd700'}; font-size: 13px; margin: 8px 0 0; font-weight: bold;">${unlocked ? this.profileText('unlocked') : this.profileText('locked', char.unlockPrice)}</p>
                 `;
                 el.onclick = () => {
                     this.selectedCharacterId = char.id;
+                    if (unlocked) PlayerProfile.selectCharacter(char.id);
                     this.updateSelectionUI();
                 };
                 charList.appendChild(el);
@@ -841,11 +978,15 @@ export class Game {
         if (weapList) {
             weapList.innerHTML = '';
             WEAPONS.forEach(weap => {
+                const unlocked = profile.unlockedWeaponIds.includes(weap.id);
+                const price = getWeaponUnlockPrice(weap.id);
                 const el = document.createElement('div');
-                el.className = `card weap-card ${this.selectedWeaponId === weap.id ? 'active' : ''}`;
+                el.className = `card weap-card ${this.selectedWeaponId === weap.id ? 'active' : ''} ${unlocked ? '' : 'locked'}`;
+                el.style.opacity = unlocked ? '1' : '0.72';
                 el.innerHTML = `
                     <p class="card-title" style="color: ${weap.color};">${t(weap.name)}</p>
                     <p class="card-desc">${getLang() === 'zh' ? '射速' : 'Rate'}: ${Math.round(1000 / weap.fireRate)} | ${getLang() === 'zh' ? '伤害' : 'Dmg'}: ${weap.damage}</p>
+                    <p style="color: ${unlocked ? '#5eead4' : '#ffd700'}; font-size: 13px; margin: 8px 0 0; font-weight: bold;">${unlocked ? this.profileText('unlocked') : this.profileText('locked', price)}</p>
                 `;
                 el.onclick = () => {
                     this.selectedWeaponId = weap.id;
@@ -863,12 +1004,18 @@ export class Game {
     }
     
     private updateSelectionUI(): void {
+        const profile = PlayerProfile.load();
+        this.updateProfileCoins(profile);
         // Update active classes
         document.querySelectorAll('.char-card').forEach((el, i) => {
-            el.classList.toggle('active', CHARACTERS[i].id === this.selectedCharacterId);
+            const character = CHARACTERS[i];
+            el.classList.toggle('active', character.id === this.selectedCharacterId);
+            el.classList.toggle('locked', !profile.unlockedCharacterIds.includes(character.id));
         });
         document.querySelectorAll('.weap-card').forEach((el, i) => {
-            el.classList.toggle('active', WEAPONS[i].id === this.selectedWeaponId);
+            const weapon = WEAPONS[i];
+            el.classList.toggle('active', weapon.id === this.selectedWeaponId);
+            el.classList.toggle('locked', !profile.unlockedWeaponIds.includes(weapon.id));
         });
         
         // Update details panel
@@ -878,6 +1025,7 @@ export class Game {
         
         const selectedChar = CHARACTERS.find(c => c.id === this.selectedCharacterId);
         if (charDetail && selectedChar) {
+            const unlocked = profile.unlockedCharacterIds.includes(selectedChar.id);
             const hpLbl = getLang() === 'zh' ? '基础生命' : 'Base HP';
             const spdLbl = getLang() === 'zh' ? '移速' : 'Speed';
             const skillLbl = getLang() === 'zh' ? '专属技能' : 'Unique Skill';
@@ -886,11 +1034,19 @@ export class Game {
                 <p style="color: #aaa; font-size: 14px; margin-bottom: 5px;">${t(selectedChar.description)}</p>
                 <p style="color: #fff; font-size: 13px; margin-bottom: 5px;">${hpLbl}: ${selectedChar.baseHp} | ${spdLbl}: ${selectedChar.baseSpeed}</p>
                 <p style="color: #0ff; font-size: 13px; margin: 0;">${skillLbl}: [${t(selectedChar.uniqueSkillName)}] ${t(selectedChar.uniqueSkillDesc)}</p>
+                ${unlocked ? `<p style="color: #5eead4; font-size: 13px; font-weight: bold; margin: 12px 0 0;">${this.profileText('unlocked')}</p>` : `<button id="unlock-character-btn" class="btn" style="margin-top: 14px; padding: 8px 14px; font-size: 15px; background: #9a6700; border-color: #ffd700;" ${profile.coins < selectedChar.unlockPrice ? 'disabled' : ''}>${this.profileText('unlock', selectedChar.unlockPrice)}</button>`}
             `;
+
+            const unlockBtn = document.getElementById('unlock-character-btn') as HTMLButtonElement | null;
+            if (unlockBtn) {
+                unlockBtn.onclick = () => this.purchaseSelectedCharacter(selectedChar.id, selectedChar.unlockPrice);
+            }
         }
         
         const selectedWeap = WEAPONS.find(w => w.id === this.selectedWeaponId);
         if (weapDetail && selectedWeap) {
+            const unlocked = profile.unlockedWeaponIds.includes(selectedWeap.id);
+            const price = getWeaponUnlockPrice(selectedWeap.id);
             const isMelee = selectedWeap.type === 'melee';
             const typeStr = getLang() === 'zh' ? (isMelee ? '近战武器' : '远程武器') : (isMelee ? 'Melee Weapon' : 'Ranged Weapon');
             const dmgLbl = getLang() === 'zh' ? '伤害' : 'Dmg';
@@ -904,15 +1060,72 @@ export class Game {
                 <p style="color: #aaa; font-size: 14px; margin-bottom: 5px;">${typeStr}</p>
                 <p style="color: #fff; font-size: 13px; margin-bottom: 5px;">${dmgLbl}: ${selectedWeap.damage} | ${rateLbl}: ${Math.round(1000 / selectedWeap.fireRate)}</p>
                 <p style="color: #fff; font-size: 13px; margin: 0;">${magLbl}: ${selectedWeap.magSize} | ${rldLbl}: ${(selectedWeap.reloadTime / 60).toFixed(1)}${secLbl}</p>
+                ${unlocked ? `<p style="color: #5eead4; font-size: 13px; font-weight: bold; margin: 12px 0 0;">${this.profileText('unlocked')}</p>` : `<button id="unlock-weapon-btn" class="btn" style="margin-top: 14px; padding: 8px 14px; font-size: 15px; background: #9a6700; border-color: #ffd700;" ${profile.coins < price ? 'disabled' : ''}>${this.profileText('unlock', price)}</button>`}
             `;
+
+            const unlockBtn = document.getElementById('unlock-weapon-btn') as HTMLButtonElement | null;
+            if (unlockBtn) {
+                unlockBtn.onclick = () => this.purchaseSelectedWeapon(selectedWeap.id, price);
+            }
         }
-        
+
         if (startBtn) {
-            startBtn.disabled = !this.selectedCharacterId || this.selectedWeaponId === null;
+            const selectedUnlocked = !!selectedChar && profile.unlockedCharacterIds.includes(selectedChar.id);
+            const selectedWeaponUnlocked = !!selectedWeap && profile.unlockedWeaponIds.includes(selectedWeap.id);
+            startBtn.disabled = !selectedUnlocked || !selectedWeaponUnlocked;
+            const isDefense = this.pendingMode === 'defense';
+            startBtn.textContent = isDefense ? '进入守卫模式' : '进入创造模式';
+            startBtn.style.background = isDefense ? '#513b82' : '#0f766e';
+            startBtn.style.borderColor = isDefense ? '#b59cff' : '#0f766e';
         }
     }
 
+    private updateProfileCoins(profile: PlayerProfileData = PlayerProfile.load()): void {
+        const el = document.getElementById('profile-coins');
+        if (!el) return;
+        el.textContent = getLang() === 'zh'
+            ? `局外金币：${profile.coins}`
+            : `Wallet: ${profile.coins} Coins`;
+    }
+
+    private profileText(kind: 'unlocked' | 'locked' | 'unlock', price?: number): string {
+        if (getLang() === 'zh') {
+            if (kind === 'unlocked') return '已解锁';
+            if (kind === 'locked') return `🔒 未解锁 · ${price ?? 0} 金币`;
+            return `花费 ${price ?? 0} 金币解锁`;
+        }
+        if (kind === 'unlocked') return 'Unlocked';
+        if (kind === 'locked') return `🔒 Locked · ${price ?? 0} Coins`;
+        return `Unlock for ${price ?? 0} Coins`;
+    }
+
+    private purchaseSelectedCharacter(characterId: string, price: number): void {
+        const result = PlayerProfile.purchaseCharacter(characterId, price);
+        if (!result.purchased) {
+            window.dispatchEvent(new CustomEvent('announce', { detail: { text: getLang() === 'zh' ? '金币不足，无法解锁该角色。' : 'Not enough coins to unlock this character.' } }));
+            return;
+        }
+
+        this.selectedCharacterId = characterId;
+        window.dispatchEvent(new CustomEvent('announce', { detail: { text: getLang() === 'zh' ? `已解锁：${CHARACTERS.find(char => char.id === characterId)?.name || characterId}` : 'Character unlocked!' } }));
+        this.showSelectionScreen();
+    }
+
+    private purchaseSelectedWeapon(weaponId: number, price: number): void {
+        const result = PlayerProfile.purchaseWeapon(weaponId, price);
+        if (!result.purchased) {
+            window.dispatchEvent(new CustomEvent('announce', { detail: { text: getLang() === 'zh' ? '金币不足，无法解锁该武器。' : 'Not enough coins to unlock this weapon.' } }));
+            return;
+        }
+
+        this.selectedWeaponId = weaponId;
+        const weaponName = WEAPONS.find(weapon => weapon.id === weaponId)?.name || String(weaponId);
+        window.dispatchEvent(new CustomEvent('announce', { detail: { text: getLang() === 'zh' ? `已解锁：${weaponName}` : 'Weapon unlocked!' } }));
+        this.showSelectionScreen();
+    }
+
     public startGame(mode: PlayMode = 'endless'): void {
+        if (this.state === GameState.DEFENSE_INTRO) return;
         this.currentMode = mode;
         // 暂时屏蔽皮肤绘制提示，直接使用默认皮肤进入无尽模式
         /*
@@ -925,18 +1138,64 @@ export class Game {
             }
         }
         */
+        this.hasSettledCurrentRun = false;
         this.reset();
+        this.configureWorldForMode();
+        if (mode === 'defense') {
+            this.state = GameState.DEFENSE_INTRO;
+            const generation = this.runGeneration;
+            void this.artworkPicker.ready.then(() => {
+                if (generation !== this.runGeneration || this.state !== GameState.DEFENSE_INTRO) return;
+                const artwork = structuredClone(this.artworkPicker.selected);
+                this.defenseIntro.play(artwork, () => {
+                    if (generation !== this.runGeneration) return;
+                    this.inputManager.keys.clear();
+                    this.inputManager.mouse.down = false;
+                    this.beginBattle(artwork);
+                }, () => {
+                    this.gameOverMenu.style.display = 'none';
+                    this.showSelectionScreen('defense');
+                });
+            });
+            return;
+        }
+        this.beginBattle();
+    }
+
+    private configureWorldForMode(): void {
+        const world = this.currentMode === 'defense' ? DEFENSE_WORLD : CREATE_WORLD;
+        this.worldWidth = world.width;
+        this.worldHeight = world.height;
+        // Update existing systems instead of constructing duplicate listeners.
+        for (const system of this.systems) system.setWorldSize(world.width, world.height);
+        this.resize();
+    }
+
+    private beginBattle(artwork?: DefenseArtwork): void {
+        if (artwork) this.defensePainting.beginArtwork(artwork);
+        this.artRecording.start(this.worldWidth, this.worldHeight, this.currentMode === 'defense', artwork,
+            this.currentMode === 'endless' ? courtyard.points : null);
+        const replayBtn = document.getElementById('replay-btn') as HTMLButtonElement | null;
+        if (replayBtn) replayBtn.disabled = true;
         this.setupEntities();
         this.state = GameState.PLAYING;
         
         if (this.mainMenu) this.mainMenu.style.display = 'none';
         if (this.selectionScreen) this.selectionScreen.style.display = 'none';
         if (this.gameOverMenu) this.gameOverMenu.style.display = 'none';
-        if (this.gameUI) this.gameUI.style.display = 'block';
+        // The selection screen can be vertically scrolled on smaller displays.
+        // Reset document scroll before revealing world-space canvases, otherwise
+        // the camera appears offset and the painting starts partly off-screen.
+        window.scrollTo(0, 0);
+        if (this.gameUI) this.gameUI.style.display = 'flex';
         if (this.minimapCanvas) this.minimapCanvas.style.display = 'block';
-        
-        // 设置局内地面特效透明度为0.1，避免视觉花眼
-        if (this.trailCanvas) this.trailCanvas.style.opacity = '0.1';
+        this.setCombatFieldNotesVisible(true);
+        if (this.paintingCanvas) this.paintingCanvas.style.display = this.currentMode === 'defense' ? 'block' : 'none';
+        this.setDefenseHudVisible(this.currentMode === 'defense');
+
+        // Night courtyard needs visible pigment; this display opacity does not
+        // alter recorded strokes, exported artwork or guard-mode readability.
+        if (this.trailCanvas) this.trailCanvas.style.opacity = this.currentMode === 'defense' ? '0.16' : this.currentMode === 'endless' ? '0.65' : '0.1';
         
         // Show Pause Button
         const pauseBtn = document.getElementById('pause-btn');
@@ -948,23 +1207,45 @@ export class Game {
     }
     
     public gameOver(score: number = 0, victory: boolean = false): void {
+        if (this.state !== GameState.PLAYING && this.state !== GameState.STUDIO) return;
         this.state = GameState.GAMEOVER;
-        
+        this.stop();
+        emitGameSound(victory ? 'victory' : 'defeat');
+        this.artRecording.finish(this.paintingCanvas, this.trailCanvas);
+        const replayBtn = document.getElementById('replay-btn') as HTMLButtonElement | null;
+        if (replayBtn) replayBtn.disabled = false;
+        const awardedCoins = this.settleCurrentRunCoins();
+
         const titleEl = this.gameOverMenu?.querySelector('h1');
         if (titleEl) {
             if (victory) {
-                titleEl.innerText = 'VICTORY';
+                titleEl.innerText = this.currentMode === 'defense' ? '守卫成功' : 'VICTORY';
                 titleEl.style.color = 'gold';
+            } else if (this.currentMode === 'defense' && this.defenseFailureMessage) {
+                titleEl.innerText = this.defenseFailureMessage;
+                titleEl.style.color = '#ff8aa6';
             } else {
                 titleEl.innerText = 'GAME OVER';
                 titleEl.style.color = '#ff4444';
             }
         }
         
-        if (this.scoreDisplay) this.scoreDisplay.innerText = `Final Score: ${score}`;
-        
+        if (this.scoreDisplay) {
+            const totalCoins = PlayerProfile.load().coins;
+            const integritySuffix = this.currentMode === 'defense'
+                ? (getLang() === 'zh'
+                    ? `  |  画作完整度：${Math.round(this.defensePainting.getIntegrity() * 100)}%`
+                    : `  |  Painting Integrity: ${Math.round(this.defensePainting.getIntegrity() * 100)}%`)
+                : '';
+            this.scoreDisplay.innerText = getLang() === 'zh'
+                ? `最终分数：${score}  |  本局获得：${awardedCoins} 金币  |  持有金币：${totalCoins}${integritySuffix}`
+                : `Final Score: ${score}  |  Earned: ${awardedCoins} Coins  |  Wallet: ${totalCoins}${integritySuffix}`;
+        }
+
         if (this.gameUI) this.gameUI.style.display = 'none';
         if (this.minimapCanvas) this.minimapCanvas.style.display = 'none';
+        this.setCombatFieldNotesVisible(false);
+        this.setDefenseHudVisible(false);
         
         // Hide Pause Button
         const pauseBtn = document.getElementById('pause-btn');
@@ -976,6 +1257,37 @@ export class Game {
         if (this.gameOverMenu) this.gameOverMenu.style.display = 'flex';
     }
 
+    private openArtReplay(): void {
+        if (this.state !== GameState.GAMEOVER || !this.artRecording.finalArtwork) return;
+        this.stop();
+        this.state = GameState.REPLAY;
+        this.inputManager.keys.clear();
+        this.inputManager.mouse.down = false;
+        this.gameOverMenu.style.display = 'none';
+        this.artReplay.open(this.artRecording, () => {
+            this.state = GameState.GAMEOVER;
+            this.gameOverMenu.style.display = 'flex';
+            this.inputManager.keys.clear();
+            this.inputManager.mouse.down = false;
+        });
+    }
+
+    private settleCurrentRunCoins(): number {
+        if (this.hasSettledCurrentRun) return 0;
+
+        let earnedCoins = 0;
+        for (const entity of this.entities.values()) {
+            if (!entity.tags.has('player')) continue;
+            const score = entity.getComponent(Score);
+            // Score 是局内金币的权威来源：它包含所有奖励，也会同步记录局内消费。
+            earnedCoins = Math.max(earnedCoins, score?.coins || 0);
+        }
+
+        this.hasSettledCurrentRun = true;
+        if (earnedCoins > 0) PlayerProfile.addCoins(earnedCoins);
+        return earnedCoins;
+    }
+
     public saveImage(): void {
         const level = (() => {
             for (const [, e] of this.entities) {
@@ -985,8 +1297,9 @@ export class Game {
             }
             return 0;
         })();
+        const exportCanvas = this.getExportCanvas();
         try {
-            const dataUrl = this.trailCanvas.toDataURL('image/png');
+            const dataUrl = exportCanvas.toDataURL('image/png');
             const b64 = dataUrl.replace(/^data:image\/png;base64,/, '');
             const bytes = base64ToBytes(b64);
             const out = injectTextChunks(bytes, [
@@ -1008,7 +1321,7 @@ export class Game {
             URL.revokeObjectURL(url);
         } catch (err) {
             try {
-                const fallback = this.trailCanvas.toDataURL('image/png');
+                const fallback = exportCanvas.toDataURL('image/png');
                 const a = document.createElement('a');
                 a.href = fallback;
                 a.download = `art-${Date.now()}.png`;
@@ -1102,7 +1415,32 @@ export class Game {
         })();
     }
 
+    private getExportCanvas(): HTMLCanvasElement {
+        // Settlement and replay must export the same immutable finished work,
+        // even if an old burst-shot timer completes after the run has ended.
+        if ((this.state === GameState.GAMEOVER || this.state === GameState.REPLAY) && this.artRecording.finalArtwork) {
+            return this.artRecording.finalArtwork;
+        }
+        if (this.currentMode !== 'defense' || !this.defensePainting.active) {
+            return this.trailCanvas;
+        }
+
+        const composite = document.createElement('canvas');
+        composite.width = this.worldWidth;
+        composite.height = this.worldHeight;
+        const ctx = composite.getContext('2d');
+        if (!ctx) return this.trailCanvas;
+        ctx.drawImage(this.paintingCanvas, 0, 0);
+        ctx.drawImage(this.trailCanvas, 0, 0);
+        return composite;
+    }
+
     private reset(): void {
+        this.runGeneration++;
+        this.defenseIntro.close();
+        this.stop();
+        this.artReplay.close(false);
+        this.artRecording.clear();
         // Clear all entities
         this.entities.clear();
         for (const system of this.systems) {
@@ -1116,7 +1454,14 @@ export class Game {
 
         // Clear canvases
         this.trailCtx.clearRect(0, 0, this.worldWidth, this.worldHeight);
+        this.defensePainting.reset();
         this.minimapCtx.clearRect(0, 0, this.minimapCanvas.width, this.minimapCanvas.height);
+
+        this.defenseElapsed = 0;
+        this.defenseIntegrityTick = 0;
+        this.lastDefenseRepairAt = 0;
+        this.defenseFailureMessage = '';
+        this.setDefenseHudVisible(false);
         
         // Reset Camera
         this.camera.x = 0;
@@ -1127,11 +1472,13 @@ export class Game {
         if (this.isRunning) return;
         this.isRunning = true;
         this.lastTime = performance.now();
-        requestAnimationFrame((time) => this.loop(time));
+        this.animationFrame = requestAnimationFrame((time) => this.loop(time));
     }
 
     public stop(): void {
         this.isRunning = false;
+        cancelAnimationFrame(this.animationFrame);
+        this.animationFrame = 0;
         // Legacy stop, now handled by gameOver()
     }
 
@@ -1189,6 +1536,7 @@ export class Game {
     }
 
     private loop(time: number): void {
+        this.animationFrame = 0;
         if (!this.isRunning) return;
 
         let dt = (time - this.lastTime) / 1000;
@@ -1196,6 +1544,7 @@ export class Game {
         
         // Cap dt to prevent huge jumps (e.g. tab switch)
         if (dt > 0.1) dt = 0.1;
+        if (this.state === GameState.PLAYING) this.artRecording.log.advance(Math.max(0, dt));
 
         // 1. Clear canvas first
         // Effect: Trail / Afterimage
@@ -1213,21 +1562,22 @@ export class Game {
         // 1. Clear canvas first
         this.gameCtx.clearRect(0, 0, this.gameCanvas.width, this.gameCanvas.height);
 
-        // ====== Canvas 时间消隐机制 (Alpha Decay) ======
-        // 仅在游戏中持续消隐背景涂鸦，降低视觉混沌感
         if (this.state === GameState.PLAYING) {
-            this.trailCtx.save();
-            this.trailCtx.globalCompositeOperation = 'destination-out';
-            // 每秒大约消隐 5%~10% 的透明度 (30秒左右降至20%以下)
-            const fadeAlpha = 0.05 * dt; 
-            this.trailCtx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha})`;
-            this.trailCtx.fillRect(0, 0, this.worldWidth, this.worldHeight);
-            this.trailCtx.restore();
+            // Share the immutable artwork boundary for this synchronous frame.
+            // Decay, paint order and recording timestamps remain unchanged.
+            this.artRecording.log.withPaintBoundary(this.trailCtx, () => {
+                if (this.currentMode !== 'defense') {
+                    this.trailCtx.save();
+                    this.trailCtx.globalCompositeOperation = 'destination-out';
+                    const fadeAlpha = 0.05 * dt;
+                    this.trailCtx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha})`;
+                    this.trailCtx.fillRect(0, 0, this.worldWidth, this.worldHeight);
+                    this.trailCtx.restore();
+                }
+                this.update(dt);
+            });
         }
-        
-        if (this.state === GameState.PLAYING) {
-            this.update(dt);
-        } else if (this.state === GameState.STUDIO) {
+        if (this.state === GameState.STUDIO) {
             this.updateStudio(dt);
         }
         
@@ -1236,9 +1586,10 @@ export class Game {
         const shakeY = this.camera.shakeY || 0;
         // Use translate3d for performance
         this.trailCanvas.style.transform = `translate3d(${-this.camera.x + shakeX}px, ${-this.camera.y + shakeY}px, 0)`;
+        this.paintingCanvas.style.transform = `translate3d(${-this.camera.x + shakeX}px, ${-this.camera.y + shakeY}px, 0)`;
 
         // 4. Request next frame
-        requestAnimationFrame((t) => this.loop(t));
+        if (this.isRunning) this.animationFrame = requestAnimationFrame((t) => this.loop(t));
     }
 
     private update(dt: number): void {
@@ -1246,10 +1597,19 @@ export class Game {
             for (const system of this.systems) {
                 // console.log('Running system:', system.constructor.name);
                 system.update(dt);
+                if (this.state !== GameState.PLAYING || !this.isRunning) break;
             }
         } catch (e) {
             console.error('System update failed:', e);
         }
+        // Catch post-render vehicle motion and any late knockback/teleport.
+        this.courtyardBoundary.update(dt);
+        if (this.state === GameState.GAMEOVER) {
+            // Collision handling may finish its current draw after emitting death.
+            this.artRecording.finish(this.paintingCanvas, this.trailCanvas);
+            return;
+        }
+        this.artRecording.captureTail(this.paintingCanvas, this.trailCanvas);
         
         // Global cleanup of inactive entities
         // Iterate through all entities and remove those marked as inactive
@@ -1276,6 +1636,105 @@ export class Game {
             this.lastRatingTick = 0;
             this.evaluateRating();
         }
+
+        if (this.currentMode === 'defense' && this.updateDefenseMode(dt)) {
+            return;
+        }
+    }
+
+    private updateDefenseMode(dt: number): boolean {
+        if (this.state !== GameState.PLAYING || !this.defensePainting.active) return false;
+
+        this.defenseElapsed += dt;
+        this.defenseIntegrityTick += dt;
+
+        if (this.defenseIntegrityTick >= 0.25) {
+            this.defenseIntegrityTick = 0;
+            const integrity = this.defensePainting.refreshIntegrity();
+            this.updateDefenseHud(integrity);
+
+            if (integrity <= 0.015) {
+                this.defenseFailureMessage = '画作已被擦除';
+                this.gameOver(this.getCurrentRunScore());
+                return true;
+            }
+        }
+
+        if (this.defenseElapsed >= 20 * 60) {
+            this.gameOver(this.getCurrentRunScore(), true);
+            return true;
+        }
+
+        return false;
+    }
+
+    private handleDefenseRepair(detail: any): void {
+        if (this.currentMode !== 'defense' || this.state !== GameState.PLAYING || !this.defensePainting.active) return;
+        if (!detail || !Number.isFinite(detail.x) || !Number.isFinite(detail.y)) return;
+
+        const now = performance.now();
+        const type = String(detail.type || 'standard');
+        const minInterval = type === 'roller' || type === 'flamethrower' ? 80 : 105;
+        if (now - this.lastDefenseRepairAt < minInterval) return;
+
+        const strengthByType: Record<string, number> = {
+            roller: 0.055,
+            flamethrower: 0.07,
+            shotgun: 0.12,
+            melee: 0.24,
+            sniper: 0.25,
+            rocket: 0.2,
+            ribbon: 0.13,
+            ruler: 0.14
+        };
+        const strength = strengthByType[type] ?? 0.16;
+        this.defensePainting.repairStroke(
+            detail.x,
+            detail.y,
+            Number.isFinite(detail.rotation) ? detail.rotation : 0,
+            Number.isFinite(detail.range) ? detail.range : 180,
+            Number.isFinite(detail.width) ? detail.width : 32,
+            strength
+        );
+        this.lastDefenseRepairAt = now;
+    }
+
+    private updateDefenseHud(integrity: number = this.defensePainting.getIntegrity()): void {
+        if (!this.defenseHud || this.currentMode !== 'defense') return;
+
+        let attackingErasers = 0;
+        for (const entity of this.entities.values()) {
+            if (!entity.active || !entity.tags.has('enemy')) continue;
+            const behavior = entity.getComponent(EnemyBehavior);
+            const transform = entity.getComponent(Transform);
+            if (behavior?.type === 'eraser' && transform && this.defensePainting.isNearPainting(transform.x, transform.y, 80)) {
+                attackingErasers++;
+            }
+        }
+
+        renderDefenseHud(this.defenseHud, { name: this.defensePainting.name, integrity,
+            attackers: attackingErasers, remaining: 20 * 60 - this.defenseElapsed, zh: getLang() === 'zh' });
+    }
+
+    private setCombatFieldNotesVisible(visible: boolean): void {
+        const scene = document.getElementById('courtyardCanvas');
+        if(scene && !visible)scene.style.display='none';
+        const notes = document.getElementById('combat-field-notes');
+        if (notes) notes.style.display = visible ? 'block' : 'none';
+    }
+
+    private setDefenseHudVisible(visible: boolean): void {
+        if (!this.defenseHud) return;
+        this.defenseHud.style.display = visible ? 'flex' : 'none';
+        if (visible) this.updateDefenseHud();
+    }
+
+    private getCurrentRunScore(): number {
+        for (const entity of this.entities.values()) {
+            if (!entity.tags.has('player')) continue;
+            return entity.getComponent(Score)?.value || 0;
+        }
+        return 0;
     }
 
     private render(): void {
@@ -1413,32 +1872,63 @@ export class Game {
         this.trailCanvas.style.transform = `translate3d(${-this.camera.x + shakeX}px, ${-this.camera.y + shakeY}px, 0)`;
     }
     
-    private saveImageToFrame(frameIndex: number): void {
-        // 直接使用 trailCanvas 的内容（包含整个世界的涂鸦，透明背景）
-        const dataUrl = this.trailCanvas.toDataURL('image/png');
-        
+    private async saveImageToFrame(frameIndex: number): Promise<boolean> {
+        if (this.savingFrame) return false;
+        this.savingFrame = true;
+        const status = document.getElementById('frame-save-status');
+        if (status) status.textContent = '正在保存，请稍候…';
+        const buttons = document.querySelectorAll<HTMLButtonElement>('.frame-select-btn');
+        buttons.forEach(button => button.disabled = true);
+        // Guard Mode saves the whole collaboration: original art, battle scars,
+        // and the player's upper-layer marks.
         try {
-            // Save to localStorage using simple keys
-            localStorage.setItem(`art_frame_${frameIndex}`, dataUrl);
+            const canvas = this.getExportCanvas();
+            const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(new Error('图片编码失败，请重试。')), 'image/png'));
+            await ArtworkStore.saveFrame(frameIndex, blob);
+            if (status) status.textContent = `已保存至画框 ${frameIndex}`;
             window.dispatchEvent(new CustomEvent('announce', { detail: { text: `作品已保存至画框 ${frameIndex}！` } }));
+            await this.loadFramesToMenu();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `dont_erase_me_art_${Date.now()}.png`;
+            link.href = url;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 30000);
+            return true;
         } catch (e) {
-            console.error('Save to localStorage failed, might be out of quota', e);
-            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `保存失败：本地存储空间不足` } }));
+            const message = e instanceof Error ? e.message : '本地存储不可用';
+            if (status) status.textContent = `保存失败：${message}。可以重试，或仅导出 PNG。`;
+            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `画框保存失败：${message}。请重试，或使用“导出 PNG”。` } }));
+            return false;
+        } finally {
+            this.savingFrame = false;
+            buttons.forEach(button => button.disabled = false);
         }
-        
-        // Update menu frames immediately
-        this.loadFramesToMenu();
-        
-        // 触发本地下载
-        const link = document.createElement('a');
-        link.download = `dont_erase_me_art_${Date.now()}.png`;
-        link.href = dataUrl;
-        link.click();
     }
 
-    public loadFramesToMenu(): void {
+    public async loadFramesToMenu(): Promise<void> {
+        const generation = ++this.frameLoadGeneration;
+        let blobs: (Blob | null)[];
+        try {
+            // One damaged legacy slot must not hide healthy IndexedDB frames.
+            await ArtworkStore.migrateLegacyFrames().catch(error => {
+                console.warn('Legacy artwork migration deferred; original data retained.', error);
+            });
+            blobs = await Promise.all([1, 2, 3, 4].map(index => ArtworkStore.getFrame(index)));
+        } catch (error) {
+            if (!this.frameStorageWarningShown) {
+                this.frameStorageWarningShown = true;
+                window.dispatchEvent(new CustomEvent('announce', { detail: { text: '本地画库读取失败，旧画作没有被删除。请检查存储空间后重试。' } }));
+            }
+            return;
+        }
+        if (generation !== this.frameLoadGeneration) return;
         for (let i = 1; i <= 4; i++) {
-            const dataUrl = localStorage.getItem(`art_frame_${i}`);
+            const oldUrl = this.frameUrls.get(i);
+            if (oldUrl) URL.revokeObjectURL(oldUrl);
+            this.frameUrls.delete(i);
+            const dataUrl = blobs[i - 1] ? URL.createObjectURL(blobs[i - 1]!) : null;
+            if (dataUrl) this.frameUrls.set(i, dataUrl);
             const imgEl = document.getElementById(`frame-img-${i}`) as HTMLImageElement;
             const spanEl = document.querySelector(`#frame-${i} span`) as HTMLElement;
             
@@ -1468,6 +1958,8 @@ export class Game {
         setText('restart-btn', '再玩一次');
         setText('save-btn', '保存作品');
         setText('back-main-btn', '返回主界面');
+        const replayButton = document.getElementById('replay-btn');
+        if (replayButton) replayButton.textContent = getLang() === 'zh' ? '回放本局画作' : 'Replay Artwork';
         setText('back-to-menu-btn', '返回主界面');
         setText('start-run-btn', '确认出击');
         

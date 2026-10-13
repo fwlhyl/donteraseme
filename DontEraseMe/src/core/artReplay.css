@@ -1,0 +1,32 @@
+#art-replay {
+    position: fixed; inset: 0; z-index: 10000; box-sizing: border-box;
+    display: flex; flex-direction: column; gap: 14px; padding: 24px;
+    color: #f5ede0; background: #171b22; font-family: inherit;
+}
+#art-replay .art-replay-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+#art-replay h2 { margin: 0 0 5px; font-size: clamp(19px, 3vw, 29px); }
+#art-replay p { margin: 0; color: #b9bbc5; font-size: 13px; }
+#art-replay button { border: 1px solid #596170; background: #282f3b; color: #f5ede0; border-radius: 8px; padding: 10px 16px; cursor: pointer; font: inherit; white-space: nowrap; }
+#art-replay button:hover, #art-replay button:focus-visible { border-color: #f6d67a; outline: 2px solid #f6d67a; outline-offset: 2px; }
+#art-replay button[aria-pressed="true"] { background: #f6d67a; color: #24242b; border-color: #f6d67a; }
+#art-replay button:disabled { cursor: default; opacity: .45; }
+#art-replay .art-replay-stage { position: relative; display: flex; justify-content: center; align-items: center; flex: 1; min-height: 0; overflow: hidden; }
+#art-replay canvas { position: static; inset: auto; z-index: auto; transform: none; pointer-events: none; opacity: 1; }
+#art-replay #replay-canvas { object-fit: contain; width: 100%; height: 100%; }
+/* The dark paper matches the live world, so white ink remains visible. */
+#art-replay .art-replay-stage { background: #222; border: 1px solid #414854; border-radius: 10px; }
+#art-replay #replay-magic { position: absolute; right: 12px; bottom: 12px; width: min(28%, 260px); padding: 10px; background: #18202be8; border: 1px solid #f6d67a; border-radius: 8px; font-size: 12px; }
+#art-replay #replay-magic[hidden] { display: none; }
+#art-replay #replay-magic-canvas { display: block; width: 100%; height: auto; }
+#art-replay .art-replay-footer { display: flex; flex-direction: column; gap: 12px; }
+#art-replay .art-replay-timeline { display: flex; align-items: center; gap: 18px; }
+#art-replay progress { flex: 1; min-width: 40px; accent-color: #f6d67a; height: 8px; }
+#art-replay #replay-clock { min-width: 120px; font-variant-numeric: tabular-nums; font-size: 13px; }
+#art-replay .art-replay-controls, #art-replay .art-replay-speeds { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+#art-replay #replay-note { text-align: center; }
+@media (max-width: 680px), (max-height: 520px) {
+    #art-replay { padding: 12px; gap: 8px; }
+    #art-replay button { font-size: 12px; padding: 8px 10px; }
+    #art-replay .art-replay-footer { gap: 6px; }
+    #art-replay .art-replay-header p, #art-replay #replay-note { display: none; }
+}

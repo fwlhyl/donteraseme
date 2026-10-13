@@ -10,7 +10,9 @@ import { Transform } from '../components/Transform'; // Import Transform
 import { Experience } from '../components/Experience';
 import { Quest } from '../components/Quest';
 import { PlayerStats } from '../components/PlayerStats';
+import { MagicManifestation } from '../components/MagicManifestation';
 import { t, getLang } from '../i18n/index';
+import { HealthHud, WeaponHud, hudRatio } from '../ui/CombatHud';
 
 export class UISystem extends System {
     private uiContainer: HTMLElement;
@@ -18,6 +20,8 @@ export class UISystem extends System {
     private statsDisplay: HTMLElement; // Add Stats Display
     private scoreDisplay: HTMLElement;
     private eyeDisplay: HTMLElement;
+    private healthHud: HealthHud;
+    private weaponHud: WeaponHud;
     private announceEl: HTMLElement | null = null;
     private escModal: HTMLElement | null = null;
 
@@ -37,6 +41,7 @@ export class UISystem extends System {
         
         // Score Display
         this.scoreDisplay = document.createElement('div');
+        this.scoreDisplay.className = 'hud-note hud-score';
         this.scoreDisplay.style.fontSize = '24px';
         this.scoreDisplay.style.fontWeight = 'bold';
         this.scoreDisplay.style.color = '#ffd700'; // Gold
@@ -45,20 +50,27 @@ export class UISystem extends System {
 
         // Stats Display (Wave, HP)
         this.statsDisplay = document.createElement('div');
+        this.statsDisplay.className = 'hud-note hud-stats';
         this.statsDisplay.style.fontSize = '18px';
         this.statsDisplay.style.marginBottom = '10px';
         this.uiContainer.appendChild(this.statsDisplay);
 
         // Create Weapon Display
         this.weaponDisplay = document.createElement('div');
+        this.weaponDisplay.className = 'hud-note hud-weapon';
         this.weaponDisplay.style.fontSize = '20px';
         this.weaponDisplay.style.fontWeight = 'bold';
         this.weaponDisplay.style.marginTop = '10px';
         this.weaponDisplay.style.color = 'white';
         this.uiContainer.appendChild(this.weaponDisplay);
+        this.healthHud = new HealthHud(this.statsDisplay);
+        this.weaponHud = new WeaponHud(this.weaponDisplay);
+        this.statsDisplay.removeAttribute('style');
+        this.weaponDisplay.removeAttribute('style');
 
         // Canvas Eye Health Display (for story mode)
         this.eyeDisplay = document.createElement('div');
+        this.eyeDisplay.className = 'hud-note hud-eye';
         this.eyeDisplay.style.fontSize = '20px';
         this.eyeDisplay.style.fontWeight = 'bold';
         this.eyeDisplay.style.marginTop = '10px';
@@ -95,6 +107,7 @@ export class UISystem extends System {
         const colors = ['#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffa500', '#000000'];
         colors.forEach(color => {
             const swatch = document.createElement('div');
+            swatch.className = 'palette-swatch';
             swatch.style.width = '30px';
             swatch.style.height = '30px';
             swatch.style.borderRadius = '50%';
@@ -150,6 +163,7 @@ export class UISystem extends System {
 
     private setupAnnounce() {
         const el = document.createElement('div');
+        el.className = 'sketch-announce';
         el.style.position = 'fixed';
         el.style.left = '50%';
         el.style.top = '80px';
@@ -205,6 +219,7 @@ export class UISystem extends System {
 
     private setupEscModal() {
         const overlay = document.createElement('div');
+        overlay.className = 'sketch-esc-overlay';
         overlay.style.position = 'fixed';
         overlay.style.left = '0';
         overlay.style.top = '0';
@@ -216,6 +231,7 @@ export class UISystem extends System {
         overlay.style.justifyContent = 'center';
         overlay.style.zIndex = '9999';
         const panel = document.createElement('div');
+        panel.className = 'sketch-dialog';
         panel.style.background = '#111';
         panel.style.padding = '16px';
         panel.style.borderRadius = '8px';
@@ -223,14 +239,17 @@ export class UISystem extends System {
         panel.style.flexDirection = 'column';
         panel.style.gap = '12px';
         const btnSaveFrame = document.createElement('button');
+        btnSaveFrame.className = 'btn';
         btnSaveFrame.textContent = t('保存当前作品到画框');
         btnSaveFrame.style.padding = '10px 14px';
         btnSaveFrame.style.cursor = 'pointer';
         const btnSaveLocal = document.createElement('button');
+        btnSaveLocal.className = 'btn';
         btnSaveLocal.textContent = t('保存作品到本地');
         btnSaveLocal.style.padding = '10px 14px';
         btnSaveLocal.style.cursor = 'pointer';
         const btnExit = document.createElement('button');
+        btnExit.className = 'btn';
         btnExit.textContent = t('退出当前对局');
         btnExit.style.padding = '10px 14px';
         btnExit.style.cursor = 'pointer';
@@ -247,38 +266,13 @@ export class UISystem extends System {
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
         this.escModal = overlay;
-        const openSelector = () => {
-            const selector = document.createElement('div');
-            selector.style.marginTop = '8px';
-            selector.style.display = 'grid';
-            selector.style.gridTemplateColumns = 'repeat(4, 120px)';
-            selector.style.gap = '8px';
-            
-            const makeCell = (i: number) => {
-                const dataUrl = localStorage.getItem(`art_frame_${i}`);
-                const hasArt = !!dataUrl;
-                const b = document.createElement('button');
-                b.textContent = `#${i} ${hasArt ? '已存储' : '空'}`;
-                b.style.padding = '8px';
-                b.style.cursor = 'pointer';
-                b.onclick = () => {
-                    window.dispatchEvent(new CustomEvent('save-art-to-frame', { detail: { index: i } }));
-                    if (this.escModal) this.escModal.style.display = 'none';
-                    window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));
-                };
-                return b;
-            };
-            selector.innerHTML = '';
-            for (let i = 1; i <= 4; i++) selector.appendChild(makeCell(i));
-            panel.appendChild(selector);
-        };
         btnSaveFrame.onclick = () => {
-            const existing = panel.querySelector('div');
-            if (existing) existing.remove();
-            openSelector();
+            // Use the same awaited save dialog as settlement. Keep this pause
+            // menu underneath so failure/retry cannot silently resume combat.
+            window.dispatchEvent(new CustomEvent('save-art-local'));
         };
         btnSaveLocal.onclick = () => {
-            window.dispatchEvent(new CustomEvent('save-art-local'));
+            window.dispatchEvent(new CustomEvent('export-art-png'));
         };
         btnExit.onclick = () => {
             if (this.escModal) this.escModal.style.display = 'none';
@@ -292,6 +286,11 @@ export class UISystem extends System {
                 // 仅在游戏进行中允许打开ESC菜单（1 = GameState.PLAYING）
                 const gameInstance = (window as any).gameInstance;
                 if (gameInstance && gameInstance.state !== 1) return;
+                const frameDialog = document.getElementById('frame-save-modal');
+                if (frameDialog?.style.display === 'flex') {
+                    frameDialog.style.display = 'none';
+                    return;
+                }
                 
                 if (!this.escModal) return;
                 const showing = this.escModal.style.display === 'flex';
@@ -371,32 +370,49 @@ export class UISystem extends System {
                 const score = entity.getComponent(Score);
                 
                 if (score) {
-                    this.scoreDisplay.textContent = `SCORE: ${score.value}  COINS: ${score.coins}  RATING: ${score.rating}`;
+                    const label = getLang() === 'zh' ? `得分 ${score.value} · 金币 ${score.coins} · 评级 ${score.rating}` : `SCORE ${score.value} · COINS ${score.coins} · RATING ${score.rating}`;
+                    if (this.scoreDisplay.textContent !== label) this.scoreDisplay.textContent = label;
                 }
 
                 // Update Stats
                 const exp = entity.getComponent(Experience);
                 const stats = entity.getComponent(PlayerStats);
                 if (health) {
-                    const lvlTxt = exp ? ` LVL: ${exp.level} (${exp.xp}/${exp.next})` : '';
                     let shieldTxt = '';
                     if (stats && stats.characterId === 'classical') {
                         if (stats.hasClassicalShield) shieldTxt = getLang() === 'zh' ? '  [厚涂护盾: 就绪]' : '  [Impasto Shield: Ready]';
                         else shieldTxt = getLang() === 'zh' ? `  [厚涂护盾: ${(stats.shieldCooldownFrames / 60).toFixed(1)}秒]` : `  [Impasto Shield: ${(stats.shieldCooldownFrames / 60).toFixed(1)}s]`;
                     }
-                    this.statsDisplay.textContent = `HP: ${Math.ceil(health.current)} / ${health.max}${lvlTxt}${shieldTxt}`;
+                    this.healthHud.update({ id: entity.id, hp: health.current, max: health.max,
+                        level: exp?.level ?? 1, xp: exp?.xp ?? 0, next: exp?.next ?? 100,
+                        shield: shieldTxt, zh: getLang() === 'zh' }, dt);
                 }
 
                 if (weapon) {
-                    const config = weapon.config;
-                    if (config) {
-                        const ammo = weapon.ammo[weapon.currentWeaponIndex] ?? 0;
-                        const reloadTxt = weapon.reloading ? (getLang() === 'zh' ? ' (装填中...)' : ' (reloading...)') : '';
-                        this.weaponDisplay.textContent = `WEAPON: ${t(config.name)}  ${ammo}/${config.magSize}${reloadTxt}`;
-                        this.weaponDisplay.style.color = config.color;
+                    const pilotedVehicle = Array.from(this.entities).find(candidate => {
+                        const manifestation = candidate.getComponent(MagicManifestation);
+                        return candidate.active && manifestation?.ownerId === entity.id;
+                    })?.getComponent(MagicManifestation);
+
+                    if (pilotedVehicle) {
+                        const names = getLang() === 'zh'
+                            ? { tank: '坦克', robot: '机器人', bomber: '轰炸机' }
+                            : { tank: 'Tank', robot: 'Robot', bomber: 'Bomber' };
+                        this.weaponHud.update({ key: pilotedVehicle.type, name: names[pilotedVehicle.type], type: 'vehicle',
+                            ammo: 0, capacity: 0, reloading: false, reloadProgress: 0,
+                            remaining: pilotedVehicle.remainingFrames / 60, zh: getLang() === 'zh' });
                     } else {
-                        this.weaponDisplay.textContent = `WEAPON: Unarmed`;
-                        this.weaponDisplay.style.color = 'gray';
+                        const config = weapon.config;
+                        if (config) {
+                            const ammo = weapon.ammo[weapon.currentWeaponIndex] ?? 0;
+                            const reloadFrames = Math.max(1, Math.floor(config.reloadTime * weapon.reloadTimeMul / (stats?.totalReloadMultiplier ?? 1)));
+                            this.weaponHud.update({ key: `${config.id}`, name: t(config.name), type: config.type,
+                                ammo, capacity: config.magSize, reloading: weapon.reloading,
+                                reloadProgress: 1 - hudRatio(weapon.reloadTimer, reloadFrames), zh: getLang() === 'zh' });
+                        } else {
+                            this.weaponHud.update({ key: 'unarmed', name: getLang() === 'zh' ? '尚未装备画笔' : 'Unarmed',
+                                type: 'standard', ammo: 0, capacity: 0, reloading: false, reloadProgress: 0, zh: getLang() === 'zh' });
+                        }
                     }
                 }
                 

@@ -10,21 +10,43 @@ import { PlayerStats } from '../components/PlayerStats';
 
 import { ParticleFactory } from '../entities/ParticleFactory';
 import { Entity } from '../core/Entity';
+import { courtyard, CourtyardNavigation } from '../world/CourtyardGeometry';
+import { courtyardRadius } from './CourtyardBoundarySystem';
 
 export class MovementSystem extends System {
+    private courtyardNavigation = new CourtyardNavigation(courtyard);
+    private courtyardRoutes = new Map<string,{x:number;y:number;ttl:number}>();
+    override onEntityRemoved(entity:Entity):void { this.courtyardRoutes.delete(entity.id); }
     constructor(
         private worldWidth: number, 
         private worldHeight: number,
         private addEntityCallback?: (entity: Entity) => void,
         private gameCtx?: CanvasRenderingContext2D,
-        private trailCtx?: CanvasRenderingContext2D
+        private trailCtx?: CanvasRenderingContext2D,
+        private useCourtyard: () => boolean = () => false
     ) {
         super();
+    }
+
+    public override setWorldSize(width: number, height: number): void {
+        this.worldWidth = width;
+        this.worldHeight = height;
+        this.courtyardRoutes.clear();
     }
 
     public update(dt: number): void {
         const entitiesToRemove: Entity[] = [];
         const newEntities: Entity[] = [];
+        let player: Transform | undefined;
+        const walls: Entity[] = [];
+        const inCourtyard = this.useCourtyard();
+        for (const entity of this.entities) {
+            if (inCourtyard && !player && entity.active && entity.tags.has('player')) player = entity.getComponent(Transform);
+            // Keep wall order and check active at collision time. In the two
+            // released maps there are no legacy wall entities, so actors no
+            // longer scan every enemy, projectile and XP pickup to find none.
+            if (entity.tags.has('wall')) walls.push(entity);
+        }
 
         for (const entity of this.entities) {
             const transform = entity.getComponent(Transform);
@@ -356,10 +378,38 @@ export class MovementSystem extends System {
                 let nextX = transform.x + velocity.x;
                 let nextY = transform.y + velocity.y;
 
+                if(this.useCourtyard() && (entity.tags.has('player')||entity.tags.has('enemy'))) {
+                    const radius=courtyardRadius(entity);
+                    // Cache steering for a fraction of a second; ordinary open
+                    // plaza movement retains the enemy's existing behaviour.
+                    if(entity.tags.has('enemy')&&player) {
+                        let route=this.courtyardRoutes.get(entity.id);
+                        if(!route||route.ttl<=0) {
+                            const from=courtyard.project(transform,radius);
+                            const target=courtyard.project(player,radius);
+                            const clear=courtyard.segmentClear(from,target,radius);
+                            const p=clear?target:this.courtyardNavigation.waypoint(from,target,radius);
+                            // NaN waypoints mean the existing enemy AI has a
+                            // clear route; no velocity override is necessary.
+                            route={x:clear?NaN:p.x,y:clear?NaN:p.y,ttl:.25};
+                            this.courtyardRoutes.set(entity.id,route);
+                        }
+                        route.ttl-=dt;
+                        if(Number.isFinite(route.x)) {
+                            const dx=route.x-transform.x,dy=route.y-transform.y,len=Math.hypot(dx,dy);
+                            const speed=Math.hypot(velocity.x,velocity.y);
+                            if(len>1){nextX=transform.x+dx/len*Math.min(speed,len);nextY=transform.y+dy/len*Math.min(speed,len);}
+                            else route.ttl=0;
+                        }
+                    }
+                    const p=courtyard.move(transform,{x:nextX,y:nextY},radius);
+                    nextX=p.x;nextY=p.y;
+                }
+
                 // Collision with walls
                 if (entity.tags.has('player') || entity.tags.has('enemy') || entity.tags.has('citizen')) {
                     const pr = renderable?.radius || 15;
-                    for (const wall of this.entities) {
+                    for (const wall of walls) {
                         if (wall.tags.has('wall') && wall.active) {
                             const wTransform = wall.getComponent(Transform);
                             const wRender = wall.getComponent(Renderable);

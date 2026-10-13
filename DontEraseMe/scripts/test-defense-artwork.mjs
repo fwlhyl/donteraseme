@@ -1,0 +1,128 @@
+// Isolated browser QA: never opens or modifies the developer's game profile.
+import assert from 'node:assert/strict';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const page = await context.newPage();
+const errors = [];
+page.on('pageerror', error => errors.push(error.message));
+const output = await mkdtemp(join(tmpdir(), 'donteraseme-defense-'));
+try {
+    await page.goto(process.env.REPLAY_TEST_URL || 'http://127.0.0.1:5174');
+    await page.waitForFunction(() => Boolean(window.gameInstance));
+    const result = await page.evaluate(async () => {
+        const { convertToStrokes, decodeImage } = await import('/src/core/ImageToStrokes.ts');
+        const { BUILT_IN_ARTWORK, validateArtwork, drawArtwork } = await import('/src/core/DefenseArtwork.ts');
+        const { DefensePainting } = await import('/src/core/DefensePainting.ts');
+        const { ArtReplayRecording } = await import('/src/core/ArtReplayRecording.ts');
+        const check = (condition, message) => { if (!condition) throw Error(message); };
+        const source = document.createElement('canvas'); source.width = 480; source.height = 360;
+        const ctx = source.getContext('2d');
+        ctx.fillStyle = 'white'; ctx.fillRect(0, 0, 480, 360);
+        ctx.strokeStyle = 'black'; ctx.lineWidth = 7;
+        ctx.strokeRect(90, 150, 200, 150);
+        ctx.beginPath(); ctx.moveTo(60, 150); ctx.lineTo(190, 45); ctx.lineTo(320, 150); ctx.closePath(); ctx.stroke();
+        ctx.strokeRect(165, 220, 48, 80); ctx.strokeRect(110, 180, 32, 32);
+        ctx.beginPath(); ctx.arc(380, 90, 38, 0, Math.PI * 2); ctx.stroke();
+        const png = source.toDataURL();
+        const started = performance.now();
+        const art = await convertToStrokes(source, { name: '我的小屋', detail: .55, lineWidth: 4 });
+        check(validateArtwork(art) && validateArtwork(BUILT_IN_ARTWORK), 'generated artworks must validate');
+        check(art.strokes.length > 3, 'house edges should survive conversion');
+        const crop = await convertToStrokes(source, { crop: { x: 330, y: 35, width: 100, height: 110 }, autoCrop: false });
+        check(JSON.stringify(crop.strokes) !== JSON.stringify(art.strokes), 'crop must change artwork');
+        const empty = document.createElement('canvas'); empty.width = 300; empty.height = 200;
+        for (const white of [false, true]) {
+            if (white) { empty.getContext('2d').fillStyle = 'white'; empty.getContext('2d').fillRect(0, 0, 300, 200); }
+            let rejected = false;
+            try { await convertToStrokes(empty); } catch { rejected = true; }
+            check(rejected, 'blank/transparent images must produce useful rejection');
+        }
+        let rejectedLarge = false;
+        try { await decodeImage(new File([new Uint8Array(21 * 1024 * 1024)], 'large.png', { type: 'image/png' })); } catch { rejectedLarge = true; }
+        check(rejectedLarge, 'oversize image must be rejected before decoding');
+        const blob = await new Promise(resolve => source.toBlob(resolve));
+        const decoded = await decodeImage(new File([blob], 'house.png', { type: 'image/png' }));
+        check(decoded.width > 0 && decoded.width <= 1200, 'local image decoding');
+        const preview = document.createElement('canvas'); preview.width = art.width; preview.height = art.height;
+        drawArtwork(preview.getContext('2d'), art, 0);
+        check(!preview.getContext('2d').getImageData(0, 0, preview.width, preview.height).data.some(value => value), 'zero progress is blank');
+        drawArtwork(preview.getContext('2d'), art, 1);
+        const world = document.createElement('canvas');
+        const painting = new DefensePainting(world, 3000, 2000); painting.beginArtwork(art);
+        check(painting.getIntegrity() === 1 && painting.getRandomInkTarget(), 'thin custom art must have full baseline and eraser targets');
+        const target = painting.getRandomInkTarget();
+        for (let i = 0; i < 3; i++) painting.eraseAt(target.x, target.y, 180, .5);
+        const damaged = painting.refreshIntegrity();
+        for (let i = 0; i < 6; i++) painting.repairStroke(target.x - 60, target.y, 0, 120, 120, .4);
+        const repaired = painting.refreshIntegrity();
+        check(damaged < 1 && repaired > damaged && repaired <= 1, 'custom art erasure/repair must change actual integrity');
+        const log = new ArtReplayRecording(); log.start(3000, 2000, true, art);
+        art.name = '修改了画库';
+        check(log.initialArtwork.name === '我的小屋', 'replay must own an immutable source copy');
+        log.clear();
+        return { png, strokes: art.strokes.length, points: art.strokes.reduce((sum, stroke) => sum + stroke.points.length, 0), elapsedMs: performance.now() - started, damaged, repaired };
+    });
+    console.log('Conversion and painting:', { ...result, png: '(fixture)' });
+    await page.locator('#defense-mode-btn').click();
+    await page.locator('#defense-art-import').click();
+    await page.locator('#defense-image-file').setInputFiles({ name: 'house.png', mimeType: 'image/png', buffer: Buffer.from(result.png.split(',')[1], 'base64') });
+    await page.locator('#defense-art-name').fill('小屋守卫验收');
+    await page.locator('#defense-art-save').waitFor({ state: 'visible' });
+    await page.waitForFunction(() => !document.querySelector('#defense-art-save').disabled);
+    await page.screenshot({ path: join(output, 'import-preview.png') });
+    await page.locator('#defense-art-save').click();
+    await page.waitForFunction(() => window.gameInstance.artworkPicker.selected.name === '小屋守卫验收');
+    const selectedId = await page.evaluate(() => window.gameInstance.artworkPicker.selected.id);
+    await page.reload();
+    await page.waitForFunction(id => window.gameInstance?.artworkPicker.selected.id === id, selectedId);
+    await page.locator('#defense-mode-btn').click();
+    await page.locator('#start-run-btn').click();
+    await page.locator('#defense-intro').waitFor();
+    const intro = await page.evaluate(() => ({ timer: window.gameInstance.defenseElapsed, entities: window.gameInstance.entities.size, running: window.gameInstance.isRunning }));
+    assert.deepEqual(intro, { timer: 0, entities: 0, running: false });
+    await page.screenshot({ path: join(output, 'intro.png') });
+    await page.locator('#cancel-defense-intro').click();
+    assert.equal(await page.evaluate(() => window.gameInstance.state), 4);
+    await page.locator('#start-run-btn').click();
+    await page.locator('#skip-defense-intro').click();
+    await page.waitForFunction(() => window.gameInstance.state === 1);
+    assert.equal(await page.locator('#painting-name').textContent(), '小屋守卫验收');
+    await page.mouse.move(950, 300);
+    await page.keyboard.down('d'); await page.waitForTimeout(400); await page.keyboard.up('d');
+    await page.screenshot({ path: join(output, 'custom-battle.png') });
+    await page.evaluate(() => {
+        const game = window.gameInstance;
+        game.stop(); game.artRecording.log.advance(10);
+        game.defensePainting.eraseAt(game.worldWidth / 2, game.worldHeight / 2, 180, .4);
+        game.artRecording.log.advance(15);
+        game.defensePainting.repairStroke(game.worldWidth / 2 - 100, game.worldHeight / 2, 0, 200, 80, .4);
+        game.gameOver(10);
+    });
+    await page.locator('#replay-btn').click();
+    const initialId = await page.evaluate(() => window.gameInstance.artRecording.initialArtwork.id);
+    assert.equal(initialId, selectedId);
+    await page.locator('#replay-skip').click();
+    assert(await page.evaluate(() => document.querySelector('#replay-canvas').toDataURL() === window.gameInstance.artRecording.finalArtwork.toDataURL()));
+    await page.locator('#replay-close').click();
+    await page.locator('#save-btn').click();
+    await page.evaluate(async () => {
+        const { ArtworkStore } = await import('/src/core/ArtworkStore.ts');
+        window.originalSaveFrame = ArtworkStore.saveFrame;
+        ArtworkStore.saveFrame = async () => { throw Error('模拟空间不足'); };
+    });
+    await page.locator('.frame-select-btn[data-index="1"]').click();
+    await page.waitForFunction(() => document.querySelector('#frame-save-status').textContent.includes('模拟空间不足'));
+    assert(await page.locator('#frame-save-modal').isVisible(), 'failure must keep retry/export options visible');
+    await page.evaluate(async () => { (await import('/src/core/ArtworkStore.ts')).ArtworkStore.saveFrame = window.originalSaveFrame; });
+    await page.locator('.frame-select-btn[data-index="1"]').click();
+    await page.locator('#frame-save-modal').waitFor({ state: 'hidden' });
+    await page.reload();
+    await page.waitForFunction(() => document.querySelector('#frame-img-1').src.startsWith('blob:'));
+    assert.deepEqual(errors, []);
+    console.log('UI: import, persist/reload, intro cancel/skip, custom battle, replay, save failure/retry, frame reload passed.');
+    console.log('Screenshots:', output);
+} finally { await context.close(); await browser.close(); }

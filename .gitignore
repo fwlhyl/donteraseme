@@ -5,6 +5,16 @@
 **/__pycache__/
 *.pyc
 
+# Machine-local configuration and credentials (keep examples shareable)
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+
 # Build dependencies and generated web output
 **/node_modules/
 **/dist/

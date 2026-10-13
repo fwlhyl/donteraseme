@@ -1,0 +1,67 @@
+.defense-artwork-picker { box-sizing: border-box; width: min(1200px, 96%); padding: 18px; margin: 0 0 22px; border: 1px solid #45534f; border-radius: 12px; background: #15211f; color: #f2eee3; }
+.defense-artwork-picker[hidden] { display: none; }
+.defense-art-library-heading, .defense-art-dialog-heading { display: flex; gap: 16px; justify-content: space-between; align-items: center; }
+.defense-artwork-picker h3 { font-size: 18px; margin: 0 0 5px; }
+.defense-artwork-picker p { font-size: 13px; line-height: 1.6; color: #b9c6bf; margin: 4px 0; }
+.defense-artwork-picker button, .defense-art-import-modal button { font: inherit; color: #f2eee3; border: 1px solid #64776e; border-radius: 7px; background: #263a32; padding: 9px 14px; cursor: pointer; }
+.defense-artwork-picker button:hover, .defense-art-import-modal button:hover { border-color: #98d6ba; }
+.defense-artwork-picker button:focus-visible, .defense-art-import-modal button:focus-visible, .defense-art-import-modal input:focus-visible { outline: 2px solid #f6d67a; outline-offset: 3px; }
+.defense-artwork-picker button:disabled, .defense-art-import-modal button:disabled, .defense-art-import-modal input:disabled { cursor: default; opacity: .45; }
+.defense-art-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 10px; max-height: 440px; overflow-y: auto; padding: 6px 2px; margin-top: 10px; }
+.defense-art-card { position: relative; border-radius: 8px; min-width: 0; max-width: 245px; border: 2px solid transparent; background: #222d29; }
+.defense-art-card.is-selected { border-color: #e6ca77; }
+.defense-art-card .defense-art-select { display: flex; flex-direction: column; gap: 5px; width: 100%; padding: 6px 6px 10px; border: 0; border-radius: 6px; background: none; text-align: left; }
+.defense-art-name { width: 100%; box-sizing: border-box; padding-right: 32px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.defense-art-caption { font-size: 11px; color: #b7c7bd; }
+.defense-art-card .defense-art-delete { position: absolute; bottom: 29px; right: 7px; padding: 1px 4px; font-size: 10px; border-color: transparent; background: none; color: #d1a5a0; }
+.defense-artwork-picker canvas, .defense-art-import-modal canvas { position: static; inset: auto; transform: none; z-index: auto; opacity: 1; background: #222; }
+.defense-artwork-picker canvas { display: block; width: 100%; height: auto; border-radius: 4px; pointer-events: none; }
+.defense-artwork-picker .is-error, .defense-art-import-modal .is-error { color: #ffb7a6; }
+.defense-art-import-modal { position: fixed; inset: 0; z-index: 11000; display: flex; justify-content: center; align-items: center; box-sizing: border-box; padding: 16px; background: #080c11ed; color: #f2eee3; font-family: inherit; }
+.defense-art-dialog { box-sizing: border-box; width: min(1040px, 100%); max-height: 100%; overflow-y: auto; padding: 22px; border: 1px solid #526359; border-radius: 14px; background: #19221f; box-shadow: 0 14px 80px #0009; }
+.defense-art-dialog h2 { font-size: clamp(19px, 2.4vw, 26px); margin: 0; }
+.defense-art-dialog h3 { font-size: 15px; margin: 0 0 8px; }
+.defense-art-dialog p { font-size: 12px; color: #b7c2b9; line-height: 1.6; margin: 7px 0; }
+.defense-art-dialog #defense-art-close { padding: 5px 10px; background: none; }
+.defense-art-file-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 0; font-size: 14px; }
+.defense-art-file-row input { max-width: 100%; }
+.defense-art-file-row input::file-selector-button { font: inherit; color: #f2eee3; background: #30483c; border: 1px solid #697d6d; border-radius: 5px; padding: 8px 12px; margin-right: 12px; cursor: pointer; }
+.defense-art-preview-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+.defense-art-preview-columns section { min-width: 0; }
+.defense-art-canvas-wrap { height: clamp(180px, 30vh, 330px); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: #222; border: 1px solid #435149; border-radius: 8px; }
+.defense-art-import-modal canvas { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.defense-art-import-modal #defense-art-source { cursor: crosshair; touch-action: none; pointer-events: auto; }
+.defense-art-import-modal #defense-art-preview { pointer-events: none; }
+.defense-art-source-empty { position: absolute; inset: 0; display: grid; place-items: center; color: #8b9c90; font-size: 14px; pointer-events: none; background: #222; }
+.defense-art-source-empty[hidden] { display: none; }
+.defense-art-crop-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12px; }
+.defense-art-crop-actions button { padding: 6px 10px; font-size: 12px; }
+.defense-art-crop-actions label { display: flex; gap: 5px; align-items: center; }
+.defense-art-import-modal input { accent-color: #a6d5af; }
+.defense-art-settings { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 20px; align-items: center; margin: 18px 0 10px; }
+.defense-art-settings label { display: flex; flex-wrap: wrap; gap: 7px; font-size: 13px; align-items: center; }
+.defense-art-settings input { box-sizing: border-box; width: 100%; }
+.defense-art-settings input[type="text"] { padding: 9px; color: #f2eee3; background: #101713; border: 1px solid #57675b; border-radius: 5px; font: inherit; }
+.defense-art-settings output { margin-left: auto; color: #dac875; font-variant-numeric: tabular-nums; }
+.defense-art-colour-setting { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; font-size: 13px; margin: 10px 0; }
+.defense-art-colour-setting span { color: #b7c2b9; font-size: 12px; }
+.defense-art-dialog-actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 13px; }
+.defense-art-dialog-actions span { font-size: 12px; color: #96a59b; margin-right: auto; }
+.defense-art-dialog #defense-art-save { background: #15634d; border-color: #43866b; }
+#defense-art-import-status { min-height: 20px; }
+@media (max-width: 700px) {
+    .defense-art-library-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
+    .defense-artwork-picker { padding: 12px; }
+    .defense-art-import-modal { padding: 8px; }
+    .defense-art-dialog { padding: 14px; }
+    .defense-art-preview-columns { gap: 10px; }
+    .defense-art-canvas-wrap { height: 190px; }
+    .defense-art-settings { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .defense-art-title-input { grid-column: 1 / -1; }
+    .defense-art-dialog-actions { flex-wrap: wrap; }
+    .defense-art-dialog-actions span { width: 100%; }
+}
+@media (max-width: 440px) {
+    .defense-art-preview-columns { grid-template-columns: 1fr; }
+    .defense-art-canvas-wrap { height: 200px; }
+}

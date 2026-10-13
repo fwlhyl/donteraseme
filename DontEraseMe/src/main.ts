@@ -1,19 +1,23 @@
 import './style.css'
+import './ui/combatHud.css'
 import { Game } from './core/Game';
 import { ElementDictionary, PaletteSystem } from './systems/PaletteSystem';
 import { Weapon } from './components/Weapon';
+import { mountGameAudio } from './audio/mountGameAudio';
+import type { AudioDirector } from './audio/AudioDirector';
 
 // Type definitions for global variables
 declare global {
     interface Window {
         gameInstance: Game;
-        audioManager: any; // 暂时用 any 绕过类型检查
+        audioManager: AudioDirector;
     }
 }
 
 // Initialize game
 const game = new Game();
 window.gameInstance = game; // Expose to global for UI and systems
+window.audioManager = mountGameAudio(game);
 
 // Start game loop
 game.start();

@@ -71,6 +71,12 @@ export class InputSystem extends System {
                 currentSpeed = Math.min(totalSpeedWithFrenzy, 8.0);
             }
 
+            // The bomber is a piloted air vehicle: it keeps the player's normal
+            // controls but has distinctly higher map traversal speed.
+            if (entity.tags.has('magic_piloting_bomber')) {
+                currentSpeed *= 1.65;
+            }
+
             // Reset velocity
             velocity.x = 0;
             velocity.y = 0;

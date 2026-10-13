@@ -22,6 +22,165 @@ import { DeathHandler } from './DeathHandler';
 import { Puddle } from '../components/Puddle';
 import { Paperclip } from '../components/Paperclip';
 import { PlayerAnimation } from '../components/PlayerAnimation';
+import { SkillVisual } from '../components/SkillVisual';
+import { emitGameSound } from '../audio/AudioEvents';
+
+/** Broad phase only: the original AABB and shape tests remain authoritative. */
+class EnemyCollisionIndex {
+    private readonly cellSize = 128;
+    private readonly cells = new Map<string, Set<number>>();
+    private readonly entries = new Map<Entity, { order: number; key: string }>();
+    private readonly unindexed = new Set<number>();
+
+    constructor(private readonly enemies: Entity[]) {
+        enemies.forEach((enemy, order) => {
+            this.entries.set(enemy, { order, key: '' });
+            this.update(enemy, enemy.getComponent(Transform));
+        });
+    }
+
+    public update(enemy: Entity, transform: Transform | undefined): void {
+        const entry = this.entries.get(enemy);
+        if (!entry) return;
+        const key = transform && Number.isFinite(transform.x) && Number.isFinite(transform.y)
+            ? `${Math.floor(transform.x / this.cellSize)},${Math.floor(transform.y / this.cellSize)}` : '';
+        if (entry.key === key && key) return;
+        if (entry.key) this.cells.get(entry.key)?.delete(entry.order);
+        this.unindexed.delete(entry.order);
+        entry.key = key;
+        if (!key) {
+            this.unindexed.add(entry.order);
+            return;
+        }
+        let cell = this.cells.get(key);
+        if (!cell) this.cells.set(key, cell = new Set());
+        cell.add(entry.order);
+    }
+
+    public query(x: number, y: number, range: number): Entity[] {
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(range)) return this.enemies;
+        const minX = Math.floor((x - range) / this.cellSize);
+        const maxX = Math.floor((x + range) / this.cellSize);
+        const minY = Math.floor((y - range) / this.cellSize);
+        const maxY = Math.floor((y + range) / this.cellSize);
+        if (![minX, maxX, minY, maxY].every(Number.isSafeInteger)) return this.enemies;
+        // A long beam can span most of the world; visiting every cell then
+        // sorting would cost more than the original ordered scan.
+        if ((maxX - minX + 1) * (maxY - minY + 1) >= this.enemies.length) return this.enemies;
+        const orders = [...this.unindexed];
+        for (let cy = minY; cy <= maxY; cy++) {
+            for (let cx = minX; cx <= maxX; cx++) {
+                const cell = this.cells.get(`${cx},${cy}`);
+                if (cell) {
+                    // A packed mob has little to cull; avoid copying/sorting
+                    // most of the list for every shot into the same crowd.
+                    if (orders.length + cell.size > this.enemies.length / 2) return this.enemies;
+                    for (const order of cell) orders.push(order);
+                }
+            }
+        }
+        // Piercing, shields, chain effects and random rolls depend on the
+        // original entity insertion order, not on spatial bucket order.
+        orders.sort((a, b) => a - b);
+        return orders.map(order => this.enemies[order]);
+    }
+}
+
+type SeparationEntry = {
+    entity: Entity;
+    behavior: EnemyBehavior | undefined;
+    transform: Transform | undefined;
+    render: Renderable | undefined;
+};
+
+type SeparationNeighborhood = {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+    /** null means the original sequential scan is cheaper/safer. */
+    orders: number[] | null;
+};
+
+/** Live, ordered broad phase for the sequential pairwise separation solver. */
+class EnemySeparationIndex {
+    private readonly cellSize = 128;
+    private readonly cells = new Map<string, Set<number>>();
+    private readonly keys: string[] = [];
+    private maxRadius = 0;
+    private supported = true;
+
+    constructor(private readonly entries: SeparationEntry[]) {
+        entries.forEach((entry, order) => {
+            if (!entry.transform || !entry.render) return;
+            const radius = entry.render.radius || 15;
+            // Keep legacy handling for malformed/non-positive radii and very
+            // large coordinates, including the coincident-center random push.
+            if (!(radius > 0) || !Number.isFinite(radius)) this.supported = false;
+            this.maxRadius = Math.max(this.maxRadius, radius);
+            this.update(order);
+        });
+    }
+
+    public update(order: number): void {
+        const transform = this.entries[order].transform;
+        if (!transform) return;
+        const cx = Math.floor(transform.x / this.cellSize);
+        const cy = Math.floor(transform.y / this.cellSize);
+        if (!Number.isSafeInteger(cx) || !Number.isSafeInteger(cy)) {
+            this.supported = false;
+            return;
+        }
+        const key = `${cx},${cy}`;
+        if (key === this.keys[order]) return;
+        const previous = this.keys[order];
+        if (previous) this.cells.get(previous)?.delete(order);
+        this.keys[order] = key;
+        let cell = this.cells.get(key);
+        if (!cell) this.cells.set(key, cell = new Set());
+        cell.add(order);
+    }
+
+    public query(transform: Transform, radius: number, after: number): SeparationNeighborhood {
+        // A little extra coverage avoids rebuilding after every tiny push.
+        // covers() checks the true collision radius against these bucket bounds.
+        const range = radius + this.maxRadius + this.cellSize / 4;
+        const minX = Math.floor((transform.x - range) / this.cellSize);
+        const maxX = Math.floor((transform.x + range) / this.cellSize);
+        const minY = Math.floor((transform.y - range) / this.cellSize);
+        const maxY = Math.floor((transform.y + range) / this.cellSize);
+        const result: SeparationNeighborhood = { minX, maxX, minY, maxY, orders: null };
+        const remaining = this.entries.length - after - 1;
+        if (!this.supported || ![minX, maxX, minY, maxY].every(Number.isSafeInteger)
+            || (maxX - minX + 1) * (maxY - minY + 1) >= remaining) return result;
+        const orders: number[] = [];
+        for (let cy = minY; cy <= maxY; cy++) {
+            for (let cx = minX; cx <= maxX; cx++) {
+                const cell = this.cells.get(`${cx},${cy}`);
+                if (!cell) continue;
+                for (const order of cell) {
+                    if (order <= after) continue;
+                    orders.push(order);
+                    // Sorting a packed crowd is more work than the old loop.
+                    if (orders.length * 2 > remaining) return result;
+                }
+            }
+        }
+        orders.sort((a, b) => a - b);
+        result.orders = orders;
+        return result;
+    }
+
+    public covers(neighborhood: SeparationNeighborhood, transform: Transform, radius: number): boolean {
+        const range = radius + this.maxRadius;
+        return this.supported
+            && Math.floor((transform.x - range) / this.cellSize) >= neighborhood.minX
+            && Math.floor((transform.x + range) / this.cellSize) <= neighborhood.maxX
+            && Math.floor((transform.y - range) / this.cellSize) >= neighborhood.minY
+            && Math.floor((transform.y + range) / this.cellSize) <= neighborhood.maxY;
+    }
+}
+
 // removed Physics import
 export class CollisionSystem extends System {
     constructor(
@@ -104,6 +263,7 @@ export class CollisionSystem extends System {
                     const proj = new Entity();
                     proj.addComponent(new Transform(pTransform.x, pTransform.y));
                     proj.addComponent(new Renderable('#555555', 4, 0, 0, 'circle'));
+                    proj.addComponent(new SkillVisual('pencil_shard'));
                     proj.addComponent(new Velocity(Math.cos(angle) * 10, Math.sin(angle) * 10));
                     proj.addComponent(new Projectile('standard', projDamage, player.id, 60, isPiercing ? 999 : 1));
                     proj.tags.add('projectile');
@@ -184,6 +344,7 @@ export class CollisionSystem extends System {
             }
             
             DamageTextSystem.addDamageText(pTransform.x, pTransform.y - 20, 0, '#00ffff', true, "免疫!");
+            emitGameSound('shield', { x: pTransform.x, y: pTransform.y });
             window.dispatchEvent(new CustomEvent('announce', { detail: { text: `厚涂护盾破裂！(剩余 ${pStats.classicalShieldStacks} 层)` } }));
             pHealth.invincibleFrames = 60; // Give some i-frames anyway to prevent instant multi-hit
             this.handlePlayerHit(player, pTransform, sourceTransform);
@@ -197,6 +358,7 @@ export class CollisionSystem extends System {
             const cooldowns = [3600, 2700, 1800]; // 60s, 45s, 30s
             pStats.origamiShieldCooldownFrames = cooldowns[shieldLevel - 1] || 3600;
             DamageTextSystem.addDamageText(pTransform.x, pTransform.y - 20, 0, '#ffffff', true, "折纸盾!");
+            emitGameSound('shield', { x: pTransform.x, y: pTransform.y });
             window.dispatchEvent(new CustomEvent('announce', { detail: { text: `折纸盾牌破裂！` } }));
             pHealth.invincibleFrames = 60;
             
@@ -207,6 +369,7 @@ export class CollisionSystem extends System {
                     const proj = new Entity();
                     proj.addComponent(new Transform(pTransform.x, pTransform.y));
                     proj.addComponent(new Renderable('#dddddd', 6, 6, 6, 'rect'));
+                    proj.addComponent(new SkillVisual('paper_shard'));
                     proj.addComponent(new Velocity(Math.cos(angle) * 8, Math.sin(angle) * 8));
                     // 给予较高的伤害和较长的存活时间以追踪
                     proj.addComponent(new Projectile('standard', 30 * pStats.totalDamageMultiplier, player.id, 120, 1));
@@ -221,6 +384,7 @@ export class CollisionSystem extends System {
         // 3. Apply base damage
         let actualDamage = amount;
         pHealth.current -= actualDamage;
+        if (actualDamage > 0) emitGameSound('hurt', { x: pTransform.x, y: pTransform.y });
         DamageTextSystem.addDamageText(pTransform.x, pTransform.y - 15, actualDamage, '#ff0000', false);
         pHealth.invincibleFrames = 60; // 1 second of i-frames
         
@@ -276,6 +440,7 @@ export class CollisionSystem extends System {
                 const explosion = new Entity();
                 explosion.addComponent(new Transform(pTransform.x, pTransform.y));
                 explosion.addComponent(new Renderable('rgba(255, 50, 50, 0.6)', 150, 0, 0, 'circle'));
+                explosion.addComponent(new SkillVisual('desperate_burst'));
                 // Use a short-lived projectile that deals massive damage to surrounding enemies
                 const proj = new Projectile('standard', 200 * pStats.totalDamageMultiplier, player.id, 10, 999);
                 explosion.addComponent(proj);
@@ -400,6 +565,10 @@ export class CollisionSystem extends System {
             }
         }
 
+        // Small encounters are cheaper to scan directly. Build once per frame;
+        // knockback below updates the index before the next projectile sees it.
+        const enemyIndex = enemies.length >= 48 && projectiles.length > 0 ? new EnemyCollisionIndex(enemies) : null;
+
         // 2. Projectile vs Enemy
         for (const projectile of projectiles) {
             const pTransform = projectile.getComponent(Transform)!;
@@ -414,38 +583,36 @@ export class CollisionSystem extends System {
                 continue;
             }
 
-            for (const enemy of enemies) {
+            // These bounds deliberately match the existing broad phase, including
+            // special weapon overrides. Hoist their calculation out of the pair loop.
+            let aabbRange = 50;
+            if (pRender.radius) aabbRange = Math.max(aabbRange, pRender.radius * 2);
+            if (pRender.width) aabbRange = Math.max(aabbRange, pRender.width * 1.5);
+            if (pRender.height) aabbRange = Math.max(aabbRange, pRender.height * 1.5);
+            if (pData.type === 'gravity') aabbRange = 300;
+            else if (pRender.shape === 'line') aabbRange = 1500;
+            else if (pData.type === 'rocket' || pData.type === 'mine') aabbRange = 200;
+            else if (pData.type === 'compass' && (pData as any).isAwakened) aabbRange = 200;
+
+            // Awakened mines move other enemies during this same loop. Keep
+            // their live ordered scan; all other shapes only move their current target.
+            const candidates = pData.type === 'mine' && (pData as any).isAwakened
+                ? enemies : enemyIndex?.query(pTransform.x, pTransform.y, aabbRange) ?? enemies;
+            for (const enemy of candidates) {
                 if (!enemy.active) continue;
 
                 // 替身免疫玩家子弹伤害
                 if (enemy.tags.has('ink_dummy')) continue;
                 
-                const eBeh = enemy.getComponent(EnemyBehavior);
-                // 磁性黑洞免疫玩家子弹伤害 (但依然会被吸附逻辑影响，在EnemySystem处理)
-                // if (eBeh && eBeh.type === 'blackhole') continue;
-
                 const eTransform = enemy.getComponent(Transform)!;
-                const eRender = enemy.getComponent(Renderable)!;
-                const eHealth = enemy.getComponent(Health)!;
-
-                if (!eTransform || !eRender || !eHealth) continue;
-
-                // ===== 性能优化：快速AABB包围盒剔除 =====
-                // 动态计算包围盒大小，防止大范围武器（如近战扇形、宽屏剑气）被错误剔除
-                let aabbRange = 50; 
-                if (pRender.radius) aabbRange = Math.max(aabbRange, pRender.radius * 2);
-                if (pRender.width) aabbRange = Math.max(aabbRange, pRender.width * 1.5);
-                if (pRender.height) aabbRange = Math.max(aabbRange, pRender.height * 1.5);
-                
-                if (pData.type === 'gravity') aabbRange = 300;
-                else if (pRender.shape === 'line') aabbRange = 1500; // Sniper beam is very long
-                else if (pData.type === 'rocket' || pData.type === 'mine') aabbRange = 200; // AoE weapons
-                else if (pData.type === 'compass' && (pData as any).isAwakened) aabbRange = 200; // 觉醒后的圆规由于体积扩大，AABB需要更宽容
-                
+                if (!eTransform) continue;
                 if (Math.abs(pTransform.x - eTransform.x) > aabbRange || Math.abs(pTransform.y - eTransform.y) > aabbRange) {
                     continue; // 距离太远直接跳过所有复杂计算
                 }
-                // =====================================
+                const eBeh = enemy.getComponent(EnemyBehavior);
+                const eRender = enemy.getComponent(Renderable)!;
+                const eHealth = enemy.getComponent(Health)!;
+                if (!eRender || !eHealth) continue;
 
                 // Check collision based on projectile shape
                 let hit = false;
@@ -466,6 +633,7 @@ export class CollisionSystem extends System {
                         const pullFactor = isAwakened ? 8.0 : 3.0; 
                         eTransform.x += (dx / dist) * pullFactor;
                         eTransform.y += (dy / dist) * pullFactor;
+                        enemyIndex?.update(enemy, eTransform);
                         
                         // 中心伤害范围（黑洞核心区域）
                         const damageRadius = isAwakened ? 100 : 40;
@@ -527,6 +695,7 @@ export class CollisionSystem extends System {
                             const kbForce = 15;
                             eTransform.x += Math.cos(angleToEnemy) * kbForce;
                             eTransform.y += Math.sin(angleToEnemy) * kbForce;
+                            enemyIndex?.update(enemy, eTransform);
                         }
                     }
                 }
@@ -557,6 +726,7 @@ export class CollisionSystem extends System {
                         const kbForce = 8;
                         eTransform.x += Math.cos(pTransform.rotation) * kbForce;
                         eTransform.y += Math.sin(pTransform.rotation) * kbForce;
+                        enemyIndex?.update(enemy, eTransform);
                     }
                 }
                 // Normal Collision Logic (Circles, Sprites, Triangles...)
@@ -601,6 +771,7 @@ export class CollisionSystem extends System {
                             // 造成伤害 (复用底下的实际扣血代码，但跳过后续的 pierceCount 减除)
                             let finalDamage = pData.damage;
                             eHealth.current -= finalDamage;
+                            if (hit && finalDamage > 0) emitGameSound(pData.isCrit || pData.isSuperCrit ? 'hit-heavy' : 'hit', { x: eTransform.x, y: eTransform.y });
                             const textColor = pData.isSuperCrit ? '#ff0000' : (pData.isCrit ? '#ff4444' : '#ffffff');
                             DamageTextSystem.addDamageText(eTransform.x, eTransform.y - 15, finalDamage, textColor, pData.isCrit || pData.isSuperCrit);
                             
@@ -652,6 +823,7 @@ export class CollisionSystem extends System {
                         const dot = vx * fx + vy * fy;
                         if (dot > Math.cos(Math.PI / 3)) {
                             eBeh.shield -= pData.damage;
+                            if (pData.damage > 0) emitGameSound('shield', { x: eTransform.x, y: eTransform.y, gain: 0.65 });
                             const textColor = pData.isSuperCrit ? '#ff0000' : (pData.isCrit ? '#ff4444' : '#66ccff');
                             DamageTextSystem.addDamageText(eTransform.x, eTransform.y - 15, pData.damage, textColor, pData.isCrit || pData.isSuperCrit);
                             if (this.trailCtx) {
@@ -675,6 +847,7 @@ export class CollisionSystem extends System {
                     }
                     // Special logic for Rocket and Mine (AOE)
                     if (pData.type === 'rocket' || pData.type === 'mine') {
+                        emitGameSound('explosion', { x: eTransform.x, y: eTransform.y });
                         // Explosion radius
                         let explosionRadius = Math.floor(100 * (pData.explosionRadiusScale || 1));
                         
@@ -698,6 +871,7 @@ export class CollisionSystem extends System {
                                         const finalPush = Math.min(pushForce, 800); 
                                         t.x += (ex / edist) * finalPush;
                                         t.y += (ey / edist) * finalPush;
+                                        enemyIndex?.update(otherEnemy, t);
                                     }
                                 }
                             }
@@ -984,6 +1158,7 @@ export class CollisionSystem extends System {
                     // Apply damage (for non-AOE or direct hit)
                     if (eBeh || pData.ownerId === (player ? player.id : '')) {
                          eHealth.current -= finalDamage;
+                         if (finalDamage > 0) emitGameSound(pData.isCrit || pData.isSuperCrit ? 'hit-heavy' : 'hit', { x: eTransform.x, y: eTransform.y });
                          const textColor = pData.isSuperCrit ? '#ff0000' : (pData.isCrit ? '#ff4444' : '#ffffff');
                          DamageTextSystem.addDamageText(eTransform.x, eTransform.y - 15, finalDamage, textColor, pData.isCrit || pData.isSuperCrit);
                     }
@@ -1614,6 +1789,7 @@ export class CollisionSystem extends System {
                 if (dist < minDist) {
                     if (pSkill && pSkill.eraserShieldFrames > 0) {
                         projectile.active = false;
+                        emitGameSound('shield', { x: pTransform.x, y: pTransform.y, gain: 0.6 });
                         continue;
                     }
                     if (pHealth && pHealth.invincibleFrames > 0) {
@@ -1652,12 +1828,20 @@ export class CollisionSystem extends System {
         
         // 3. Enemy vs Enemy separation to avoid complete overlap
         if (enemies.length > 1) {
+            // Retain the original i/j order: each push affects the next pair.
+            // Components themselves are stable during this phase; read them once.
+            const separation = enemies.map(entity => ({
+                entity,
+                behavior: entity.getComponent(EnemyBehavior),
+                transform: entity.getComponent(Transform),
+                render: entity.getComponent(Renderable),
+            }));
+            const separationIndex = enemies.length >= 48 ? new EnemySeparationIndex(separation) : null;
             for (let i = 0; i < enemies.length; i++) {
-                const e1 = enemies[i];
+                const { entity: e1, behavior: beh1, transform: t1, render: r1 } = separation[i];
                 if (!e1.active) continue;
                 
                 // 【修改点】：如果 e1 是正在冲锋的巨型滚刷，则不参与与其他小怪的互相碰撞排斥
-                const beh1 = e1.getComponent(EnemyBehavior);
                 if (beh1 && beh1.type === 'boss_roller') {
                     const stateCycle = beh1.bossTimer % 360;
                     if (stateCycle >= 180 && stateCycle < 210) {
@@ -1665,15 +1849,18 @@ export class CollisionSystem extends System {
                     }
                 }
 
-                const t1 = e1.getComponent(Transform);
-                const r1 = e1.getComponent(Renderable);
                 if (!t1 || !r1) continue;
+                let neighborhood = separationIndex?.query(t1, r1.radius || 15, i);
+                let candidateCursor = 0;
                 for (let j = i + 1; j < enemies.length; j++) {
-                    const e2 = enemies[j];
+                    if (neighborhood?.orders) {
+                        if (candidateCursor >= neighborhood.orders.length) break;
+                        j = neighborhood.orders[candidateCursor++];
+                    }
+                    const { entity: e2, behavior: beh2, transform: t2, render: r2 } = separation[j];
                     if (!e2.active) continue;
 
                     // 【修改点】：同样检查 e2 是否为冲锋中的滚刷
-                    const beh2 = e2.getComponent(EnemyBehavior);
                     if (beh2 && beh2.type === 'boss_roller') {
                         const stateCycle2 = beh2.bossTimer % 360;
                         if (stateCycle2 >= 180 && stateCycle2 < 210) {
@@ -1681,13 +1868,13 @@ export class CollisionSystem extends System {
                         }
                     }
                     if (!e2.active) continue;
-                    const t2 = e2.getComponent(Transform);
-                    const r2 = e2.getComponent(Renderable);
                     if (!t2 || !r2) continue;
                     const dx = t2.x - t1.x;
                     const dy = t2.y - t1.y;
-                    let dist = Math.hypot(dx, dy);
                     const minDist = (r1.radius || 15) + (r2.radius || 15);
+                    if (minDist > 0 && (Math.abs(dx) >= minDist || Math.abs(dy) >= minDist)) continue;
+                    let dist = Math.hypot(dx, dy);
+                    let moved = false;
                     if (dist === 0) {
                         const angle = Math.random() * Math.PI * 2;
                         const push = minDist * 0.5;
@@ -1695,9 +1882,8 @@ export class CollisionSystem extends System {
                         t1.y -= Math.sin(angle) * push;
                         t2.x += Math.cos(angle) * push;
                         t2.y += Math.sin(angle) * push;
-                        continue;
-                    }
-                    if (dist < minDist) {
+                        moved = true;
+                    } else if (dist < minDist) {
                         const overlap = minDist - dist;
                         const nx = dx / dist;
                         const ny = dy / dist;
@@ -1706,6 +1892,18 @@ export class CollisionSystem extends System {
                         t1.y -= ny * push;
                         t2.x += nx * push;
                         t2.y += ny * push;
+                        moved = true;
+                    }
+                    if (moved && separationIndex) {
+                        separationIndex.update(i);
+                        separationIndex.update(j);
+                        // A static candidate snapshot misses neighbors that a
+                        // previous collision has just pushed us toward. Refresh
+                        // only the unvisited tail, and only on leaving coverage.
+                        if (neighborhood?.orders && !separationIndex.covers(neighborhood, t1, r1.radius || 15)) {
+                            neighborhood = separationIndex.query(t1, r1.radius || 15, j);
+                            candidateCursor = 0;
+                        }
                     }
                 }
             }
@@ -1742,6 +1940,7 @@ export class CollisionSystem extends System {
                         const exp = player.getComponent(Experience);
                         if (exp) {
                             exp.xp += oData.amount;
+                            emitGameSound('pickup', { x: pTransform.x, y: pTransform.y });
                         }
                     }
                 }

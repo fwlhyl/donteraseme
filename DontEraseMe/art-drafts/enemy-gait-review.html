@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>敌人自然步态审阅</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#202937;color:#eee7d6;font:15px/1.7 system-ui}main{max-width:1180px;margin:auto;padding:24px}h1{font-size:26px;margin:0}p{color:#b7c3d0}.controls{position:sticky;top:0;z-index:1;background:#202937;display:flex;gap:10px;flex-wrap:wrap;padding:12px 0}button,select{font:inherit;padding:7px 12px;border:1px solid #9ca8b6;border-radius:5px;background:#f1ebdf;color:#20232a}#gallery{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{margin:0;border:1px solid #697787;border-radius:6px;overflow:hidden}.card h2{font-size:17px;margin:0;padding:9px 14px;background:#303c4c}.card canvas{width:100%;display:block}a{color:#b8dff7}@media(max-width:760px){#gallery{grid-template-columns:1fr}}
+</style></head><body><main>
+<h1>敌人自然步态 · 身体原尺寸对照</h1>
+<p>每格左侧为原图，右侧为正式分层绘制（统一 64 px 显示框，放大 3 倍）。旧腿沿身体下沿隐藏，独立双腿交替落地；碰撞与战斗参数保持原值。</p>
+<div class="controls"><button id="pause">暂停动画</button><button id="walk">切换待机</button><button id="freeze">冻结</button><button id="attack">攻击反馈</button><button id="hit">受击反馈</button><label>朝向 <select id="heading"><option value="0">右</option><option value="90">下</option><option value="180">左</option><option value="270">上</option></select></label></div>
+<p id="status" role="status">图集加载中…</p><div id="gallery"></div>
+<p>这是只读动态审阅，不运行战斗、不写存档。纸飞机／棱镜继续悬浮，史莱姆与黑洞保留各自的动作。<a href="./doodle-review.html">返回完整美术审阅</a></p>
+</main><script type="module" src="./enemy-gait-review.ts"></script></body></html>

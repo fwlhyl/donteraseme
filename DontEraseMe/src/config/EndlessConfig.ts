@@ -7,6 +7,7 @@ export interface CharacterConfig {
     // 角色专属技能描述
     uniqueSkillName: string;
     uniqueSkillDesc: string;
+    unlockPrice: number;
 }
 
 export const CHARACTERS: CharacterConfig[] = [
@@ -17,7 +18,8 @@ export const CHARACTERS: CharacterConfig[] = [
         baseHp: 800,  //400
         baseSpeed: 4.25, // 平均速度
         uniqueSkillName: '打钱',
-        uniqueSkillDesc: '随着游戏存活时间增加，金币获取量逐渐提升'
+        uniqueSkillDesc: '随着游戏存活时间增加，金币获取量逐渐提升',
+        unlockPrice: 0
     },
     {
         id: 'graffiti',
@@ -26,7 +28,8 @@ export const CHARACTERS: CharacterConfig[] = [
         baseHp: 600,
         baseSpeed: 5, // 高移速
         uniqueSkillName: '涂鸦护城河',
-        uniqueSkillDesc: '按住攻击键移动时留下轨迹，闭合图形会瞬间造成伤害，并形成持续5秒的颜料沼泽（减速并持续伤害）'
+        uniqueSkillDesc: '按住攻击键移动时留下轨迹，闭合图形会瞬间造成伤害，并形成持续5秒的颜料沼泽（减速并持续伤害）',
+        unlockPrice: 600
     },
     {
         id: 'classical',
@@ -35,7 +38,8 @@ export const CHARACTERS: CharacterConfig[] = [
         baseHp: 1000,
         baseSpeed: 3.65, // 低移速
         uniqueSkillName: '厚涂',
-        uniqueSkillDesc: '自带护盾，能抵挡一次任意伤害（怪物碰撞或子弹）。护盾破裂后需20秒重新生成。'
+        uniqueSkillDesc: '自带护盾，能抵挡一次任意伤害（怪物碰撞或子弹）。护盾破裂后需20秒重新生成。',
+        unlockPrice: 600
     },
     {
         id: 'sketcher',
@@ -44,7 +48,8 @@ export const CHARACTERS: CharacterConfig[] = [
         baseHp: 500,
         baseSpeed: 4.25,
         uniqueSkillName: '极速手感',
-        uniqueSkillDesc: '基础射速和换弹速度提升30%，但生命值较少。'
+        uniqueSkillDesc: '基础射速和换弹速度提升30%，但生命值较少。',
+        unlockPrice: 600
     },
     {
         id: 'watercolor',
@@ -53,7 +58,8 @@ export const CHARACTERS: CharacterConfig[] = [
         baseHp: 600,
         baseSpeed: 4.25,
         uniqueSkillName: '水痕',
-        uniqueSkillDesc: '击杀敌人后在原地留下水痕毒沼，造成持续伤害'
+        uniqueSkillDesc: '击杀敌人后在原地留下水痕毒沼，造成持续伤害',
+        unlockPrice: 600
     },
     {
         id: 'digital',
@@ -62,7 +68,8 @@ export const CHARACTERS: CharacterConfig[] = [
         baseHp: 9999, //360
         baseSpeed: 4.25,
         uniqueSkillName: 'Ctrl+C',
-        uniqueSkillDesc: '自带“数位笔”浮游炮，周期性复制上一次强力攻击'
+        uniqueSkillDesc: '自带“数位笔”浮游炮，周期性复制上一次强力攻击',
+        unlockPrice: 600
     },
     {
         id: 'calligrapher',
@@ -71,7 +78,8 @@ export const CHARACTERS: CharacterConfig[] = [
         baseHp: 500,
         baseSpeed: 4.25,
         uniqueSkillName: '入木三分',
-        uniqueSkillDesc: '静止时伤害不断叠加，且子弹具有极强穿透力'
+        uniqueSkillDesc: '静止时伤害不断叠加，且子弹具有极强穿透力',
+        unlockPrice: 600
     },
     {
         id: 'ink',
@@ -80,7 +88,8 @@ export const CHARACTERS: CharacterConfig[] = [
         baseHp: 500,
         baseSpeed: 4.25,
         uniqueSkillName: '墨染',
-        uniqueSkillDesc: '受击喷射致盲水墨团，范围内的敌人丢失目标原地发愣'
+        uniqueSkillDesc: '受击喷射致盲水墨团，范围内的敌人丢失目标原地发愣',
+        unlockPrice: 600
     }
 ];
 
