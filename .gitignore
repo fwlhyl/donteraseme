@@ -24,3 +24,6 @@ DontEraseMe/release/
 
 # This legacy archive exceeds GitHub's 100 MB per-file Git limit.
 正式版v0.5/DontEraseMe.zip
+
+# Local dev logs
+vite.log
