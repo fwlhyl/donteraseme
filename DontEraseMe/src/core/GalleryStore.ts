@@ -295,22 +295,27 @@ export class GalleryStore {
             const existing = store.get(metadata.id);
             const marker = migrationKey ? transaction.objectStore('meta').get(migrationKey) : null;
             const commit = () => {
-                // Migration must never resurrect deleted works or overwrite user-renamed works.
-                if (migrationKey && (marker?.result === true || existing.result !== undefined)) {
-                    transaction.objectStore('meta').put(true, migrationKey);
-                    setResult(validMetadata(existing.result) ? existing.result : metadata);
-                    return;
-                }
-                if (existing.result !== undefined && !validMetadata(existing.result)) {
-                    fail(new Error('原作品的信息无法读取，未覆盖原存档。'));
-                    return;
-                }
-                const saved = { ...metadata, createdAt: existing.result?.createdAt ?? metadata.createdAt };
-                store.put(saved);
-                transaction.objectStore('originals').put(images.blob, metadata.id);
-                transaction.objectStore('displays').put(images.display, metadata.id);
-                if (migrationKey) transaction.objectStore('meta').put(true, migrationKey);
-                setResult(saved);
+                // This callback runs after transaction()'s initial try/catch.
+                // Synchronous IDB write failures must use the same rollback and
+                // user-facing error path, not escape as an uncaught event error.
+                try {
+                    // Migration must never resurrect deleted works or overwrite user-renamed works.
+                    if (migrationKey && (marker?.result === true || existing.result !== undefined)) {
+                        transaction.objectStore('meta').put(true, migrationKey);
+                        setResult(validMetadata(existing.result) ? existing.result : metadata);
+                        return;
+                    }
+                    if (existing.result !== undefined && !validMetadata(existing.result)) {
+                        fail(new Error('原作品的信息无法读取，未覆盖原存档。'));
+                        return;
+                    }
+                    const saved = { ...metadata, createdAt: existing.result?.createdAt ?? metadata.createdAt };
+                    store.put(saved);
+                    transaction.objectStore('originals').put(images.blob, metadata.id);
+                    transaction.objectStore('displays').put(images.display, metadata.id);
+                    if (migrationKey) transaction.objectStore('meta').put(true, migrationKey);
+                    setResult(saved);
+                } catch (error) { fail(error); }
             };
             if (marker) marker.onsuccess = commit;
             else existing.onsuccess = commit;
