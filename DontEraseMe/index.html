@@ -53,7 +53,19 @@
         <h1 class="title">Dont Erase Me!</h1>
         <p class="subtitle">A Creative Shooter Experience</p>
         
-        <div style="display: flex; width: 100%; max-width: 1200px; justify-content: space-between; align-items: center; margin-top: 40px;">
+        <div class="new-mode-menu">
+            <button id="create-mode-btn" class="btn" aria-label="选择创造模式"><span>✦ 创造模式</span><small>从空白画布开始，在战斗中创作</small></button>
+            <button id="defense-mode-btn" class="btn" aria-label="选择守卫模式"><span>🛡 守卫模式</span><small>守住原画，抵御擦除并留下新痕迹</small></button>
+            <button id="drawing-mode-btn" class="btn" aria-label="进入纯画画模式"><span>✎ 纯画画模式</span><small>收藏家 · 已解锁画笔 · 20 分钟自由创作</small></button>
+            <button id="gallery-btn" class="btn" aria-label="进入我的画廊"><span>▣ 我的画廊</span><small>第一人称 3D 展厅，收藏与欣赏你的作品</small></button>
+        </div>
+        <div class="menu-footer">
+            <button id="settings-btn" class="btn">设置</button>
+            <button id="exit-btn" class="btn">退出游戏</button>
+        </div>
+        <p class="controls-hint">WASD 移动 · 鼠标绘画 / 瞄准 · Esc 暂停</p>
+        <!-- Legacy frame elements remain hidden for compatibility; their saved data is migrated, never cleared. -->
+        <div hidden style="display:none">
             <!-- Left Frames -->
             <div style="display: flex; flex-direction: column; gap: 30px;">
                 <div class="art-frame" id="frame-1" style="width: 300px; height: 200px; border: 4px solid #ff4444; border-radius: 4px; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; position: relative;">
@@ -70,17 +82,15 @@
             <div style="display: flex; flex-direction: column; align-items: center; min-width: 300px;">
                 <button id="story-btn" class="btn" style="display: none;">Story Mode</button>
                 <div style="margin-top: 20px; color: #d6fff9; font-size: 18px; letter-spacing: 3px;">选择游戏模式</div>
-                <button id="create-mode-btn" class="btn" aria-label="选择创造模式" style="margin-top: 16px; background: #0f766e; border-color: #2dd4bf; width: 280px; min-height: 82px; text-align: left; padding: 14px 18px;">
+                <button class="btn" style="margin-top: 16px; background: #0f766e; border-color: #2dd4bf; width: 280px; min-height: 82px; text-align: left; padding: 14px 18px;">
                     <span style="display: block; font-size: 22px; font-weight: bold;">✦ 创造模式</span>
                     <span style="display: block; font-size: 13px; color: #d6fff9; margin-top: 6px;">从空白画布开始，战斗并创造你的作品</span>
                 </button>
-                <button id="defense-mode-btn" class="btn" aria-label="选择守卫模式" style="margin-top: 14px; background: #513b82; border-color: #b59cff; width: 280px; min-height: 82px; text-align: left; padding: 14px 18px;">
+                <button class="btn" style="margin-top: 14px; background: #513b82; border-color: #b59cff; width: 280px; min-height: 82px; text-align: left; padding: 14px 18px;">
                     <span style="display: block; font-size: 22px; font-weight: bold;">🛡 守卫模式</span>
                     <span style="display: block; font-size: 13px; color: #efe9ff; margin-top: 6px;">守住原画，抵御橡皮擦，并留下修复痕迹</span>
                 </button>
                 <button id="editor-btn" class="btn" style="display: none; margin-top: 20px; background: #9c27b0; border-color: #9c27b0;">🎨 Create Skin</button>
-                <button id="settings-btn" class="btn" style="margin-top: 20px; background: #555; border-color: #888; width: 200px;">设置</button>
-                <button id="exit-btn" class="btn" style="margin-top: 20px; background: #e91e63; border-color: #e91e63; width: 200px;">退出游戏</button>
                 <div class="controls-hint" style="margin-top: 40px;">
                     <p>WASD to Move | Mouse to Aim & Shoot</p>
                 </div>
@@ -102,16 +112,19 @@
 
     <!-- Frame Selection Modal for Saving -->
     <div id="frame-save-modal" class="overlay" style="display: none; position: fixed; background: rgba(0,0,0,0.9); z-index: 12000;">
-        <h2 style="color: white; margin-bottom: 30px;">请选择保存到哪个画框？</h2>
-        <p style="color: #aaa; margin-bottom: 30px;">如果画框已有作品，将被新作品覆盖</p>
-        <div style="display: flex; gap: 20px;">
+        <h2>收藏到我的画廊</h2>
+        <label for="gallery-art-name">给这幅作品起个名字</label>
+        <input id="gallery-art-name" type="text" maxlength="80" placeholder="未命名作品">
+        <button id="gallery-save-confirm" class="btn">保存到画廊</button>
+        <p id="gallery-save-status" role="status"></p>
+        <div hidden style="display:none">
             <button class="btn frame-select-btn" data-index="1">画框 1</button>
             <button class="btn frame-select-btn" data-index="2">画框 2</button>
             <button class="btn frame-select-btn" data-index="3">画框 3</button>
             <button class="btn frame-select-btn" data-index="4">画框 4</button>
         </div>
         <p id="frame-save-status" role="status" style="max-width: 90vw; color: #ffd199;"></p>
-        <button id="export-art-png" class="btn" style="margin-top: 20px;">仅导出 PNG（不存画框）</button>
+        <button id="export-art-png" class="btn" style="margin-top: 20px;">导出 PNG 到本地</button>
         <button id="cancel-frame-save" class="btn" style="margin-top: 20px; background: #555; border-color: #555;">取消</button>
     </div>
 

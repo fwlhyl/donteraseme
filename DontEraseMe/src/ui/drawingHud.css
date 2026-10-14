@@ -1,0 +1,24 @@
+#drawing-hud { position:fixed; left:18px; top:18px; z-index:120; width:270px; padding:16px; color:#292724; background:#fffaf0; border:2px solid #292724; box-shadow:4px 4px 0 #766b5c; font:14px/1.5 var(--ui,system-ui); }
+#drawing-hud[hidden] { display:none; }
+#pause-btn[style*="display: none"] { display:none !important; }
+.drawing-heading { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+#drawing-timer { font-size:22px; font-variant-numeric:tabular-nums; }
+#drawing-hud p { margin:4px 0 12px; font-size:12px; }
+#drawing-hud label { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:8px 0; }
+#drawing-hud select { width:190px; padding:6px; background:white; color:#292724; }
+#drawing-hud input[type=color] { width:190px; height:30px; }
+.drawing-actions { display:flex; gap:8px; margin:14px 0 10px; }
+.drawing-actions button { cursor:pointer; border:1px solid #292724; background:#d7e8df; color:#292724; padding:8px; flex:1; }
+#drawing-hud small { font-size:11px; }
+#main-menu .new-mode-menu { display:grid; grid-template-columns:repeat(2,minmax(0,300px)); gap:16px; margin-top:8px; }
+#main-menu .new-mode-menu .btn { width:100%; margin:0; min-height:90px; text-align:left; }
+#main-menu .new-mode-menu span { display:block; }
+#main-menu .new-mode-menu small { display:block; font:13px/1.4 var(--ui,system-ui); margin-top:7px; }
+#main-menu .menu-footer { display:flex; gap:18px; margin-top:25px; }
+#main-menu .menu-footer .btn { min-width:140px; }
+#main-menu .new-mode-menu #drawing-mode-btn { background:#f0d79a !important; }
+#main-menu .new-mode-menu #gallery-btn { background:#cbdce7 !important; }
+#frame-save-modal input { width:min(360px,80vw); padding:12px; margin:12px 0; font-size:18px; }
+#gallery-save-status { max-width:min(500px,85vw); }
+@media(max-height:650px) { #main-menu { overflow-y:auto; justify-content:flex-start; } #drawing-hud { padding:10px; top:8px; left:8px; } #drawing-hud small { display:none; } }
+@media(max-width:650px) { #main-menu .new-mode-menu { width:90%; grid-template-columns:1fr; } #main-menu .menu-footer { flex-wrap:wrap; justify-content:center; } #drawing-hud { width:230px; } #drawing-hud select,#drawing-hud input[type=color] { width:150px; } }

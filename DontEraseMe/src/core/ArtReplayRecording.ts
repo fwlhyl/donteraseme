@@ -8,6 +8,7 @@ export interface ArtworkSnapshot { time: number; blob: Blob }
 export class ArtReplayRecording {
     public readonly log = new StrokeLog();
     public isDefense = false;
+    public isDrawing = false;
     public initialArtwork: DefenseArtwork | null = null;
     public finalArtwork: HTMLCanvasElement | null = null;
     public readonly snapshots: ArtworkSnapshot[] = [];
@@ -25,6 +26,7 @@ export class ArtReplayRecording {
     }
 
     public clear(): void {
+        this.isDrawing = false;
         this.generation++;
         this.pending = false;
         this.nextSnapshotAt = 0;

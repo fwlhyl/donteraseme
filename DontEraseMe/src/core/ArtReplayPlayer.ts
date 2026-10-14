@@ -49,7 +49,7 @@ export class ArtReplayPlayer {
         overlay.innerHTML = `
             <div class="art-replay-header">
                 <div><h2 id="art-replay-title">${tr('这幅画，是这样诞生的', 'How your artwork came to life')}</h2>
-                <p>${source.isDefense ? tr('守卫模式 · 原画、擦除与修复', 'Guard mode · painting, erasure and repair') : tr('创造模式 · 本局作画过程', 'Create mode · this run’s artwork')}</p></div>
+                <p>${source.isDrawing ? tr('纯画画 · 本次创作过程', 'Drawing mode · your creative process') : source.isDefense ? tr('守卫模式 · 原画、擦除与修复', 'Guard mode · painting, erasure and repair') : tr('创造模式 · 本局作画过程', 'Create mode · this run’s artwork')}</p></div>
                 <button id="replay-close" type="button">${tr('返回结算', 'Back to results')} · Esc</button>
             </div>
             <div class="art-replay-stage"><canvas id="replay-canvas" aria-label="${tr('作画回放画布', 'Artwork replay canvas')}"></canvas>

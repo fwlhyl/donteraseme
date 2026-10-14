@@ -47,7 +47,8 @@ export class RenderSystem extends System {
         private worldWidth: number,
         private worldHeight: number,
         private useCourtyard: () => boolean = () => false,
-        private useRuins: () => boolean = () => false
+        private useRuins: () => boolean = () => false,
+        private clipDrawingToWorld: () => boolean = () => false
     ) {
         super();
         this.tempCanvas = document.createElement('canvas');
@@ -113,6 +114,7 @@ export class RenderSystem extends System {
         if (Number.isFinite(dt) && dt > 0) this.artTime += Math.min(dt, .1);
         const ruins = this.useRuins();
         const illustratedScene = this.useCourtyard() || ruins;
+        const boundedDrawing = this.clipDrawingToWorld();
         this.ctx.save();
 
         // 1. Update Camera Position (Follow Player)
@@ -136,7 +138,7 @@ export class RenderSystem extends System {
 
         // 2. Draw Background Grid
         this.courtyardScene.draw(this.camera,this.worldWidth,this.worldHeight,illustratedScene,ruins?'ruins':'atelier',this.artTime);
-        if(!illustratedScene) this.drawGrid();
+        if(!illustratedScene) this.drawGrid(boundedDrawing);
 
 
         this.ctx.save();
@@ -178,6 +180,16 @@ export class RenderSystem extends System {
         this.ctx.strokeStyle = '#444';
         this.ctx.lineWidth = 5;
         if(!illustratedScene) this.ctx.strokeRect(0, 0, this.worldWidth, this.worldHeight);
+
+        // The permanent trail bitmap already ends at the paper edge. Clip the
+        // live layer too: long shots, wide brushes and particles must not hang
+        // outside that same edge. Install after the camera/DPR transform so it
+        // remains a world-space boundary, including on oversized viewports.
+        if (boundedDrawing) {
+            const paper = new Path2D();
+            paper.rect(0, 0, this.worldWidth, this.worldHeight);
+            this.ctx.clip(paper);
+        }
 
         // const player = Array.from(this.entities).find(e => e.tags.has('player')); // Already defined at the top of update()
 
@@ -940,7 +952,7 @@ export class RenderSystem extends System {
         this.ctx.restore(); // frame state
     }
 
-    private drawGrid() {
+    private drawGrid(boundedDrawing = false) {
         this.ctx.save();
         // Light pencil construction lines: the map reads as an open sketchbook
         // page rather than a digital arena grid.
@@ -957,6 +969,11 @@ export class RenderSystem extends System {
         const endY = startY + viewport.height + gridSize;
 
         this.ctx.translate(-this.camera.x, -this.camera.y);
+        if (boundedDrawing) {
+            const paper = new Path2D();
+            paper.rect(0, 0, this.worldWidth, this.worldHeight);
+            this.ctx.clip(paper);
+        }
 
         this.ctx.beginPath();
         for (let x = startX; x <= endX; x += gridSize) {
