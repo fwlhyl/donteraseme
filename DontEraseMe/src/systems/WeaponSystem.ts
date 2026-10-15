@@ -31,6 +31,9 @@ const WEAPON_SHOT_SOUNDS: readonly SoundCue[] = [
 ];
 
 export class WeaponSystem extends System {
+    // Weak references keep finished drawings/projectiles collectible between runs.
+    private drawingMarks = new WeakMap<Entity, { x: number; y: number; finished: boolean }>();
+
     constructor(
         private input: InputManager,
         private addEntityCallback: (entity: Entity) => void,
@@ -40,7 +43,110 @@ export class WeaponSystem extends System {
         super();
     }
 
+    private canAttack(owner: Entity): boolean {
+        if (!owner.active || owner.tags.has('magic_piloting')) return false;
+        if (!owner.tags.has('drawing_mode')) return true;
+        const game = (window as any).gameInstance;
+        // PLAYING is state 1. The membership check also rejects an old owner
+        // if a new drawing starts before a queued callback has executed.
+        return this.entities.has(owner) && game?.currentMode === 'drawing' && game.state === 1 && game.isRunning;
+    }
+
+    private queueAttack(owner: Entity, attack: () => void, delay: number): void {
+        const guardedAttack = () => { if (this.canAttack(owner)) attack(); };
+        // Drawing has no enemies whose erasure must finish before a new mark.
+        // Paint same-frame so Finish/Replay always captures the final click.
+        if (owner.tags.has('drawing_mode') && delay === 0) guardedAttack();
+        else setTimeout(guardedAttack, delay);
+    }
+
+    /** Combat impact-only tools need a paint action when there are no enemies. */
+    private paintDrawingProjectiles(): void {
+        const ctx = this.trailCtx;
+        if (!ctx || (window as any).gameInstance?.currentMode !== 'drawing') return;
+        const owners = new Map<string, Entity>();
+        for (const entity of this.entities) {
+            if (entity.tags.has('drawing_mode') && this.canAttack(entity)) owners.set(entity.id, entity);
+        }
+        if (!owners.size) return;
+        for (const entity of this.entities) {
+            const projectile = entity.getComponent(Projectile);
+            if (!projectile) continue;
+            const owner = owners.get(projectile.ownerId);
+            const transform = entity.getComponent(Transform);
+            const renderable = entity.getComponent(Renderable);
+            if (!owner || !transform || !renderable) continue;
+            if (!['standard', 'chain', 'gravity', 'rocket', 'compass', 'mine'].includes(projectile.type)) continue;
+            const previous = this.drawingMarks.get(entity);
+            if (previous?.finished) continue;
+            const mark = previous ?? { x: transform.x, y: transform.y, finished: false };
+            const color = entity.tags.has('blackhole')
+                ? owner.getComponent(Renderable)?.color ?? '#7722bb'
+                : renderable.color;
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 0.8;
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            if (projectile.type === 'mine') {
+                this.paintDrawingSplash(ctx, transform.x, transform.y, 36);
+                mark.finished = true;
+            } else if (entity.tags.has('blackhole')) {
+                // A compact swirl replaces the battle-only enemy absorption.
+                ctx.lineWidth = 7;
+                ctx.beginPath();
+                for (let step = 0; step <= 40; step++) {
+                    const angle = step * Math.PI / 8;
+                    const radius = 5 + step * 1.1;
+                    const x = transform.x + Math.cos(angle) * radius;
+                    const y = transform.y + Math.sin(angle) * radius;
+                    if (step === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                mark.finished = true;
+            } else {
+                const width = projectile.type === 'rocket' ? 3
+                    : projectile.type === 'chain' ? 4 : Math.max(3, renderable.radius * 1.1);
+                ctx.lineWidth = width;
+                ctx.beginPath();
+                if (previous && (mark.x !== transform.x || mark.y !== transform.y)) {
+                    ctx.moveTo(mark.x, mark.y);
+                    ctx.lineTo(transform.x, transform.y);
+                    ctx.stroke();
+                } else if (!previous) {
+                    ctx.arc(transform.x, transform.y, width / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                if (projectile.type === 'rocket' && (!entity.active || projectile.life <= 0)) {
+                    this.paintDrawingSplash(ctx, transform.x, transform.y, 70 * projectile.explosionRadiusScale);
+                    mark.finished = true;
+                }
+            }
+            ctx.restore();
+            mark.x = transform.x;
+            mark.y = transform.y;
+            this.drawingMarks.set(entity, mark);
+        }
+    }
+
+    private paintDrawingSplash(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
+        ctx.beginPath();
+        ctx.arc(x, y, radius * 0.66, 0, Math.PI * 2);
+        ctx.fill();
+        for (let i = 0; i < 7; i++) {
+            const angle = i * Math.PI * 2 / 7;
+            const offset = radius * (0.65 + (i % 3) * 0.12);
+            ctx.beginPath();
+            ctx.arc(x + Math.cos(angle) * offset, y + Math.sin(angle) * offset, radius * (0.11 + (i % 2) * 0.05), 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
     public update(dt: number): void {
+        this.paintDrawingProjectiles();
         for (const entity of this.entities) {
             const weapon = entity.getComponent(Weapon);
             const transform = entity.getComponent(Transform);
@@ -48,6 +154,10 @@ export class WeaponSystem extends System {
             const stats = entity.getComponent(PlayerStats);
             
             if (weapon && transform && renderable) {
+                if (entity.tags.has('drawing_mode') && !this.canAttack(entity)) {
+                    entity.attacking = false;
+                    continue;
+                }
                 // Magic Pen manifestations are piloted vehicles. Their combat
                 // system owns the temporary attack while the player's equipped
                 // shop weapon is fully frozen, then resumes untouched on expiry.
@@ -66,7 +176,7 @@ export class WeaponSystem extends System {
                     this.handlePlayerInput(entity, weapon, transform, renderable);
                     
                     // 数字板绘师：浮游炮逻辑
-                    if (stats && stats.hasDigitalPassive) {
+                    if (stats && stats.hasDigitalPassive && !entity.tags.has('drawing_mode')) {
                         this.handleDigitalPen(entity, stats, transform, renderable);
                     }
                 }
@@ -75,6 +185,7 @@ export class WeaponSystem extends System {
     }
 
     private handlePlayerInput(player: Entity, weapon: Weapon, transform: Transform, renderable: Renderable): void {
+        const drawing = player.tags.has('drawing_mode');
         // Weapon switching
         if (this.input.isKeyDown('1')) this.switchWeapon(weapon, 0);
         if (this.input.isKeyDown('2')) this.switchWeapon(weapon, 1);
@@ -97,7 +208,13 @@ export class WeaponSystem extends System {
         if (weapon.currentWeaponIndex === -1) return;
         const stats = player.getComponent(PlayerStats);
         
-        if (this.input.isKeyDown('r') || this.input.isKeyDown('R')) {
+        if (drawing) {
+            // A freshly selected or previously empty tool is ready immediately;
+            // infinite ink is independent of combat buffs and reload passives.
+            weapon.reloading = false;
+            weapon.reloadTimer = 0;
+            if (weapon.config) weapon.ammo[weapon.currentWeaponIndex] = weapon.config.magSize;
+        } else if (this.input.isKeyDown('r') || this.input.isKeyDown('R')) {
             const cfg = weapon.config;
             if (cfg && weapon.ammo[weapon.currentWeaponIndex] < cfg.magSize) {
                 this.startReload(player, weapon, stats);
@@ -105,7 +222,7 @@ export class WeaponSystem extends System {
         }
 
         // Handle auto-attack setting
-        const autoAttack = (window as any).gameInstance?.autoAttackEnabled || false;
+        const autoAttack = !drawing && ((window as any).gameInstance?.autoAttackEnabled || false);
         
         let isTryingToShoot = false;
         let nearestEnemy: Entity | null = null;
@@ -193,17 +310,17 @@ export class WeaponSystem extends System {
                     
                     // 速写漫画家觉醒1：残影连击 (50%概率额外发射免费子弹)
                     let freeShot = false;
-                    if (stats && stats.hasSkill('awakening_sketcher_1') && Math.random() < 0.5) {
+                    if (!drawing && stats && stats.hasSkill('awakening_sketcher_1') && Math.random() < 0.5) {
                         freeShot = true;
                         // 稍微延迟一丁点发射免费子弹，形成“残影连击”视觉效果
-                        setTimeout(() => {
+                        this.queueAttack(player, () => {
                             if (player.active && !player.tags.has('magic_piloting')) {
                                 this.shoot(player, weapon, transform, renderable.color, stats);
                             }
                         }, 50);
                     }
                     
-                    if (!stats || Date.now() >= (stats.infiniteAmmoUntil || 0)) {
+                    if (!drawing && (!stats || Date.now() >= (stats.infiniteAmmoUntil || 0))) {
                         weapon.ammo[idx] -= 1;
                     }
                     if (weapon.ammo[idx] <= 0) {
@@ -505,7 +622,7 @@ export class WeaponSystem extends System {
             if (this.trailCtx) {
                 const sx = transform.x;
                 const sy = transform.y;
-                setTimeout(() => {
+                this.queueAttack(owner, () => {
                     if (this.trailCtx) {
                         this.trailCtx.save();
                         this.trailCtx.globalCompositeOperation = 'source-over';
@@ -616,7 +733,7 @@ export class WeaponSystem extends System {
         const burstDelay = 100;
 
         for (let b = 0; b < burstCount; b++) {
-            setTimeout(() => {
+            this.queueAttack(owner, () => {
                 if (!owner.active || owner.tags.has('magic_piloting')) return;
                 
                 if (config.type === 'shotgun' && burstCount > 1) {
@@ -721,6 +838,7 @@ export class WeaponSystem extends System {
     }
 
     private shoot(owner: Entity, weapon: Weapon, transform: Transform, ownerColorArg: string, stats?: PlayerStats): void {
+        if (!this.canAttack(owner)) return;
         const config = weapon.config;
         if (!config) return;
         
@@ -882,7 +1000,7 @@ export class WeaponSystem extends System {
         // Determine bullet color
         let bulletColor = config.color;
         // All weapons except Pistol (0) should use player color
-        if (config.id !== 0) {
+        if (config.id !== 0 || owner.tags.has('drawing_mode')) {
             bulletColor = ownerColor;
         }
 
@@ -914,6 +1032,8 @@ export class WeaponSystem extends System {
             this.trailCtx.stroke();
             this.trailCtx.restore();
             
+            if (owner.tags.has('drawing_mode')) return;
+
             // Damage enemies along the line
             const ax = transform.x, ay = transform.y;
             const bx = endX, by = endY;
@@ -1040,7 +1160,7 @@ export class WeaponSystem extends System {
                 if (this.trailCtx) {
                     const sx = transform.x;
                     const sy = transform.y;
-                    setTimeout(() => {
+                    this.queueAttack(owner, () => {
                         if (this.trailCtx) {
                             this.trailCtx.save();
                             this.trailCtx.globalCompositeOperation = 'source-over';
@@ -1172,7 +1292,7 @@ export class WeaponSystem extends System {
         const burstDelay = 100;
 
         for (let b = 0; b < burstCount; b++) {
-            setTimeout(() => {
+            this.queueAttack(owner, () => {
                 if (!owner.active || owner.tags.has('magic_piloting')) return;
                 
                 if (config.type === 'shotgun' && burstCount > 1) {
@@ -1295,6 +1415,7 @@ export class WeaponSystem extends System {
     }
     
     private startReload(player: Entity, weapon: Weapon, stats?: PlayerStats) {
+        if (player.tags.has('drawing_mode')) return;
         if (weapon.reloading) return;
         const cfg = weapon.config;
         if (!cfg) return;

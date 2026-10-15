@@ -240,7 +240,7 @@ export class UISystem extends System {
         panel.style.gap = '12px';
         const btnSaveFrame = document.createElement('button');
         btnSaveFrame.className = 'btn';
-        btnSaveFrame.textContent = t('保存当前作品到画框');
+        btnSaveFrame.textContent = '保存当前作品到画廊';
         btnSaveFrame.style.padding = '10px 14px';
         btnSaveFrame.style.cursor = 'pointer';
         const btnSaveLocal = document.createElement('button');
@@ -255,7 +255,7 @@ export class UISystem extends System {
         btnExit.style.cursor = 'pointer';
         
         window.addEventListener('lang-changed', () => {
-            btnSaveFrame.textContent = t('保存当前作品到画框');
+            btnSaveFrame.textContent = '保存当前作品到画廊';
             btnSaveLocal.textContent = t('保存作品到本地');
             btnExit.textContent = t('退出当前对局');
         });
@@ -263,6 +263,13 @@ export class UISystem extends System {
         panel.appendChild(btnSaveFrame);
         panel.appendChild(btnSaveLocal);
         panel.appendChild(btnExit);
+        const resume = document.createElement('button');
+        resume.className = 'btn'; resume.textContent = '继续 / Esc';
+        resume.onclick = () => {
+            this.dismissPause();
+            window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));
+        };
+        panel.appendChild(resume);
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
         this.escModal = overlay;
@@ -286,6 +293,7 @@ export class UISystem extends System {
                 // 仅在游戏进行中允许打开ESC菜单（1 = GameState.PLAYING）
                 const gameInstance = (window as any).gameInstance;
                 if (gameInstance && gameInstance.state !== 1) return;
+                btnExit.textContent = gameInstance?.currentMode === 'drawing' ? '完成绘画并查看作品' : t('退出当前对局');
                 const frameDialog = document.getElementById('frame-save-modal');
                 if (frameDialog?.style.display === 'flex') {
                     frameDialog.style.display = 'none';
@@ -304,6 +312,9 @@ export class UISystem extends System {
             }
         });
         window.addEventListener('open-esc', () => {
+            const game = (window as any).gameInstance;
+            if (game?.state !== 1) return;
+            btnExit.textContent = game?.currentMode === 'drawing' ? '完成绘画并查看作品' : t('退出当前对局');
             if (!this.escModal) return;
             this.escModal.style.display = 'flex';
             window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: true } }));
@@ -323,6 +334,12 @@ export class UISystem extends System {
             this.pauseMenu.style.display = 'none';
             window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));
         }
+    }
+
+    public dismissPause(): void {
+        this.isPaused = false;
+        this.pauseMenu.style.display = 'none';
+        if (this.escModal) this.escModal.style.display = 'none';
     }
 
     private updatePlayerSettings(key: string, value: any) {

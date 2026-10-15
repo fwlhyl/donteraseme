@@ -109,20 +109,24 @@ try {
     assert(await page.evaluate(() => document.querySelector('#replay-canvas').toDataURL() === window.gameInstance.artRecording.finalArtwork.toDataURL()));
     await page.locator('#replay-close').click();
     await page.locator('#save-btn').click();
-    await page.evaluate(async () => {
-        const { ArtworkStore } = await import('/src/core/ArtworkStore.ts');
-        window.originalSaveFrame = ArtworkStore.saveFrame;
-        ArtworkStore.saveFrame = async () => { throw Error('模拟空间不足'); };
+    await page.evaluate(() => {
+        window.originalGalleryPut = IDBObjectStore.prototype.put;
+        IDBObjectStore.prototype.put = function (...args) {
+            if (this.transaction.db.name === 'dont_erase_me_gallery_v1') throw Error('模拟空间不足');
+            return window.originalGalleryPut.apply(this, args);
+        };
     });
-    await page.locator('.frame-select-btn[data-index="1"]').click();
-    await page.waitForFunction(() => document.querySelector('#frame-save-status').textContent.includes('模拟空间不足'));
+    await page.locator('#gallery-save-confirm').click();
+    await page.waitForFunction(() => document.querySelector('#gallery-save-status').textContent.includes('模拟空间不足'));
     assert(await page.locator('#frame-save-modal').isVisible(), 'failure must keep retry/export options visible');
-    await page.evaluate(async () => { (await import('/src/core/ArtworkStore.ts')).ArtworkStore.saveFrame = window.originalSaveFrame; });
-    await page.locator('.frame-select-btn[data-index="1"]').click();
-    await page.locator('#frame-save-modal').waitFor({ state: 'hidden' });
+    await page.evaluate(() => { IDBObjectStore.prototype.put = window.originalGalleryPut; });
+    await page.locator('#gallery-save-confirm').click();
+    await page.waitForFunction(() => document.querySelector('#gallery-save-status').textContent.includes('已保存'));
     await page.reload();
-    await page.waitForFunction(() => document.querySelector('#frame-img-1').src.startsWith('blob:'));
+    await page.locator('#gallery-btn').click();
+    await page.waitForSelector('.gallery-thumbnail');
+    assert.equal(await page.locator('.gallery-artwork-card').count(), 1);
     assert.deepEqual(errors, []);
-    console.log('UI: import, persist/reload, intro cancel/skip, custom battle, replay, save failure/retry, frame reload passed.');
+    console.log('UI: import, persist/reload, intro cancel/skip, custom battle, replay, gallery save failure/retry/reload passed.');
     console.log('Screenshots:', output);
 } finally { await context.close(); await browser.close(); }

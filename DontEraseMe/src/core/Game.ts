@@ -50,6 +50,11 @@ import { ArtworkStore } from './ArtworkStore';
 import type { DefenseArtwork } from './DefenseArtwork';
 import { CREATE_WORLD, DEFENSE_WORLD } from '../config/WorldConfig';
 import { emitGameSound } from '../audio/AudioEvents';
+import { DrawingHud } from '../ui/DrawingHud';
+import { GalleryStore } from './GalleryStore';
+import type { ArtGallery } from '../gallery/ArtGallery';
+import { Skill } from '../components/Skill';
+import { Trail } from '../components/Trail';
 
 import { SKILLS, SkillCategory } from '../config/EndlessConfig';
 import type { SkillConfig } from '../config/EndlessConfig';
@@ -63,11 +68,12 @@ export enum GameState {
     STUDIO,
     SELECTION, // 新增状态：选人界面
     REPLAY,
-    DEFENSE_INTRO
+    DEFENSE_INTRO,
+    GALLERY
 }
 
-export type PlayMode = 'story' | 'endless' | 'defense';
-type SelectablePlayMode = Exclude<PlayMode, 'story'>;
+export type PlayMode = 'story' | 'endless' | 'defense' | 'drawing';
+type SelectablePlayMode = 'endless' | 'defense';
 
 export class Game {
     public entities: Map<string, Entity> = new Map();
@@ -125,6 +131,13 @@ export class Game {
     private frameLoadGeneration = 0;
     private savingFrame = false;
     private frameStorageWarningShown = false;
+    private drawingElapsed = 0;
+    private readonly drawingDuration = 20 * 60;
+    private readonly drawingHud = new DrawingHud(() => this.finishDrawing(), () => this.clearInput());
+    private gallery: ArtGallery | null = null;
+    private galleryGeneration = 0;
+    private savedGalleryId: string | undefined;
+    private savingGallery = false;
 
     public inputManager: InputManager;
     public currentMode: PlayMode = 'endless';
@@ -193,8 +206,7 @@ export class Game {
 
         this.setupSystems();
         
-        // Initial load of frames to main menu
-        this.loadFramesToMenu();
+        // Gallery migrates the legacy frames lazily, without loading full PNGs on the menu.
         // Entities are setup on Start Game now
         // this.setupEntities();
 
@@ -207,6 +219,9 @@ export class Game {
 
         const defenseModeBtn = document.getElementById('defense-mode-btn');
         if (defenseModeBtn) defenseModeBtn.addEventListener('click', () => this.showSelectionScreen('defense'));
+        document.getElementById('drawing-mode-btn')?.addEventListener('click', () => this.startGame('drawing'));
+        document.getElementById('gallery-btn')?.addEventListener('click', () => { void this.openGallery(); });
+        document.getElementById('gallery-save-confirm')?.addEventListener('click', () => { void this.saveToGallery(); });
 
         const startRunBtn = document.getElementById('start-run-btn');
         if (startRunBtn) startRunBtn.addEventListener('click', () => this.startGame(this.pendingMode));
@@ -233,9 +248,7 @@ export class Game {
         // Save Button
         const saveBtn = document.getElementById('save-btn');
         if (saveBtn) saveBtn.addEventListener('click', () => {
-            // Show frame selection modal instead of downloading immediately
-            const modal = document.getElementById('frame-save-modal');
-            if (modal) modal.style.display = 'flex';
+            this.showGallerySaveDialog();
         });
         
         // Frame Selection Modal Listeners
@@ -277,6 +290,7 @@ export class Game {
             } else {
                 this.start();
             }
+            this.clearInput();
         });
         window.addEventListener('game-over', (e: any) => this.gameOver(e.detail?.score, e.detail?.victory));
         window.addEventListener('player-painted', (e: Event) => {
@@ -421,8 +435,7 @@ export class Game {
         
         // ESC modal bridge events
         window.addEventListener('save-art-local', () => {
-            const modal = document.getElementById('frame-save-modal');
-            if (modal) modal.style.display = 'flex';
+            this.showGallerySaveDialog();
         });
         window.addEventListener('save-art-to-frame', (e: any) => {
             const idx = e.detail?.index;
@@ -431,6 +444,7 @@ export class Game {
         });
         window.addEventListener('exit-run', () => {
             if (this.state !== GameState.PLAYING && this.state !== GameState.STUDIO) return;
+            if (this.currentMode === 'drawing') { this.finishDrawing(); return; }
             this.settleCurrentRunCoins();
             this.stop();
             this.artReplay.close(false);
@@ -459,7 +473,7 @@ export class Game {
         ));
         this.addSystem(new CollisionSystem((entity) => this.addEntity(entity), this.trailCtx));
         
-        this.waveSystem = new WaveSystem((entity) => this.addEntity(entity), this.camera, () => this.currentMode);
+        this.waveSystem = new WaveSystem((entity) => this.addEntity(entity), this.camera, () => this.currentMode === 'drawing' ? 'endless' : this.currentMode);
         this.addSystem(this.waveSystem);
         
         this.addSystem(new SkillSystem(this.inputManager, this.trailCtx, this.camera, (entity) => this.addEntity(entity), this.worldWidth, this.worldHeight));
@@ -467,12 +481,12 @@ export class Game {
         this.addSystem(new TrailSystem(this.trailCtx, this.camera));
         this.addSystem(new SkeletonSystem());
         this.addSystem(new ObjectiveSystem(this.worldWidth, this.worldHeight, (e) => this.addEntity(e)));
-        this.addSystem(new LevelSystem(() => this.currentMode));
+        this.addSystem(new LevelSystem(() => this.currentMode === 'drawing' ? 'endless' : this.currentMode));
         this.addSystem(new PrologueSystem(this.worldWidth, this.worldHeight));
         this.courtyardBoundary = new CourtyardBoundarySystem(() => this.currentMode === 'endless');
         this.addSystem(this.courtyardBoundary);
         this.addSystem(new RenderSystem(this.gameCtx, this.camera, this.worldWidth, this.worldHeight,
-            () => this.currentMode === 'endless', () => this.currentMode === 'defense'));
+            () => this.currentMode === 'endless', () => this.currentMode === 'defense', () => this.currentMode === 'drawing'));
         this.addSystem(new MinimapSystem(this.minimapCtx, this.worldWidth, this.worldHeight, this.camera, () => this.currentMode === 'endless'));
         this.addSystem(new UISystem());
         this.addSystem(new QuestSystem());
@@ -483,7 +497,7 @@ export class Game {
         this.addSystem(new SummonSystem((entity) => this.addEntity(entity)));
         this.addSystem(new MagicPenSystem(
             (entity) => this.addEntity(entity),
-            () => this.state === GameState.PLAYING && this.isRunning
+            () => this.state === GameState.PLAYING && this.isRunning && this.currentMode !== 'drawing'
         ));
     }
 
@@ -491,15 +505,16 @@ export class Game {
         const player = PlayerFactory.create(
             this.width / 2, 
             this.height / 2, 
-            this.selectedCharacterId || undefined, 
-            this.selectedWeaponId !== null ? this.selectedWeaponId : undefined
+            this.currentMode === 'drawing' ? 'collector' : this.selectedCharacterId || undefined,
+            this.currentMode === 'drawing' ? 0 : this.selectedWeaponId !== null ? this.selectedWeaponId : undefined
         );
         this.configurePlayerForMode(player);
-        if(this.currentMode === 'endless') {
+        if(this.currentMode === 'endless' || this.currentMode === 'drawing') {
             const t=player.getComponent(Transform)!;
             t.x=this.worldWidth/2;t.y=this.worldHeight/2;
         }
         this.addEntity(player);
+        if (this.currentMode === 'drawing') this.drawingHud.show(player);
 
         // Remove test enemies to prevent instant death at start
         // WaveSystem will handle spawning enemies
@@ -566,6 +581,26 @@ export class Game {
         const weapon = player.getComponent(Weapon);
         const quest = player.getComponent(Quest);
         const story = player.getComponent(StoryState);
+
+        if (this.currentMode === 'drawing') {
+            player.tags.add('drawing_mode');
+            const stats = new PlayerStats();
+            stats.characterId = 'collector';
+            stats.infiniteAmmoUntil = Infinity;
+            player.addComponent(stats);
+            player.removeComponent(Skill);
+            player.getComponent(Renderable)!.color = '#287ac0';
+            player.getComponent(Trail)!.color = '#287ac0';
+            if (weapon) {
+                weapon.unlocked = new Set(WEAPONS.filter(config => PlayerProfile.load().unlockedWeaponIds.includes(config.id)).map(config => config.id));
+                weapon.cooldown = 0;
+                weapon.reloading = false;
+            }
+            if (exp) exp.next = Number.MAX_SAFE_INTEGER;
+            if (quest) quest.active = false;
+            if (story) story.chapter = 'Drawing';
+            return;
+        }
 
         if (weapon) {
             // Unlocked set should contain the starting weapon
@@ -643,6 +678,7 @@ export class Game {
     }
 
     public showLevelUpScreen(entityId: string): void {
+        if (this.currentMode === 'drawing') return;
         const player = this.entities.get(entityId);
         if (!player) return;
         const stats = player.getComponent(PlayerStats);
@@ -925,6 +961,7 @@ export class Game {
     }
 
     public showSelectionScreen(mode?: SelectablePlayMode): void {
+        if (this.state === GameState.GALLERY) return;
         if (mode) this.pendingMode = mode;
         this.state = GameState.SELECTION;
         this.mainMenu.style.display = 'none';
@@ -1125,7 +1162,7 @@ export class Game {
     }
 
     public startGame(mode: PlayMode = 'endless'): void {
-        if (this.state === GameState.DEFENSE_INTRO) return;
+        if (this.state === GameState.DEFENSE_INTRO || this.state === GameState.GALLERY) return;
         this.currentMode = mode;
         // 暂时屏蔽皮肤绘制提示，直接使用默认皮肤进入无尽模式
         /*
@@ -1163,7 +1200,7 @@ export class Game {
     }
 
     private configureWorldForMode(): void {
-        const world = this.currentMode === 'defense' ? DEFENSE_WORLD : CREATE_WORLD;
+        const world = this.currentMode === 'defense' || this.currentMode === 'drawing' ? DEFENSE_WORLD : CREATE_WORLD;
         this.worldWidth = world.width;
         this.worldHeight = world.height;
         // Update existing systems instead of constructing duplicate listeners.
@@ -1174,7 +1211,17 @@ export class Game {
     private beginBattle(artwork?: DefenseArtwork): void {
         if (artwork) this.defensePainting.beginArtwork(artwork);
         this.artRecording.start(this.worldWidth, this.worldHeight, this.currentMode === 'defense', artwork,
-            this.currentMode === 'endless' ? courtyard.points : null);
+            this.currentMode === 'endless' ? courtyard.points : this.currentMode === 'drawing' ? [
+                { x: 0, y: 0 }, { x: this.worldWidth, y: 0 },
+                { x: this.worldWidth, y: this.worldHeight }, { x: 0, y: this.worldHeight }
+            ] : null);
+        this.artRecording.isDrawing = this.currentMode === 'drawing';
+        if (this.currentMode === 'drawing') {
+            this.trailCtx.save();
+            this.trailCtx.fillStyle = '#ffffff';
+            this.trailCtx.fillRect(0, 0, this.worldWidth, this.worldHeight);
+            this.trailCtx.restore();
+        }
         const replayBtn = document.getElementById('replay-btn') as HTMLButtonElement | null;
         if (replayBtn) replayBtn.disabled = true;
         this.setupEntities();
@@ -1188,18 +1235,20 @@ export class Game {
         // the camera appears offset and the painting starts partly off-screen.
         window.scrollTo(0, 0);
         if (this.gameUI) this.gameUI.style.display = 'flex';
+        if (this.currentMode === 'drawing') this.gameUI.style.display = 'none';
         if (this.minimapCanvas) this.minimapCanvas.style.display = 'block';
-        this.setCombatFieldNotesVisible(true);
+        this.setCombatFieldNotesVisible(this.currentMode !== 'drawing');
         if (this.paintingCanvas) this.paintingCanvas.style.display = this.currentMode === 'defense' ? 'block' : 'none';
         this.setDefenseHudVisible(this.currentMode === 'defense');
 
         // Night courtyard needs visible pigment; this display opacity does not
         // alter recorded strokes, exported artwork or guard-mode readability.
-        if (this.trailCanvas) this.trailCanvas.style.opacity = this.currentMode === 'defense' ? '0.16' : this.currentMode === 'endless' ? '0.65' : '0.1';
+        if (this.trailCanvas) this.trailCanvas.style.opacity = this.currentMode === 'drawing' ? '1' : this.currentMode === 'defense' ? '0.16' : this.currentMode === 'endless' ? '0.65' : '0.1';
         
         // Show Pause Button
         const pauseBtn = document.getElementById('pause-btn');
-        if (pauseBtn) pauseBtn.style.display = 'block';
+        if (pauseBtn) pauseBtn.style.display = this.currentMode === 'drawing' ? 'none' : 'block';
+        this.clearInput();
 
         if (!this.isRunning) {
             this.start();
@@ -1210,6 +1259,9 @@ export class Game {
         if (this.state !== GameState.PLAYING && this.state !== GameState.STUDIO) return;
         this.state = GameState.GAMEOVER;
         this.stop();
+        this.clearInput();
+        this.drawingHud.hide();
+        this.dismissPauseMenus();
         emitGameSound(victory ? 'victory' : 'defeat');
         this.artRecording.finish(this.paintingCanvas, this.trailCanvas);
         const replayBtn = document.getElementById('replay-btn') as HTMLButtonElement | null;
@@ -1218,7 +1270,10 @@ export class Game {
 
         const titleEl = this.gameOverMenu?.querySelector('h1');
         if (titleEl) {
-            if (victory) {
+            if (this.currentMode === 'drawing') {
+                titleEl.innerText = '作品完成';
+                titleEl.style.color = '#287ac0';
+            } else if (victory) {
                 titleEl.innerText = this.currentMode === 'defense' ? '守卫成功' : 'VICTORY';
                 titleEl.style.color = 'gold';
             } else if (this.currentMode === 'defense' && this.defenseFailureMessage) {
@@ -1240,6 +1295,11 @@ export class Game {
             this.scoreDisplay.innerText = getLang() === 'zh'
                 ? `最终分数：${score}  |  本局获得：${awardedCoins} 金币  |  持有金币：${totalCoins}${integritySuffix}`
                 : `Final Score: ${score}  |  Earned: ${awardedCoins} Coins  |  Wallet: ${totalCoins}${integritySuffix}`;
+        }
+
+        if (this.currentMode === 'drawing' && this.scoreDisplay) {
+            const seconds = Math.floor(this.drawingElapsed);
+            this.scoreDisplay.innerText = `纯画画 · 创作 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒 · 无金币结算`;
         }
 
         if (this.gameUI) this.gameUI.style.display = 'none';
@@ -1273,6 +1333,7 @@ export class Game {
     }
 
     private settleCurrentRunCoins(): number {
+        if (this.currentMode === 'drawing') { this.hasSettledCurrentRun = true; return 0; }
         if (this.hasSettledCurrentRun) return 0;
 
         let earnedCoins = 0;
@@ -1442,6 +1503,7 @@ export class Game {
         this.artReplay.close(false);
         this.artRecording.clear();
         // Clear all entities
+        for (const entity of this.entities.values()) entity.active = false;
         this.entities.clear();
         for (const system of this.systems) {
             system.entities.clear();
@@ -1458,6 +1520,11 @@ export class Game {
         this.minimapCtx.clearRect(0, 0, this.minimapCanvas.width, this.minimapCanvas.height);
 
         this.defenseElapsed = 0;
+        this.drawingElapsed = 0;
+        this.savedGalleryId = undefined;
+        this.drawingHud.hide();
+        this.dismissPauseMenus();
+        this.clearInput();
         this.defenseIntegrityTick = 0;
         this.lastDefenseRepairAt = 0;
         this.defenseFailureMessage = '';
@@ -1517,6 +1584,7 @@ export class Game {
     }
 
     private handleExplosion(x: number, y: number, radius: number, damage: number): void {
+        if (this.currentMode === 'drawing') return;
         for (const entity of this.entities.values()) {
             if (entity.tags.has('player') || entity.tags.has('enemy') || entity.tags.has('canvas_eye')) {
                 const t = entity.getComponent(Transform);
@@ -1543,7 +1611,8 @@ export class Game {
         this.lastTime = time;
         
         // Cap dt to prevent huge jumps (e.g. tab switch)
-        if (dt > 0.1) dt = 0.1;
+        dt = Math.max(0, Math.min(0.1, dt));
+        if (this.currentMode === 'drawing') dt = Math.min(dt, this.drawingDuration - this.drawingElapsed);
         if (this.state === GameState.PLAYING) this.artRecording.log.advance(Math.max(0, dt));
 
         // 1. Clear canvas first
@@ -1566,7 +1635,7 @@ export class Game {
             // Share the immutable artwork boundary for this synchronous frame.
             // Decay, paint order and recording timestamps remain unchanged.
             this.artRecording.log.withPaintBoundary(this.trailCtx, () => {
-                if (this.currentMode !== 'defense') {
+                if (this.currentMode !== 'defense' && this.currentMode !== 'drawing') {
                     this.trailCtx.save();
                     this.trailCtx.globalCompositeOperation = 'destination-out';
                     const fadeAlpha = 0.05 * dt;
@@ -1596,6 +1665,7 @@ export class Game {
         try {
             for (const system of this.systems) {
                 // console.log('Running system:', system.constructor.name);
+                if (this.currentMode === 'drawing' && !this.isDrawingSystem(system)) continue;
                 system.update(dt);
                 if (this.state !== GameState.PLAYING || !this.isRunning) break;
             }
@@ -1625,6 +1695,12 @@ export class Game {
             }
         }
         
+        if (this.currentMode === 'drawing') {
+            this.drawingElapsed = Math.min(this.drawingDuration, this.drawingElapsed + dt);
+            this.drawingHud.update(this.drawingDuration - this.drawingElapsed);
+            if (this.drawingElapsed >= this.drawingDuration) this.finishDrawing();
+            return;
+        }
         this.lastRatingTick += dt;
         const activeEnemies = (() => {
             let c = 0;
@@ -1872,6 +1948,111 @@ export class Game {
         this.trailCanvas.style.transform = `translate3d(${-this.camera.x + shakeX}px, ${-this.camera.y + shakeY}px, 0)`;
     }
     
+    private clearInput(): void {
+        this.inputManager.clear();
+    }
+
+    private dismissPauseMenus(): void {
+        for (const system of this.systems) if (system instanceof UISystem) system.dismissPause();
+        const modal = document.getElementById('frame-save-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    private isDrawingSystem(system: System): boolean {
+        // Use type identity rather than class names, which production builds minify.
+        return system instanceof InputSystem || system instanceof MovementSystem || system instanceof WeaponSystem
+            || system instanceof ParticleSystem || system instanceof TrailSystem || system instanceof SkeletonSystem
+            || system instanceof RenderSystem || system instanceof MinimapSystem;
+    }
+
+    private finishDrawing(): void {
+        if (this.currentMode !== 'drawing' || this.state !== GameState.PLAYING) return;
+        this.gameOver(0, true);
+    }
+
+    private async openGallery(): Promise<void> {
+        if (this.state !== GameState.MENU) return;
+        this.stop();
+        this.clearInput();
+        this.state = GameState.GALLERY;
+        this.mainMenu.style.display = 'none';
+        this.gameCanvas.style.visibility = 'hidden';
+        this.trailCanvas.style.visibility = 'hidden';
+        const generation = ++this.galleryGeneration;
+        const button = document.getElementById('gallery-btn') as HTMLButtonElement;
+        button.disabled = true;
+        const returnToMenu = () => {
+            if (generation !== this.galleryGeneration) return;
+            this.state = GameState.MENU;
+            this.mainMenu.style.display = 'flex';
+            this.clearInput();
+            button.disabled = false;
+        };
+        try {
+            const { ArtGallery } = await import('../gallery/ArtGallery');
+            if (generation !== this.galleryGeneration || this.state !== GameState.GALLERY) return;
+            this.gallery ??= new ArtGallery();
+            this.mainMenu.style.display = 'none';
+            this.gameCanvas.style.visibility = 'hidden';
+            this.trailCanvas.style.visibility = 'hidden';
+            this.setCombatFieldNotesVisible(false);
+            await this.gallery.open(() => {
+                this.gameCanvas.style.visibility = '';
+                this.trailCanvas.style.visibility = '';
+                returnToMenu();
+            });
+        } catch (error) {
+            if (generation !== this.galleryGeneration) return;
+            this.gallery?.close();
+            this.gameCanvas.style.visibility = '';
+            this.trailCanvas.style.visibility = '';
+            returnToMenu();
+            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `画廊打开失败：${error instanceof Error ? error.message : '请重试'}` } }));
+        } finally { button.disabled = false; }
+    }
+
+    private showGallerySaveDialog(): void {
+        const modal = document.getElementById('frame-save-modal');
+        const name = document.getElementById('gallery-art-name') as HTMLInputElement | null;
+        if (!modal || !name) return;
+        if (!this.savedGalleryId) {
+            const label = this.currentMode === 'drawing' ? '自由创作' : this.currentMode === 'defense' ? '守卫画作' : '战斗画作';
+            name.value = `${label} ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+        }
+        const status = document.getElementById('gallery-save-status');
+        if (status && !this.savingGallery) status.textContent = this.savedGalleryId ? '本次作品已收藏，再次保存会更新这一幅。' : '保存在当前设备，可在主菜单「我的画廊」中查看。';
+        modal.style.display = 'flex';
+        this.clearInput();
+        name.focus(); name.select();
+    }
+
+    private async saveToGallery(): Promise<void> {
+        if (this.savingGallery) return;
+        if (this.state !== GameState.GAMEOVER && !(this.state === GameState.PLAYING && !this.isRunning)) return;
+        this.savingGallery = true;
+        const button = document.getElementById('gallery-save-confirm') as HTMLButtonElement;
+        const status = document.getElementById('gallery-save-status')!;
+        const name = (document.getElementById('gallery-art-name') as HTMLInputElement).value.trim() || '未命名作品';
+        button.disabled = true;
+        status.textContent = '正在保存作品…';
+        // Capture identity and pixels before any asynchronous storage operation.
+        const generation = this.runGeneration;
+        const mode = this.currentMode === 'story' ? 'endless' : this.currentMode;
+        const canvas = this.getExportCanvas();
+        const width = canvas.width, height = canvas.height;
+        const id = this.savedGalleryId;
+        try {
+            const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('图片编码失败')), 'image/png'));
+            const artwork = await GalleryStore.save({ id, name, mode, width, height, blob });
+            if (generation === this.runGeneration) {
+                this.savedGalleryId = artwork.id;
+                status.textContent = '已保存到我的画廊 ✓（返回主菜单即可参观）';
+            }
+        } catch (error) {
+            if (generation === this.runGeneration) status.textContent = `保存失败：${error instanceof Error ? error.message : '本地存储不可用'}。请重试或导出 PNG 备份。`;
+        } finally { this.savingGallery = false; button.disabled = false; }
+    }
+
     private async saveImageToFrame(frameIndex: number): Promise<boolean> {
         if (this.savingFrame) return false;
         this.savingFrame = true;
@@ -1986,8 +2167,7 @@ export class Game {
         setText('windowed-btn', '窗口模式 / Windowed');
         setText('close-settings-btn', '返回 (Back)');
 
-        // Frames
-        this.loadFramesToMenu();
+        // Saved artworks are now displayed by the on-demand gallery.
         
         // Re-render selection screen if it's visible
         if (this.state === GameState.SELECTION) {
