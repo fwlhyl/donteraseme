@@ -27,6 +27,10 @@ try {
             const player = [...game.entities.values()].find(e => e.tags.has('player'));
             const transform = player.getComponent(Transform);
             const w = game.worldWidth, h = game.worldHeight, dpr = window.devicePixelRatio;
+            const renderDpr = game.gameCtx.getTransform().a;
+            check(renderDpr === Math.min(dpr, 1), 'game rendering must cap DPR at 1');
+            check(game.gameCanvas.width === Math.floor(game.width * renderDpr)
+                && game.gameCanvas.height === Math.floor(game.height * renderDpr), 'game backing size must use capped DPR');
             // Preserve scenery as the reference: only *new ink/effects* must not
             // spill beyond the board, not its decorative outline.
             const draw = () => { game.gameCtx.clearRect(0, 0, game.gameCanvas.width, game.gameCanvas.height); render.update(0); };
@@ -48,8 +52,8 @@ try {
             const pxW = game.gameCanvas.width;
             for (let i = 0; i < painted.length; i += 4) {
                 if (painted[i] === baseline[i] && painted[i + 1] === baseline[i + 1] && painted[i + 2] === baseline[i + 2] && painted[i + 3] === baseline[i + 3]) continue;
-                const x = (i / 4 % pxW + .5) / dpr + game.camera.x;
-                const y = (Math.floor(i / 4 / pxW) + .5) / dpr + game.camera.y;
+                const x = (i / 4 % pxW + .5) / renderDpr + game.camera.x;
+                const y = (Math.floor(i / 4 / pxW) + .5) / renderDpr + game.camera.y;
                 if (x < 0 || y < 0 || x >= w || y >= h) outsideChanges++;
                 else insideChanges++;
             }
@@ -88,7 +92,7 @@ try {
             game.gameOver(0, true);
             const final = game.getExportCanvas();
             check(final.width === w && final.height === h, 'PNG/gallery export must retain the map bounds');
-            return { dpr, outsideChanges, insideChanges, replayDifference: difference / live.length, export: [final.width, final.height] };
+            return { dpr, renderDpr, outsideChanges, insideChanges, replayDifference: difference / live.length, export: [final.width, final.height] };
         });
         await page.evaluate(() => { document.getElementById('game-over').style.display = 'none'; });
         await page.screenshot({ path: join(output, `boundary-${dpr}x.png`) });

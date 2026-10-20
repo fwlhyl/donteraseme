@@ -10,9 +10,11 @@ await build({ entryPoints: ['src/world/DoodleLights.ts'], bundle: true, platform
 const { DOODLE_LIGHTS, sampleDoodleLight, drawDoodleLights } = await import(pathToFileURL(out));
 
 for (const [theme, lights] of Object.entries(DOODLE_LIGHTS)) {
-    assert(lights.filter(light => light.kind === 'lamp').length >= 3, `${theme} has several independent lamps`);
+    assert(lights.length >= 2, `${theme} has independent lights at visible authored sources`);
     assert(lights.some(light => light.kind === 'window'), `${theme} includes lit windows`);
     assert.equal(new Set(lights.map(light => light.id)).size, lights.length, 'light identifiers are unique');
+    assert(lights.every(light => light.regions.every(region => region.points.every(([x, y]) => x >= 0 && y >= 0 && x <= 1536 && y <= 1024))), 'all masks stay within the authored image');
+    if (theme === 'ruins') assert(lights.every(light => light.regions.every(region => region.points.every(([x, y]) => x < 256 || x > 1280 || y < 171 || y > 853))), 'guard lights never cover the protected painting rectangle');
     const traces = lights.map(light => Array.from({ length: 1801 }, (_, frame) => sampleDoodleLight(light, frame / 60)));
     for (const [index, light] of lights.entries()) {
         const trace = traces[index];
@@ -87,7 +89,8 @@ for (const theme of ['atelier', 'ruins']) {
     assert.equal(outside.fills.length, 0, 'offscreen light regions are culled');
     assert.equal(outside.stack.length, 0, 'an empty viewport also restores canvas state');
 
-    const cropped = canvas(), view = { x: offset[0], y: offset[1], width: 340, height: 400 };
+    const anchor = DOODLE_LIGHTS[theme][0].regions[0].points[0];
+    const cropped = canvas(), view = { x: offset[0] + anchor[0] * 2700 / 1536 - 50, y: offset[1] + anchor[1] * 1800 / 1024 - 50, width: 100, height: 100 };
     drawDoodleLights(cropped.ctx, width, height, theme, 12.3, view);
     assert(cropped.fills.length > 0 && cropped.fills.length < all.fills.length, 'viewport culling keeps nearby lamps and removes distant ones');
     const expected = DOODLE_LIGHTS[theme].filter(light => {

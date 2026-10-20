@@ -1,7 +1,20 @@
 import { COURTYARD_OUTLINE } from './CourtyardGeometry';
 import type { CourtyardTheme } from './SceneLayout';
+import floorTextureUrl from '../assets/paper-scenes/floor-clarity-v1.webp';
 
-export const DOODLE_FLOOR = '#2c3747';
+// Shared with the scene's overscan / missing-image fallback. Keep the historical
+// export name because rendering and geometry regression tests use this module.
+export const DOODLE_FLOOR = '#242019';
+let floorTexture: HTMLImageElement | undefined;
+
+/** Load only when a scene is shown, not on the menu or artwork export path. */
+export function isDoodleFloorTextureReady(): boolean {
+    if (!floorTexture && typeof Image !== 'undefined') {
+        floorTexture = new Image();
+        floorTexture.src = floorTextureUrl;
+    }
+    return !!floorTexture?.complete && floorTexture.naturalWidth > 0;
+}
 
 /** The painted floor uses the SAME boundary as gameplay.
  * This covers any generated decoration that drifts inside the play area.
@@ -21,15 +34,26 @@ export function drawDoodleFloor(ctx: CanvasRenderingContext2D, width: number, he
     traceDoodleFloor(ctx, width, height, theme);
     ctx.fillStyle = DOODLE_FLOOR;
     ctx.fill();
-    // No ruler-straight dashed box or double curb across the illustration.
+    // Exactly the gameplay boundary: texture/scuffs never cross the wall and
+    // this scenery layer is never included in saved strokes or artwork.
     ctx.clip();
-    // Sparse, deterministic broken pencil seams. Never randomize every frame.
-    ctx.strokeStyle = '#8995a018'; ctx.lineWidth = 1.5;
-    for (let i = 0; i < 36; i++) {
+    if (isDoodleFloorTextureReady()) {
+        // A single world-aligned texture avoids obvious repeated tile seams.
+        // Its low contrast leaves the player's colored ink as the focal point.
+        ctx.save();
+        ctx.globalAlpha = .62;
+        ctx.drawImage(floorTexture!, 0, 0, width, height);
+        ctx.restore();
+    }
+    // A few deterministic dry-brush scuffs instead of the old regular T seams.
+    // All of these are constructed once in the cached floor, never animated.
+    ctx.strokeStyle = '#9b92751c'; ctx.lineWidth = 1.1;
+    for (let i = 0; i < 14; i++) {
         const x = ((i * 317 + 97) % 997) / 997 * width;
         const y = ((i * 193 + 71) % 991) / 991 * height;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 32, y + 2);
-        ctx.moveTo(x + 16, y + 1); ctx.lineTo(x + 20, y - 14); ctx.stroke();
+        const length = 13 + i % 4 * 5, rise = i % 2 ? 4 : -3;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + length, y + rise);
+        ctx.moveTo(x + 4, y + 3); ctx.lineTo(x + length - 5, y + rise + 2); ctx.stroke();
     }
     ctx.restore();
 }
@@ -40,7 +64,9 @@ const floorCache = new Map<string, HTMLCanvasElement>();
 export function drawBlendedDoodleFloor(ctx: CanvasRenderingContext2D, width: number, height: number, theme: CourtyardTheme): void {
     // Graceful fallback for Canvas implementations without filter support.
     if (typeof ctx.filter !== 'string') { drawDoodleFloor(ctx, width, height, theme); return; }
-    const key = `${theme}:${width}:${height}`;
+    // A loaded texture gets its own one-time cache. Failed/unfinished assets
+    // retain the quiet charcoal fallback without rebuilding every frame.
+    const key = `${theme}:${width}:${height}:${isDoodleFloorTextureReady()}`;
     let floor = floorCache.get(key);
     if (!floor) {
         floor = document.createElement('canvas');

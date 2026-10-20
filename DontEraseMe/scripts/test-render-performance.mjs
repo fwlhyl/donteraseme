@@ -25,7 +25,7 @@ export {SkillVisual} from './src/components/SkillVisual';
 export {PlayerStats} from './src/components/PlayerStats';
 export {sampleDoodleMotion, signalDoodleAttack} from './src/art/DoodleMotion';
 export {getDoodleSkills} from './src/art/DoodleSkillArt';
-`, resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', loader: { '.png': 'dataurl' }, outfile: out });
+`, resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', loader: { '.png': 'dataurl', '.webp': 'dataurl' }, outfile: out });
 
 globalThis.Image = class { complete = true; naturalWidth = 1536; naturalHeight = 1024; };
 globalThis.localStorage = { getItem: () => null, setItem() {} };

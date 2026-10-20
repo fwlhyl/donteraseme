@@ -54,6 +54,12 @@ export function getDoodleWeapons(): HTMLImageElement {
     return weapons;
 }
 
+/** Optional cutout hand treatment; omitted for every existing doodle character. */
+export interface DoodleWeaponStyle {
+    detachedHand?: boolean;
+    drawGrip?: (ctx: CanvasRenderingContext2D, ratio: number) => void;
+}
+
 /**
  * Draws an independently held tool and arm in upright player-local coordinates.
  * Caller supplies the torso's vertical offset once, and must not mirror/rotate this
@@ -67,6 +73,7 @@ export function drawDoodleWeapon(
     aim: number,
     pose?: DoodlePose,
     reloading = false,
+    style?: DoodleWeaponStyle,
 ): boolean {
     if (!type || !Object.prototype.hasOwnProperty.call(WEAPON_FRAMES, type)
         || !Number.isFinite(size) || size <= 0 || !Number.isFinite(aim)) return false;
@@ -95,15 +102,17 @@ export function drawDoodleWeapon(
     ctx.setLineDash([]);
 
     // A short bent ink arm follows the hand; torso and feet stay independent.
-    const shoulderX = facing * 8.5 * ratio;
-    const shoulderY = 6 * ratio;
-    ctx.strokeStyle = '#1c1b23';
-    ctx.lineWidth = 2.1 * ratio;
-    ctx.beginPath();
-    ctx.moveTo(shoulderX, shoulderY);
-    ctx.lineTo((shoulderX + handX) * .5, (shoulderY + handY) * .5 + 2 * ratio);
-    ctx.lineTo(handX, handY);
-    ctx.stroke();
+    if (!style?.detachedHand) {
+        const shoulderX = facing * 8.5 * ratio;
+        const shoulderY = 6 * ratio;
+        ctx.strokeStyle = '#1c1b23';
+        ctx.lineWidth = 2.1 * ratio;
+        ctx.beginPath();
+        ctx.moveTo(shoulderX, shoulderY);
+        ctx.lineTo((shoulderX + handX) * .5, (shoulderY + handY) * .5 + 2 * ratio);
+        ctx.lineTo(handX, handY);
+        ctx.stroke();
+    }
 
     ctx.translate(handX, handY);
     ctx.rotate(angle);
@@ -112,13 +121,16 @@ export function drawDoodleWeapon(
     ctx.drawImage(image, source.x, source.y, source.width, source.height,
         -width * grip.x, -height * grip.y, width, height);
 
-    ctx.fillStyle = '#eee4cb';
-    ctx.strokeStyle = '#1c1b23';
-    ctx.lineWidth = 1.3 * ratio;
-    ctx.beginPath();
-    ctx.ellipse(0, 1.1 * ratio, 2.7 * ratio, 2.35 * ratio, -.12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    if (style?.drawGrip) style.drawGrip(ctx, ratio);
+    else {
+        ctx.fillStyle = '#eee4cb';
+        ctx.strokeStyle = '#1c1b23';
+        ctx.lineWidth = 1.3 * ratio;
+        ctx.beginPath();
+        ctx.ellipse(0, 1.1 * ratio, 2.7 * ratio, 2.35 * ratio, -.12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }
     ctx.restore();
     return true;
 }

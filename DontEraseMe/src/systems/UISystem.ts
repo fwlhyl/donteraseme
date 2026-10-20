@@ -42,39 +42,23 @@ export class UISystem extends System {
         // Score Display
         this.scoreDisplay = document.createElement('div');
         this.scoreDisplay.className = 'hud-note hud-score';
-        this.scoreDisplay.style.fontSize = '24px';
-        this.scoreDisplay.style.fontWeight = 'bold';
-        this.scoreDisplay.style.color = '#ffd700'; // Gold
-        this.scoreDisplay.style.marginBottom = '10px';
         this.uiContainer.appendChild(this.scoreDisplay);
 
         // Stats Display (Wave, HP)
         this.statsDisplay = document.createElement('div');
         this.statsDisplay.className = 'hud-note hud-stats';
-        this.statsDisplay.style.fontSize = '18px';
-        this.statsDisplay.style.marginBottom = '10px';
         this.uiContainer.appendChild(this.statsDisplay);
 
         // Create Weapon Display
         this.weaponDisplay = document.createElement('div');
         this.weaponDisplay.className = 'hud-note hud-weapon';
-        this.weaponDisplay.style.fontSize = '20px';
-        this.weaponDisplay.style.fontWeight = 'bold';
-        this.weaponDisplay.style.marginTop = '10px';
-        this.weaponDisplay.style.color = 'white';
         this.uiContainer.appendChild(this.weaponDisplay);
         this.healthHud = new HealthHud(this.statsDisplay);
         this.weaponHud = new WeaponHud(this.weaponDisplay);
-        this.statsDisplay.removeAttribute('style');
-        this.weaponDisplay.removeAttribute('style');
 
         // Canvas Eye Health Display (for story mode)
         this.eyeDisplay = document.createElement('div');
         this.eyeDisplay.className = 'hud-note hud-eye';
-        this.eyeDisplay.style.fontSize = '20px';
-        this.eyeDisplay.style.fontWeight = 'bold';
-        this.eyeDisplay.style.marginTop = '10px';
-        this.eyeDisplay.style.color = '#ff6666';
         this.eyeDisplay.style.display = 'none'; // Hidden by default
         this.uiContainer.appendChild(this.eyeDisplay);
 
@@ -106,20 +90,23 @@ export class UISystem extends System {
         // Colors
         const colors = ['#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffa500', '#000000'];
         colors.forEach(color => {
-            const swatch = document.createElement('div');
+            const swatch = document.createElement('button');
+            swatch.type = 'button';
             swatch.className = 'palette-swatch';
-            swatch.style.width = '30px';
-            swatch.style.height = '30px';
-            swatch.style.borderRadius = '50%';
+            swatch.setAttribute('aria-label', `${getLang() === 'zh' ? '笔迹颜色' : 'Ink color'} ${color}`);
+            swatch.setAttribute('aria-pressed', 'false');
+            // These small samples represent actual drawing colors, not UI rarity.
             swatch.style.backgroundColor = color;
-            swatch.style.cursor = 'pointer';
-            swatch.style.border = '2px solid rgba(255,255,255,0.2)';
             
             swatch.addEventListener('click', () => {
                 this.updatePlayerSettings('color', color);
                 // Highlight selection
-                Array.from(this.colorPalette.children).forEach((c: any) => c.style.borderColor = 'rgba(255,255,255,0.2)');
-                swatch.style.borderColor = 'white';
+                Array.from(this.colorPalette.children).forEach(c => {
+                    c.classList.remove('is-selected');
+                    c.setAttribute('aria-pressed', 'false');
+                });
+                swatch.classList.add('is-selected');
+                swatch.setAttribute('aria-pressed', 'true');
             });
             this.colorPalette.appendChild(swatch);
         });
@@ -164,18 +151,8 @@ export class UISystem extends System {
     private setupAnnounce() {
         const el = document.createElement('div');
         el.className = 'sketch-announce';
-        el.style.position = 'fixed';
-        el.style.left = '50%';
-        el.style.top = '80px';
-        el.style.transform = 'translateX(-50%)';
-        el.style.padding = '10px 20px';
-        el.style.background = 'rgba(0,0,0,0.6)';
-        el.style.color = '#ffd700';
-        el.style.fontSize = '28px';
-        el.style.fontWeight = 'bold';
-        el.style.borderRadius = '6px';
         el.style.display = 'none';
-        el.style.zIndex = '9999';
+        el.setAttribute('role', 'status');
         document.body.appendChild(el);
         this.announceEl = el;
         window.addEventListener('announce', (e: any) => {
@@ -220,41 +197,33 @@ export class UISystem extends System {
     private setupEscModal() {
         const overlay = document.createElement('div');
         overlay.className = 'sketch-esc-overlay';
-        overlay.style.position = 'fixed';
-        overlay.style.left = '0';
-        overlay.style.top = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.backgroundColor = 'rgba(0,0,0,0.6)';
         overlay.style.display = 'none';
-        overlay.style.alignItems = 'center';
-        overlay.style.justifyContent = 'center';
-        overlay.style.zIndex = '9999';
         const panel = document.createElement('div');
         panel.className = 'sketch-dialog';
-        panel.style.background = '#111';
-        panel.style.padding = '16px';
-        panel.style.borderRadius = '8px';
-        panel.style.display = 'flex';
-        panel.style.flexDirection = 'column';
-        panel.style.gap = '12px';
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-modal', 'true');
+        panel.setAttribute('aria-labelledby', 'escape-dialog-title');
+        const heading = document.createElement('h2');
+        heading.id = 'escape-dialog-title';
+        heading.className = 'dialog-heading';
+        heading.textContent = getLang() === 'zh' ? '对局暂停' : 'PAUSED';
+        const copy = document.createElement('p');
+        copy.className = 'dialog-copy';
+        copy.textContent = getLang() === 'zh' ? '暂留此刻。保存笔迹，或继续抵抗抹除。' : 'Hold this moment. Preserve your marks, or resist erasure.';
+        panel.append(heading, copy);
         const btnSaveFrame = document.createElement('button');
         btnSaveFrame.className = 'btn';
         btnSaveFrame.textContent = '保存当前作品到画廊';
-        btnSaveFrame.style.padding = '10px 14px';
-        btnSaveFrame.style.cursor = 'pointer';
         const btnSaveLocal = document.createElement('button');
         btnSaveLocal.className = 'btn';
         btnSaveLocal.textContent = t('保存作品到本地');
-        btnSaveLocal.style.padding = '10px 14px';
-        btnSaveLocal.style.cursor = 'pointer';
         const btnExit = document.createElement('button');
-        btnExit.className = 'btn';
+        btnExit.className = 'btn btn-danger';
         btnExit.textContent = t('退出当前对局');
-        btnExit.style.padding = '10px 14px';
-        btnExit.style.cursor = 'pointer';
         
         window.addEventListener('lang-changed', () => {
+            heading.textContent = getLang() === 'zh' ? '对局暂停' : 'PAUSED';
+            copy.textContent = getLang() === 'zh' ? '暂留此刻。保存笔迹，或继续抵抗抹除。' : 'Hold this moment. Preserve your marks, or resist erasure.';
             btnSaveFrame.textContent = '保存当前作品到画廊';
             btnSaveLocal.textContent = t('保存作品到本地');
             btnExit.textContent = t('退出当前对局');
@@ -264,7 +233,7 @@ export class UISystem extends System {
         panel.appendChild(btnSaveLocal);
         panel.appendChild(btnExit);
         const resume = document.createElement('button');
-        resume.className = 'btn'; resume.textContent = '继续 / Esc';
+        resume.className = 'btn btn-primary'; resume.textContent = '继续 / Esc';
         resume.onclick = () => {
             this.dismissPause();
             window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));

@@ -48,7 +48,7 @@ export class ArtReplayPlayer {
         overlay.setAttribute('aria-labelledby', 'art-replay-title');
         overlay.innerHTML = `
             <div class="art-replay-header">
-                <div><h2 id="art-replay-title">${tr('这幅画，是这样诞生的', 'How your artwork came to life')}</h2>
+                <div><h2 id="art-replay-title">${tr('笔迹回放', 'Ink archive · Replay')}</h2>
                 <p>${source.isDrawing ? tr('纯画画 · 本次创作过程', 'Drawing mode · your creative process') : source.isDefense ? tr('守卫模式 · 原画、擦除与修复', 'Guard mode · painting, erasure and repair') : tr('创造模式 · 本局作画过程', 'Create mode · this run’s artwork')}</p></div>
                 <button id="replay-close" type="button">${tr('返回结算', 'Back to results')} · Esc</button>
             </div>
@@ -209,7 +209,7 @@ export class ArtReplayPlayer {
         ctx.clearRect(0, 0, 640, 360);
         ctx.save();
         ctx.scale(640 / drawing.width, 360 / drawing.height);
-        ctx.strokeStyle = '#f6d67a'; ctx.lineWidth = 5; ctx.lineCap = ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#eee4c8'; ctx.lineWidth = 5; ctx.lineCap = ctx.lineJoin = 'round';
         for (const stroke of drawing.strokes) {
             ctx.beginPath();
             stroke.forEach((point, i) => i === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y));

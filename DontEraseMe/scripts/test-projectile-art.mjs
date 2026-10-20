@@ -17,7 +17,7 @@ export {PlayerStats} from './src/components/PlayerStats';
 export {SkillVisual} from './src/components/SkillVisual';
 export {BulletFactory} from './src/entities/BulletFactory';
 export {RenderSystem} from './src/systems/RenderSystem';
-`,resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',loader:{'.png':'dataurl'},outfile:out});
+`,resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',loader:{'.png':'dataurl','.webp':'dataurl'},outfile:out});
 globalThis.localStorage={getItem:()=>null,setItem(){}};
 globalThis.Image=class{complete=true;naturalWidth=1536;naturalHeight=1024;};
 globalThis.window={addEventListener(){},innerWidth:1280,innerHeight:720,devicePixelRatio:1};

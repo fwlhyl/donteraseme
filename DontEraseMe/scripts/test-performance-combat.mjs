@@ -27,7 +27,7 @@ function replaceChecked(source, before, after) {
 }
 await Promise.all(['indexed', 'linear'].map(async mode => build({
     stdin: { contents: entry, resolveDir: process.cwd() }, bundle: true,
-    platform: 'node', format: 'esm', loader: { '.png': 'dataurl' },
+    platform: 'node', format: 'esm', loader: { '.png': 'dataurl', '.webp': 'dataurl' },
     outfile: join(directory, `${mode}.mjs`),
     plugins: [{ name: 'measured-broad-phases', setup(builder) {
         builder.onLoad({ filter: /\/CollisionSystem\.ts$/ }, async ({ path }) => {

@@ -49,11 +49,10 @@ export class MinimapSystem extends System {
         // Clear minimap
         this.ctx.clearRect(0, 0, this.width, this.height);
 
-        // A tiny paper map: a warm wash and intentionally uneven ink grid keep
-        // the in-run navigator in the same sketchbook vocabulary as the HUD.
-        this.ctx.fillStyle = '#ecdfbd';
+        // Dark-paper navigator. These colors are UI-only, never artwork colors.
+        this.ctx.fillStyle = '#252621';
         this.ctx.fillRect(0, 0, this.width, this.height);
-        this.ctx.strokeStyle = 'rgba(41, 39, 36, 0.18)';
+        this.ctx.strokeStyle = 'rgba(238, 228, 200, 0.025)';
         this.ctx.lineWidth = 1;
         this.ctx.beginPath();
         for (let x = 12; x < this.width; x += 24) {
@@ -67,15 +66,15 @@ export class MinimapSystem extends System {
         this.ctx.stroke();
 
         if(this.useCourtyard()) {
-            this.ctx.fillStyle='#b4b497';
+            this.ctx.fillStyle='#2c2d26';
             this.ctx.fillRect(0,0,this.width,this.height);
             this.ctx.beginPath();
             courtyard.points.forEach((p,i)=>{
                 if(i===0)this.ctx.moveTo(p.x*this.scaleX,p.y*this.scaleY);
                 else this.ctx.lineTo(p.x*this.scaleX,p.y*this.scaleY);
             });
-            this.ctx.closePath();this.ctx.fillStyle='#f8f1de';this.ctx.fill();
-            this.ctx.strokeStyle='#5e574c';this.ctx.stroke();
+            this.ctx.closePath();this.ctx.fillStyle='#252621';this.ctx.fill();
+            this.ctx.strokeStyle='#eee4c8';this.ctx.stroke();
         }
 
         // Draw entities as dots
@@ -91,8 +90,8 @@ export class MinimapSystem extends System {
             const mx = transform.x * this.scaleX;
             const my = transform.y * this.scaleY;
 
-            this.ctx.fillStyle = entity.tags.has('enemy') ? '#df7180' : '#438fc3';
-            this.ctx.strokeStyle = '#292724';
+            this.ctx.fillStyle = entity.tags.has('enemy') ? '#b74736' : '#eee4c8';
+            this.ctx.strokeStyle = '#eee4c8';
             this.ctx.lineWidth = 1;
             this.ctx.beginPath();
             
@@ -109,7 +108,7 @@ export class MinimapSystem extends System {
         }
 
         // Draw Camera Viewport Rect
-        this.ctx.strokeStyle = '#292724';
+        this.ctx.strokeStyle = 'rgba(238, 228, 200, 0.3)';
         this.ctx.lineWidth = 1.5;
         // Large monitors may show the entire small arena with negative camera
         // offsets; clip the viewport indicator to the actual world bounds.

@@ -26,12 +26,14 @@ import { ExperienceOrb } from '../components/ExperienceOrb';
 import { SkillVisual } from '../components/SkillVisual';
 import type { Entity } from '../core/Entity';
 import { CourtyardScene } from '../world/CourtyardScene';
+import { DrawingScene, drawingSceneBounds } from '../world/DrawingScene';
 import { sceneBounds, sceneCameraAxis } from '../world/SceneLayout';
 
 export class RenderSystem extends System {
     private tempCanvas: HTMLCanvasElement;
     private tempCtx: CanvasRenderingContext2D;
     private courtyardScene = new CourtyardScene();
+    private drawingScene = new DrawingScene();
     private doodleMotion = new WeakMap<Entity,DoodleMotion>();
     private skillMotion = new WeakMap<Entity,DoodleMotion>();
     private artTime = 0;
@@ -130,7 +132,8 @@ export class RenderSystem extends System {
 
                 // A viewport larger than the world centers the whole arena,
                 // including its painting. Negative offsets are intentional.
-                const bounds = sceneBounds(this.worldWidth, this.worldHeight, ruins ? 'ruins' : 'atelier');
+                const bounds = boundedDrawing ? drawingSceneBounds(this.worldWidth, this.worldHeight)
+                    : sceneBounds(this.worldWidth, this.worldHeight, ruins ? 'ruins' : 'atelier');
                 this.camera.x = sceneCameraAxis(t.x, viewport.width, this.worldWidth, -bounds.x);
                 this.camera.y = sceneCameraAxis(t.y, viewport.height, this.worldHeight, -bounds.y);
             }
@@ -138,7 +141,8 @@ export class RenderSystem extends System {
 
         // 2. Draw Background Grid
         this.courtyardScene.draw(this.camera,this.worldWidth,this.worldHeight,illustratedScene,ruins?'ruins':'atelier',this.artTime);
-        if(!illustratedScene) this.drawGrid(boundedDrawing);
+        this.drawingScene.draw(this.camera, this.worldWidth, this.worldHeight, boundedDrawing);
+        if(!illustratedScene && !boundedDrawing) this.drawGrid();
 
 
         this.ctx.save();
@@ -174,12 +178,12 @@ export class RenderSystem extends System {
 
         // Legacy scenery is only used in the story-mode prototype. Both released
         // modes render their illustrated environment beneath the artwork layers.
-        if(!illustratedScene) this.drawSketchbookSetDressing();
+        if(!illustratedScene && !boundedDrawing) this.drawSketchbookSetDressing();
         
         // Draw World Boundary
         this.ctx.strokeStyle = '#444';
         this.ctx.lineWidth = 5;
-        if(!illustratedScene) this.ctx.strokeRect(0, 0, this.worldWidth, this.worldHeight);
+        if(!illustratedScene && !boundedDrawing) this.ctx.strokeRect(0, 0, this.worldWidth, this.worldHeight);
 
         // The permanent trail bitmap already ends at the paper edge. Clip the
         // live layer too: long shots, wide brushes and particles must not hang

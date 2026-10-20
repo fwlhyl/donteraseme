@@ -1,0 +1,10 @@
+Use case: precise-object-edit.
+Asset: a single transparent 2D 64px-game-character concept, refined proportions.
+Input image 1 is the edit target: our Collector with detached hands and shoes. Keep the same character, colors, square glasses, stern gaze, small red scarf, dark hair, short paintbrush, three-quarter orientation, and independent hand/foot construction.
+Change ONLY these three proportional features:
+1. Reduce the ENTIRE head including hair, glasses, face uniformly to roughly 85% of its current size relative to the torso. Do not enlarge it back to fill space. Keep expression and compact one-tuft hairstyle. The head must be noticeably less dominant; do not return to full human anatomy.
+2. Make the torso firmer, straighter and slightly taller: one compact charcoal/slate block, almost straight sides, subtly broad shoulders, a flat bottom with clipped corners instead of round swollen belly. Absolutely NO clothing details, lapels, folds, chest panels, belts, buttons or armor.
+3. Replace the bulbous dome shoes with two LOW, FLAT wedge-shaped shoe blocks about half their current height, with flat soles and slightly squared toes. Bring both closer to the body. Keep a narrow clearly visible transparent gap between torso and shoes (about 1–2px when whole figure is 60px tall), and a clear gap between the two shoes.
+CRITICAL invariants: NO arms, NO elbows, NO sleeves, NO thighs, NO shins, NO trousers, NO ankles. Two small detached ivory mitten fists beside the body, one holding the short brush; two detached low shoes underneath. Do not connect limbs and do not change the weapon design. Keep the detached-piece design unified, not an exploded parts diagram.
+Visual style: simple firm hand-inked graphic outlines and broad restrained fills; charcoal, muted slate, warm ivory and small rusty-red accent only. Mature tough attitude rather than a plush toy. NO added ornament, texture speckles, shading panels, gradients, shiny rendering, or microdetail.
+One complete character centered, genuinely transparent background/alpha preserved; no floor, scene, cast shadow, text, watermarks, labels, UI or extra characters.

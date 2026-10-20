@@ -2,6 +2,7 @@ import { PlayerArtwork } from '../components/PlayerArtwork';
 import { drawAtlasFrame } from '../art/AtlasFrame';
 import { applyDoodlePose, drawDoodleAccent, type DoodlePose } from '../art/DoodleMotion';
 import { drawDoodleWeapon } from '../art/DoodleWeapons';
+import { drawPaperCollector } from '../art/PaperCollectorArt';
 import type { Weapon } from '../components/Weapon';
 
 /** Feet stay on the floor while the two legs alternate; the torso never sways. */
@@ -85,7 +86,9 @@ export function drawPlayerArtwork(
     if (pose) {
         ctx.fillStyle='#0c15294d';ctx.beginPath();ctx.ellipse(0,size*.44,size*.23*pose.shadowScale,size*.055,0,0,Math.PI*2);ctx.fill();
     }
-    if (artwork.articulated && artwork.frame) {
+    if (artwork.rig === 'paper-collector-v1') {
+        drawPaperCollector(ctx, artwork.image, size, artwork.facingLeft, aim, pose, weapon);
+    } else if (artwork.articulated && artwork.frame) {
         drawArticulatedPlayer(ctx, artwork, size, aim, pose, weapon);
     } else {
         ctx.save();

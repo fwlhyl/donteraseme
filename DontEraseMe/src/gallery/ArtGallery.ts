@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GalleryStore } from '../core/GalleryStore';
 import type { GalleryArtwork, GalleryMode } from '../core/GalleryStore';
+import { buildPaperGalleryRoom, createPaperGalleryFrame } from './PaperGalleryRoom';
 import './artGallery.css';
 
 const PAGE_SIZE = 10;
@@ -70,6 +71,7 @@ export class ArtGallery {
     private scene: THREE.Scene | null = null;
     private camera: THREE.PerspectiveCamera | null = null;
     private pageGroup: THREE.Group | null = null;
+    private releaseRoom: (() => void) | null = null;
     private raycaster = new THREE.Raycaster();
     private walls: WallArtwork[] = [];
     private keys = new Set<string>();
@@ -164,10 +166,11 @@ export class ArtGallery {
         root.setAttribute('aria-modal', 'true');
         root.setAttribute('aria-label', '我的画廊');
         root.tabIndex = -1;
+        root.dataset.theme = 'dark-paper';
         this.root = root;
         const header = element('header', 'gallery-header');
         const heading = element('div', 'gallery-heading');
-        heading.append(element('h1', '', '我的画廊'), element('span', '', '只收藏在这台设备 · 无敌人，无时间限制'));
+        heading.append(element('h1', '', '我的画廊'), element('span', '', '笔迹档案 / 本机收藏 · 无敌人，无时间限制'));
         const controls = element('div', 'gallery-header-actions');
         this.walkButton = this.button('进入漫游', () => { void this.requestPointer(); }, 'gallery-primary');
         this.walkButton.id = 'gallery-walk-btn';
@@ -214,28 +217,15 @@ export class ArtGallery {
             this.renderer.domElement.setAttribute('aria-hidden', 'true');
             this.stage!.append(this.renderer.domElement);
             this.scene = new THREE.Scene();
-            this.scene.background = new THREE.Color('#efe8d5');
             this.camera = new THREE.PerspectiveCamera(65, 1, 0.08, 60);
-            this.scene.add(new THREE.HemisphereLight('#ffffff', '#8b806c', 2.2));
-            const light = new THREE.DirectionalLight('#fff7e5', 1.8);
-            light.position.set(4, 6, 5);
-            this.scene.add(light);
-            this.box(ROOM_WIDTH, 0.2, ROOM_DEPTH, 0, -0.1, 0, '#d1c5aa');
-            this.box(ROOM_WIDTH + 0.4, 5, 0.2, 0, 2.5, -ROOM_DEPTH / 2, '#f8f3e5');
-            this.box(ROOM_WIDTH + 0.4, 5, 0.2, 0, 2.5, ROOM_DEPTH / 2, '#e5dfce');
-            this.box(0.2, 5, ROOM_DEPTH, -ROOM_WIDTH / 2, 2.5, 0, '#ece6d9');
-            this.box(0.2, 5, ROOM_DEPTH, ROOM_WIDTH / 2, 2.5, 0, '#ece6d9');
-            this.box(ROOM_WIDTH, 0.17, 0.12, 0, 0.09, -ROOM_DEPTH / 2 + 0.12, '#9e998d');
-            this.box(0.12, 0.17, ROOM_DEPTH, -ROOM_WIDTH / 2 + 0.12, 0.09, 0, '#9e998d');
-            this.box(0.12, 0.17, ROOM_DEPTH, ROOM_WIDTH / 2 - 0.12, 0.09, 0, '#9e998d');
-            const floorLines = new THREE.GridHelper(20, 10, '#b6aa90', '#b6aa90');
-            floorLines.scale.z = 0.9;
-            floorLines.position.y = 0.005;
-            this.scene.add(floorLines);
-            const title = this.label('DONT ERASE ME  /  我的画廊', 6.5, 0.72, '#f4ead2');
+            this.releaseRoom = buildPaperGalleryRoom(this.scene, ROOM_WIDTH, ROOM_DEPTH, this.renderer.capabilities.getMaxAnisotropy());
+            const title = this.label('DONT ERASE ME  /  笔迹档案', 6.5, 0.72);
             title.rotation.y = Math.PI;
             title.position.set(0, 3.0, ROOM_DEPTH / 2 - 0.14);
             this.scene.add(title);
+            const archive = this.label('ARCHIVE  /  留下的每一笔', 5.2, 0.55);
+            archive.position.set(0, 4.35, -ROOM_DEPTH / 2 + 0.14);
+            this.scene.add(archive);
             this.pageGroup = new THREE.Group();
             this.scene.add(this.pageGroup);
             this.fallbackReason = '';
@@ -247,20 +237,19 @@ export class ArtGallery {
         }
     }
 
-    private box(w: number, h: number, d: number, x: number, y: number, z: number, color: string): void {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color }));
-        mesh.position.set(x, y, z);
-        this.scene!.add(mesh);
-    }
-
-    private label(text: string, width: number, height: number, background = '#faf5e9'): THREE.Mesh {
+    private label(text: string, width: number, height: number, background = '#252621'): THREE.Mesh {
         const canvas = document.createElement('canvas');
         canvas.width = 1024;
         canvas.height = 128;
         const context = canvas.getContext('2d')!;
         context.fillStyle = background;
         context.fillRect(0, 0, canvas.width, canvas.height);
-        context.fillStyle = '#35332f';
+        context.fillStyle = '#777463';
+        context.fillRect(30, 20, 964, 1);
+        context.fillRect(30, 107, 964, 1);
+        context.fillStyle = '#a54836';
+        context.fillRect(30, 107, 74, 3);
+        context.fillStyle = '#e4dabe';
         context.font = '36px system-ui, sans-serif';
         context.textAlign = 'center';
         context.textBaseline = 'middle';
@@ -360,8 +349,10 @@ export class ArtGallery {
         const group = new THREE.Group();
         group.position.set(slot.x, 2.25, slot.z);
         group.rotation.y = slot.rotation;
-        const frame = new THREE.Mesh(new THREE.BoxGeometry(width + 0.18, height + 0.18, 0.1), new THREE.MeshLambertMaterial({ color: artwork ? '#453e34' : '#c5bda9' }));
-        const paper = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ color: '#fffdf5' }));
+        const frame = createPaperGalleryFrame(width, height, Boolean(artwork));
+        // White here is a neutral texture multiplier, not a UI colour: saved
+        // paintings must retain every original channel under the dark theme.
+        const paper = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ color: artwork ? '#ffffff' : '#303229' }));
         paper.position.z = 0.057;
         group.add(frame, paper);
         const title = this.label(artwork ? `${number}. ${artwork.name}` : '留给下一幅作品', 3.5, 0.32);
@@ -676,6 +667,8 @@ export class ArtGallery {
     }
 
     private disposeRenderer(): void {
+        this.releaseRoom?.();
+        this.releaseRoom = null;
         if (this.scene) releaseTree(this.scene);
         this.pageGroup = null;
         this.scene = null;

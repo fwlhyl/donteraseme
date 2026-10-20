@@ -27,9 +27,10 @@ export class HealthHud {
     private previous = -1; private actor = ''; private flash = 0;
     constructor(public readonly root: HTMLElement) {
         root.className = 'hud-paper health-card';
-        root.innerHTML = `<div class="hud-card-heading"><span data-hud="status">生命 / VITALITY</span><b data-hud="level"></b></div>
-            <div class="hud-health-row"><div class="heart-seal">${hudIcon('heart')}</div><div class="hud-health-body"><strong data-hud="value"></strong>${track('health')}</div></div>
-            <div class="hud-xp-row"><span>XP</span>${track('xp', 'xp-meter')}</div><small data-hud="shield" class="shield-note" hidden></small>`;
+        root.innerHTML = `<div class="hud-health-row"><span data-hud="status">生命</span><strong data-hud="value"></strong></div>
+            ${track('health')}
+            <div class="hud-xp-row"><b data-hud="level"></b>${track('xp', 'xp-meter')}</div>
+            <small data-hud="shield" class="shield-note" hidden></small>`;
         this.value = find(root,'value'); this.level = find(root,'level'); this.bar = find(root,'health');
         this.xp = find(root,'xp'); this.shield = find(root,'shield'); this.status = find(root,'status');
     }
@@ -60,9 +61,10 @@ export class WeaponHud {
     private iconKey = ''; private slotCount = -1;
     constructor(public readonly root: HTMLElement) {
         root.className = 'hud-paper weapon-card';
-        root.innerHTML = `<div class="hud-card-heading"><span data-hud="caption"></span><small data-hud="status"></small></div>
-            <div class="hud-weapon-row"><div class="weapon-stamp" data-hud="icon"></div><div class="hud-weapon-body"><b data-hud="name"></b><strong data-hud="count"></strong></div></div>
-            <div class="ammo-pips" data-hud="pips" aria-hidden="true"></div>${track('reload','reload-meter')}`;
+        root.innerHTML = `<div class="weapon-stamp" data-hud="icon"></div>
+            <div class="hud-weapon-body"><div class="hud-weapon-heading"><b data-hud="name"></b><strong data-hud="count"></strong></div>
+                <div class="ammo-pips" data-hud="pips" aria-hidden="true"></div>${track('reload','reload-meter')}
+                <div class="hud-card-heading"><span data-hud="caption"></span><small data-hud="status"></small></div></div>`;
         this.icon = find(root,'icon'); this.name = find(root,'name'); this.count = find(root,'count');
         this.status = find(root,'status'); this.pips = find(root,'pips'); this.bar = find(root,'reload'); this.caption = find(root,'caption');
     }
@@ -88,6 +90,27 @@ export class WeaponHud {
     }
 }
 
+/** Read-only inspiration display; charging and piloting remain owned by MagicPenSystem. */
+export class MagicHud {
+    private label: HTMLElement; private count: HTMLElement; private bar: HTMLElement; private status: HTMLElement;
+    constructor(public readonly root: HTMLElement) {
+        root.innerHTML = `<div class="hud-magic-stamp">${hudIcon('brush')}</div>
+            <div class="hud-magic-readout"><div class="hud-magic-heading"><kbd>G</kbd><span data-hud="label"></span><strong data-hud="count"></strong></div>
+            ${track('inspiration', 'hud-magic-meter')}<small class="hud-magic-status" data-hud="status" hidden></small></div>`;
+        this.label = find(root, 'label'); this.count = find(root, 'count');
+        this.bar = find(root, 'inspiration'); this.status = find(root, 'status');
+    }
+    update(progress: number, maximum: number, piloting: boolean, zh: boolean) {
+        const ready = !piloting && progress >= maximum;
+        text(this.label, zh ? '神笔' : 'Magic Ink');
+        text(this.count, `${progress} / ${maximum}`);
+        text(this.status, piloting ? (zh ? '驾驶中' : 'Piloting') : ready ? (zh ? '就绪 · 按 G 描绘' : 'Ready · press G') : '');
+        this.status.hidden = !piloting && !ready;
+        meter(this.bar, hudRatio(progress, maximum), zh ? '神笔灵感' : 'Inspiration');
+        this.root.dataset.ready = String(ready);
+    }
+}
+
 export function mountDefenseHud(root: HTMLElement) {
     root.classList.add('hud-paper', 'guard-card');
     // The old HTML's inline dimensions must not defeat responsive HUD rules.
@@ -110,8 +133,8 @@ export function updateDefenseHud(root: HTMLElement, data: { name: string; integr
     meter(el('painting-integrity-meter'), ratio, data.zh ? '画作完整度' : 'Artwork integrity');
     // Preserve this public element/width for existing UI consumers.
     el('painting-integrity-fill').style.width = `${percent}%`;
-    text(el('guard-condition'), state === 'critical' ? (data.zh ? '！濒临损毁' : '! CRITICAL')
-        : state === 'worn' ? (data.zh ? '／需要修复' : '/ DAMAGED') : (data.zh ? '◇ 画作完好' : '◇ INTACT'));
+    text(el('guard-condition'), state === 'critical' ? (data.zh ? '濒临损毁' : 'CRITICAL')
+        : state === 'worn' ? (data.zh ? '需要修复' : 'DAMAGED') : (data.zh ? '画作完好' : 'INTACT'));
     const seconds = Math.max(0, Math.ceil(data.remaining));
     text(el('guard-time'), `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`);
     text(el('painting-alert'), data.attackers > 0 ? (data.zh ? `！${data.attackers} 个橡皮擦正在擦画` : `! ${data.attackers} erasers attacking`)

@@ -89,7 +89,7 @@ export class DefenseArtworkPicker {
             name.textContent = artwork.name;
             const caption = document.createElement('span');
             caption.className = 'defense-art-caption';
-            caption.textContent = selected ? '✓ 本局守卫这幅画' : artwork.id === BUILT_IN_ARTWORK.id ? '内置画作 · 免费' : '已保存在本机';
+            caption.textContent = selected ? '本局守卫这幅画' : artwork.id === BUILT_IN_ARTWORK.id ? '内置画作 · 免费' : '已保存在本机';
             select.append(thumbnail, name, caption);
             select.addEventListener('click', () => this.selectArtwork(artwork));
             card.append(select);
@@ -147,7 +147,7 @@ export class DefenseArtworkPicker {
         modal.className = 'defense-art-import-modal';
         modal.innerHTML = `
             <section class="defense-art-dialog" role="dialog" aria-modal="true" aria-labelledby="defense-art-dialog-title" aria-describedby="defense-art-import-help">
-                <div class="defense-art-dialog-heading"><h2 id="defense-art-dialog-title">把图片变成要守护的画</h2><button id="defense-art-close" type="button" aria-label="关闭导入">✕</button></div>
+                <div class="defense-art-dialog-heading"><h2 id="defense-art-dialog-title">导入守卫画作</h2><button id="defense-art-close" type="button" aria-label="关闭导入">关闭</button></div>
                 <p id="defense-art-import-help">PNG / JPG / WebP，最多 20 MB。只在本机处理，不上传图片；保存的是可擦除、可修复的彩色线稿，不是照片或整块颜色填充。</p>
                 <div class="defense-art-file-row"><label for="defense-image-file">选择图片</label><input id="defense-image-file" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"></div>
                 <div class="defense-art-preview-columns">
@@ -400,7 +400,7 @@ export class DefenseArtworkPicker {
         ctx.rect(0, 0, canvas.width, canvas.height);
         ctx.rect(x, y, width, height);
         ctx.fill('evenodd');
-        ctx.strokeStyle = '#15c4b3';
+        ctx.strokeStyle = '#eee4c8';
         ctx.lineWidth = Math.max(2, canvas.width / 260);
         ctx.setLineDash([ctx.lineWidth * 3, ctx.lineWidth * 2]);
         ctx.strokeRect(x, y, width, height);

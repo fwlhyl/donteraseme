@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 
 const file = join(await mkdtemp(join(tmpdir(), 'combat-hud-')), 'hud.mjs');
 await build({ entryPoints: ['src/ui/CombatHud.ts'], bundle: true, platform: 'node', format: 'esm', outfile: file });
-const { hudRatio, ammoModel, integrityState, HealthHud, WeaponHud, mountDefenseHud, updateDefenseHud } = await import(pathToFileURL(file));
+const { hudRatio, ammoModel, integrityState, HealthHud, WeaponHud, MagicHud, mountDefenseHud, updateDefenseHud } = await import(pathToFileURL(file));
 assert.equal(hudRatio(-20, 100), 0); assert.equal(hudRatio(110, 100), 1);
 assert.equal(hudRatio(20, 0), 0); assert.equal(hudRatio(NaN, 100), 0);
 assert.equal(ammoModel(9999, 9999, true).slots, 0);
@@ -52,6 +52,19 @@ weapon.update({ ...brush, key: 'unarmed' }); assert.equal(part(weaponRoot, 'coun
 weapon.update(brush); assert.equal(part(weaponRoot, 'pips').children.length, 12);
 assert.equal(part(weaponRoot, 'reload').hidden, true);
 
+const magicRoot = new Element(), magic = new MagicHud(magicRoot);
+magic.update(32, 45, false, true);
+assert.equal(part(magicRoot, 'count').textContent, '32 / 45');
+assert.equal(part(magicRoot, 'inspiration').style['--fill'], '71%');
+assert.equal(part(magicRoot, 'status').hidden, true);
+magic.update(45, 45, false, true);
+assert.equal(magicRoot.dataset.ready, 'true');
+assert.equal(part(magicRoot, 'status').textContent, '就绪 · 按 G 描绘');
+magic.update(0, 45, true, false);
+assert.equal(magicRoot.dataset.ready, 'false');
+assert.equal(part(magicRoot, 'status').textContent, 'Piloting');
+assert.equal(part(magicRoot, 'status').hidden, false);
+
 const guard = new Element(); mountDefenseHud(guard);
 updateDefenseHud(guard, { name: '<img onerror=alert(1)>', integrity: .2, attackers: 3, remaining: 65.1, zh: true });
 assert.equal(guard.dataset.state, 'critical'); assert.equal(guard.dataset.attacked, 'true');
@@ -61,5 +74,5 @@ assert.equal(guard.querySelector('#painting-integrity-fill').style.width, '20%')
 updateDefenseHud(guard, { name: 'Flower', integrity: 1, attackers: 0, remaining: -2, zh: false });
 assert.equal(guard.dataset.state, 'safe'); assert.equal(guard.dataset.attacked, 'false');
 assert.equal(guard.querySelector('#guard-time').textContent, '0:00');
-assert.equal(guard.querySelector('#guard-condition').textContent, '◇ INTACT');
+assert.equal(guard.querySelector('#guard-condition').textContent, 'INTACT');
 console.log('PASS: health/XP, hit reset, shields, grouped ammo, reload, melee, vehicle/unarmed transitions, integrity states, timer, repair recovery and safe artwork names.');

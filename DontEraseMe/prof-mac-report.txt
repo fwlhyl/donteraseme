@@ -1,0 +1,268 @@
+# Mac 性能测试报告 2026-10-15 19:16:13
+
+==================== 场景1：敌潮 300 敌 30s（基础压力） ====================
+[prof] 场景: 敌潮=300 敌人 / CPU×1 / 30s
+
+=== 帧统计 ===
+fps≈34  帧均 29.75ms  p95 66.7ms  >16.7ms 653 帧(64.7%)  >33.4ms 277 帧
+系统合计 2.85ms/帧  →  帧内缺口（消隐+栅格+合成+其他）26.89ms/帧
+消隐 fillRect: 857 次 / 均 0ms  |  gameCtx clearRect: 均 0.01ms
+loop 真实执行: 均 3.17ms  max 182.9ms  卡帧(>8ms) 8 次  |  dpr=1 采样率≈34Hz
+StrokeLog: 24845 事件 / 3.25 MiB
+
+=== 每系统耗时（avg 降序，单位 ms/帧）===
+name                              avg      p95      max    count
+RenderSystem                    1.263      1.7      2.1      838
+CollisionSystem                 0.723      1.1        2      839
+MovementSystem                  0.268      0.5      2.6      839
+EnemySystem                     0.123      0.2      0.8      839
+DamageTextSystem                0.079      0.2      2.3      838
+MinimapSystem                   0.067      0.2      0.4      838
+UISystem                        0.062      0.2      0.2      838
+CourtyardBoundarySystem         0.061      0.1      0.6     1677
+WeaponSystem                     0.04      0.1      2.5      839
+SummonSystem                    0.034      0.1      0.2      838
+MagicPenSystem                   0.03      0.1      0.2      838
+InputSystem                     0.024      0.1      1.1      839
+SkillSystem                     0.015      0.1      0.2      839
+ParticleSystem                  0.012      0.1      0.1      839
+TrailSystem                     0.009      0.1      0.1      839
+WaveSystem                      0.008      0.1      0.1      839
+SkeletonSystem                  0.008      0.1      0.2      839
+LevelSystem                     0.008        0      2.7      839
+ObjectiveSystem                 0.007      0.1      0.1      839
+GraffitiSystem                  0.005      0.1      0.2      838
+PrologueSystem                  0.003        0      0.1      838
+QuestSystem                     0.003        0      0.1      838
+
+=== 每 2s 实体采样（t=秒 enemies/bullets/particles/xp, heap MB）===
+t=  0  敌1 弹0 粒0 珠0  heap 10MB
+t=  2  敌100 弹13 粒0 珠0  heap 12MB
+t=  4  敌198 弹32 粒0 珠0  heap 12MB
+t=  6  敌300 弹57 粒0 珠0  heap 13MB
+t=  8  敌303 弹75 粒0 珠0  heap 12MB
+t= 10  敌306 弹78 粒0 珠0  heap 12MB
+t= 12  敌306 弹84 粒0 珠0  heap 12MB
+t= 14  敌322 弹95 粒0 珠0  heap 13MB
+t= 16  敌324 弹109 粒0 珠0  heap 17MB
+t= 18  敌326 弹116 粒0 珠0  heap 14MB
+t= 20  敌334 弹120 粒0 珠0  heap 17MB
+t= 22  敌348 弹123 粒0 珠0  heap 16MB
+t= 24  敌354 弹139 粒0 珠0  heap 16MB
+t= 26  敌372 弹142 粒0 珠0  heap 15MB
+t= 28  敌386 弹155 粒0 珠0  heap 20MB
+t= 30  敌392 弹144 粒0 珠0  heap 23MB
+
+==================== 场景2：笔迹洪流 6000 笔迹 30s（笔迹压力） ====================
+[prof] 场景: 敌潮=0 敌人 / CPU×1 / 30s
+
+=== 帧统计 ===
+fps≈60  帧均 16.77ms  p95 17.3ms  >16.7ms 697 帧(39%)  >33.4ms 3 帧
+系统合计 0.86ms/帧  →  帧内缺口（消隐+栅格+合成+其他）15.91ms/帧
+消隐 fillRect: 1805 次 / 均 0.01ms  |  gameCtx clearRect: 均 0.01ms
+loop 真实执行: 均 1.25ms  max 11.3ms  卡帧(>8ms) 1 次  |  dpr=1 采样率≈60Hz
+StrokeLog: 34805 事件 / 4.5 MiB
+
+=== 每系统耗时（avg 降序，单位 ms/帧）===
+name                              avg      p95      max    count
+RenderSystem                    0.369      0.7      1.6     1788
+DamageTextSystem                 0.13      0.4      0.9     1788
+UISystem                        0.103      0.2      0.4     1788
+MagicPenSystem                   0.04      0.1      0.2     1788
+MovementSystem                  0.034      0.1      0.2     1788
+MinimapSystem                   0.031      0.1      0.2     1788
+WeaponSystem                     0.03      0.1      1.9     1788
+CollisionSystem                 0.029      0.1      0.9     1788
+InputSystem                     0.024      0.1      0.2     1788
+SummonSystem                    0.013      0.1      0.2     1788
+EnemySystem                     0.007      0.1      0.2     1788
+SkillSystem                     0.007      0.1      0.1     1788
+ParticleSystem                  0.007      0.1      0.1     1788
+PrologueSystem                  0.007      0.1      0.1     1788
+WaveSystem                      0.006      0.1      0.3     1788
+ObjectiveSystem                 0.006      0.1      0.2     1788
+SkeletonSystem                  0.005        0      0.1     1788
+CourtyardBoundarySystem         0.005      0.1      0.1     3576
+GraffitiSystem                  0.004        0      0.1     1788
+TrailSystem                     0.003        0      0.2     1788
+LevelSystem                     0.002        0      0.1     1788
+QuestSystem                     0.002        0      0.1     1788
+
+=== 每 2s 实体采样（t=秒 enemies/bullets/particles/xp, heap MB）===
+t=  0  敌1 弹0 粒0 珠0  heap 10MB
+t=  2  敌2 弹3 粒0 珠0  heap 11MB
+t=  4  敌2 弹3 粒0 珠0  heap 12MB
+t=  6  敌2 弹2 粒0 珠0  heap 11MB
+t=  8  敌1 弹3 粒0 珠0  heap 11MB
+t= 10  敌1 弹1 粒0 珠0  heap 12MB
+t= 12  敌2 弹3 粒0 珠0  heap 12MB
+t= 14  敌2 弹3 粒0 珠0  heap 13MB
+t= 16  敌1 弹3 粒0 珠0  heap 13MB
+t= 18  敌1 弹3 粒0 珠0  heap 14MB
+t= 20  敌1 弹1 粒0 珠0  heap 13MB
+t= 22  敌1 弹2 粒0 珠0  heap 14MB
+t= 24  敌2 弹2 粒0 珠0  heap 15MB
+t= 26  敌2 弹2 粒0 珠0  heap 15MB
+t= 28  敌2 弹3 粒0 珠0  heap 15MB
+t= 30  敌4 弹2 粒0 珠0  heap 15MB
+
+==================== 场景3：敌潮 300 敌 + CPU×4 30s（模拟降频） ====================
+[prof] 场景: 敌潮=300 敌人 / CPU×4 / 30s
+
+=== 帧统计 ===
+fps≈49  帧均 20.21ms  p95 34.1ms  >16.7ms 845 帧(56.9%)  >33.4ms 127 帧
+系统合计 5.85ms/帧  →  帧内缺口（消隐+栅格+合成+其他）14.36ms/帧
+消隐 fillRect: 641 次 / 均 0ms  |  gameCtx clearRect: 均 0.01ms
+loop 真实执行: 均 2.68ms  max 118.8ms  卡帧(>8ms) 175 次  |  dpr=1 采样率≈49Hz
+StrokeLog: 21148 事件 / 2.75 MiB
+
+=== 每系统耗时（avg 降序，单位 ms/帧）===
+name                              avg      p95      max    count
+RenderSystem                    2.688      4.3      6.5      629
+CollisionSystem                 1.289      2.6      6.5      630
+MovementSystem                   0.45      1.1      1.7      630
+EnemySystem                     0.322      0.8      1.2      630
+DamageTextSystem                0.196      0.7      1.5      629
+CourtyardBoundarySystem         0.171      0.7      0.9     1259
+MinimapSystem                   0.159      0.7      0.9      629
+UISystem                        0.158      0.7      0.9      629
+SummonSystem                    0.075      0.6        1      629
+MagicPenSystem                  0.073      0.6      0.9      629
+WeaponSystem                     0.07      0.5      1.9      630
+InputSystem                     0.032      0.2      0.8      630
+ParticleSystem                  0.026      0.1      0.8      630
+ObjectiveSystem                 0.024      0.1      0.8      630
+SkeletonSystem                  0.023      0.1      0.8      630
+WaveSystem                      0.021      0.1      0.8      630
+SkillSystem                      0.02      0.1      0.8      630
+TrailSystem                     0.015      0.1      0.7      630
+LevelSystem                     0.011        0      1.8      630
+QuestSystem                     0.009        0      0.8      629
+GraffitiSystem                  0.008        0      0.7      629
+PrologueSystem                  0.006        0      0.7      629
+
+=== 每 2s 实体采样（t=秒 enemies/bullets/particles/xp, heap MB）===
+t=  0  敌1 弹0 粒0 珠0  heap 10MB
+t=  2  敌95 弹12 粒0 珠0  heap 10MB
+t=  4  敌192 弹35 粒0 珠0  heap 14MB
+t=  6  敌297 弹59 粒0 珠0  heap 12MB
+t=  8  敌308 弹82 粒0 珠0  heap 14MB
+t= 10  敌322 弹96 粒0 珠0  heap 17MB
+t= 12  敌336 弹112 粒0 珠0  heap 20MB
+t= 14  敌336 弹112 粒0 珠0  heap 17MB
+t= 16  敌340 弹113 粒0 珠0  heap 15MB
+t= 18  敌340 弹113 粒0 珠0  heap 15MB
+t= 20  敌340 弹113 粒0 珠0  heap 15MB
+t= 22  敌340 弹113 粒0 珠0  heap 16MB
+t= 24  敌340 弹113 粒0 珠0  heap 16MB
+t= 26  敌340 弹113 粒0 珠0  heap 16MB
+t= 28  敌340 弹113 粒0 珠0  heap 16MB
+t= 30  敌346 弹115 粒0 珠0  heap 15MB
+
+==================== 场景4：敌潮 300 敌 + 关闭每帧clip 30s（第二轮优化回归实验） ====================
+[prof] 场景: 敌潮=300 敌人 / CPU×1 / 30s
+
+=== 帧统计 ===
+fps≈31  帧均 32.13ms  p95 83.3ms  >16.7ms 566 帧(60.6%)  >33.4ms 278 帧
+系统合计 2.48ms/帧  →  帧内缺口（消隐+栅格+合成+其他）29.66ms/帧
+消隐 fillRect: 701 次 / 均 0ms  |  gameCtx clearRect: 均 0.01ms
+loop 真实执行: 均 3.08ms  max 220.9ms  卡帧(>8ms) 10 次  |  dpr=1 采样率≈31Hz
+StrokeLog: 23154 事件 / 3 MiB
+
+=== 每系统耗时（avg 降序，单位 ms/帧）===
+name                              avg      p95      max    count
+RenderSystem                    1.126      1.7        4      681
+CollisionSystem                 0.567      1.2        4      683
+MovementSystem                  0.212      0.5      1.8      683
+EnemySystem                     0.127      0.2        1      683
+DamageTextSystem                0.067      0.2      0.5      681
+MinimapSystem                   0.064      0.1      0.2      681
+UISystem                        0.062      0.1      0.3      681
+CourtyardBoundarySystem         0.055      0.1      0.2     1364
+WeaponSystem                    0.034      0.1      1.5      683
+SummonSystem                    0.034      0.1      0.2      681
+MagicPenSystem                  0.032      0.1      0.2      681
+InputSystem                     0.023      0.1      0.2      683
+SkillSystem                     0.013      0.1      0.1      683
+ParticleSystem                  0.013      0.1      0.1      683
+SkeletonSystem                   0.01      0.1      0.1      683
+WaveSystem                      0.009      0.1      0.1      683
+ObjectiveSystem                 0.008      0.1      0.1      683
+TrailSystem                     0.007      0.1      0.1      683
+LevelSystem                     0.005        0      0.4      683
+PrologueSystem                  0.003        0      0.1      681
+GraffitiSystem                  0.003        0      0.1      681
+QuestSystem                     0.002        0      0.1      681
+
+=== 每 2s 实体采样（t=秒 enemies/bullets/particles/xp, heap MB）===
+t=  0  敌1 弹0 粒0 珠0  heap 11MB
+t=  2  敌102 弹11 粒0 珠0  heap 11MB
+t=  4  敌203 弹30 粒0 珠0  heap 10MB
+t=  6  敌298 弹65 粒0 珠0  heap 13MB
+t=  8  敌304 弹73 粒0 珠0  heap 14MB
+t= 10  敌304 弹73 粒0 珠0  heap 15MB
+t= 12  敌318 弹88 粒0 珠0  heap 12MB
+t= 14  敌322 弹102 粒0 珠0  heap 17MB
+t= 16  敌334 弹117 粒0 珠0  heap 18MB
+t= 18  敌342 弹124 粒0 珠0  heap 15MB
+t= 20  敌346 弹131 粒0 珠0  heap 18MB
+t= 22  敌351 弹135 粒0 珠0  heap 15MB
+t= 24  敌349 弹137 粒0 珠0  heap 16MB
+t= 26  敌354 弹143 粒0 珠0  heap 16MB
+t= 28  敌357 弹148 粒0 珠0  heap 15MB
+t= 30  敌359 弹148 粒0 珠0  heap 17MB
+
+==================== 场景5：敌潮 300 敌 + 关闭全画布消隐 30s（消隐开销实验） ====================
+[prof] 场景: 敌潮=300 敌人 / CPU×1 / 30s
+
+=== 帧统计 ===
+fps≈32  帧均 31.12ms  p95 66.7ms  >16.7ms 591 帧(61.3%)  >33.4ms 286 帧
+系统合计 2.45ms/帧  →  帧内缺口（消隐+栅格+合成+其他）28.67ms/帧
+消隐 fillRect: 694 次 / 均 0ms  |  gameCtx clearRect: 均 0.01ms
+loop 真实执行: 均 2.69ms  max 200.9ms  卡帧(>8ms) 7 次  |  dpr=1 采样率≈32Hz
+StrokeLog: 19035 事件 / 2.5 MiB
+
+=== 每系统耗时（avg 降序，单位 ms/帧）===
+name                              avg      p95      max    count
+RenderSystem                    1.137      1.8      2.7      673
+CollisionSystem                 0.559      1.2      2.2      675
+MovementSystem                  0.215      0.5      1.1      675
+EnemySystem                     0.109      0.2      0.7      675
+DamageTextSystem                0.082      0.3      0.6      673
+MinimapSystem                   0.062      0.2      0.2      673
+UISystem                         0.06      0.2      0.3      673
+CourtyardBoundarySystem         0.053      0.1      0.2     1348
+WeaponSystem                    0.031      0.1      1.6      675
+MagicPenSystem                   0.03      0.1      0.2      673
+SummonSystem                    0.028      0.1      0.2      673
+InputSystem                     0.018      0.1      0.1      675
+SkillSystem                     0.012      0.1      0.1      675
+ParticleSystem                   0.01      0.1      0.1      675
+ObjectiveSystem                  0.01      0.1      0.2      675
+WaveSystem                      0.009      0.1      0.1      675
+SkeletonSystem                  0.009      0.1      0.1      675
+TrailSystem                     0.006      0.1      0.1      675
+LevelSystem                     0.004        0      0.6      675
+QuestSystem                     0.003        0      0.1      673
+GraffitiSystem                  0.003        0      0.1      673
+PrologueSystem                  0.002        0      0.1      673
+
+=== 每 2s 实体采样（t=秒 enemies/bullets/particles/xp, heap MB）===
+t=  0  敌1 弹0 粒0 珠0  heap 10MB
+t=  2  敌94 弹15 粒0 珠0  heap 10MB
+t=  4  敌195 弹37 粒0 珠0  heap 12MB
+t=  6  敌293 弹57 粒0 珠0  heap 11MB
+t=  8  敌301 弹75 粒0 珠0  heap 11MB
+t= 10  敌307 弹86 粒0 珠0  heap 17MB
+t= 12  敌306 弹86 粒0 珠0  heap 12MB
+t= 14  敌306 弹86 粒0 珠0  heap 15MB
+t= 16  敌310 弹100 粒0 珠0  heap 18MB
+t= 18  敌320 弹115 粒0 珠0  heap 18MB
+t= 20  敌323 弹120 粒0 珠0  heap 17MB
+t= 22  敌331 弹121 粒0 珠0  heap 13MB
+t= 24  敌332 弹128 粒0 珠0  heap 13MB
+t= 26  敌339 弹135 粒0 珠0  heap 14MB
+t= 28  敌346 弹139 粒0 珠0  heap 16MB
+t= 30  敌345 弹139 粒0 珠0  heap 16MB
+
+==================== 全部完成 ====================

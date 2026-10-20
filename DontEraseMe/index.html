@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dont Erase Me! - 涂鸦战士</title>
+    <title>Dont Erase Me — 笔迹与擦除</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #222; color: white; font-family: Arial, sans-serif; touch-action: none; }
+        body { margin: 0; overflow: hidden; background-color: #252621; color: #eee4c8; font-family: system-ui, sans-serif; touch-action: none; }
         canvas { display: block; position: absolute; top: 0; left: 0; }
         #paintingCanvas { pointer-events: none; z-index: 0; }
         #trailCanvas { pointer-events: none; z-index: 1; }
@@ -15,55 +15,63 @@
     </style>
 </head>
 <body>
-    <div id="pause-btn" style="position: absolute; top: 10px; left: 10px; z-index: 100; font-size: 30px; cursor: pointer; display: none;">⚙️</div>
+    <button id="pause-btn" type="button" aria-label="暂停与设置" title="暂停与设置" style="display: none;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-width="3"/></svg></button>
 
     <div id="pause-menu" class="overlay" style="display: none;">
-        <h2 class="title">PAUSED</h2>
+        <p class="eyebrow">HOLD THE LINE</p>
+        <h2 class="title">暂停</h2>
         
         <div class="setting-group" style="margin-bottom: 20px;">
-            <label>Brush Color</label>
+            <label>笔迹颜色</label>
             <div id="color-palette" style="display: flex; gap: 10px; margin-top: 5px;">
                 <!-- Colors injected by JS -->
             </div>
         </div>
 
         <div class="setting-group" style="margin-bottom: 20px;">
-            <label>Trail Opacity: <span id="alpha-val">20%</span></label>
+            <label>笔迹浓度：<span id="alpha-val">20%</span></label>
             <input type="range" id="setting-alpha" min="1" max="100" value="20" style="width: 100%;">
         </div>
 
         <div class="setting-group" style="margin-bottom: 20px;">
             <label>
                 <input type="checkbox" id="setting-damage-numbers" checked style="margin-right: 10px;">
-                Show Damage Numbers
+                显示伤害数值
             </label>
         </div>
 
         <div class="setting-group" style="margin-bottom: 20px;">
             <label>
                 <input type="checkbox" id="setting-auto-attack" style="margin-right: 10px;">
-                自动攻击 (Auto Attack)
+                自动攻击
             </label>
         </div>
 
-        <button id="resume-btn" class="btn">Resume</button>
+        <button id="resume-btn" class="btn btn-primary">继续战斗</button>
     </div>
 
     <div id="main-menu" class="overlay">
-        <h1 class="title">Dont Erase Me!</h1>
-        <p class="subtitle">A Creative Shooter Experience</p>
-        
-        <div class="new-mode-menu">
-            <button id="create-mode-btn" class="btn" aria-label="选择创造模式"><span>✦ 创造模式</span><small>从空白画布开始，在战斗中创作</small></button>
-            <button id="defense-mode-btn" class="btn" aria-label="选择守卫模式"><span>🛡 守卫模式</span><small>守住原画，抵御擦除并留下新痕迹</small></button>
-            <button id="drawing-mode-btn" class="btn" aria-label="进入纯画画模式"><span>✎ 纯画画模式</span><small>收藏家 · 已解锁画笔 · 20 分钟自由创作</small></button>
-            <button id="gallery-btn" class="btn" aria-label="进入我的画廊"><span>▣ 我的画廊</span><small>第一人称 3D 展厅，收藏与欣赏你的作品</small></button>
+        <div class="menu-stage">
+            <header class="menu-identity sr-only">
+                <h1>DON’T ERASE ME</h1>
+                <p>笔迹与擦除</p>
+            </header>
+            <nav class="menu-paths" aria-label="游戏模式">
+                <div class="new-mode-menu">
+                    <button id="create-mode-btn" class="btn mode-entry" aria-label="选择创造模式"><span>创造模式</span></button>
+                    <button id="defense-mode-btn" class="btn mode-entry" aria-label="选择守卫模式"><span>守卫模式</span></button>
+                    <button id="drawing-mode-btn" class="btn mode-entry" aria-label="进入纯画画模式"><span>纯画画模式</span></button>
+                    <button id="gallery-btn" class="btn mode-entry" aria-label="进入我的画廊"><span>我的画廊</span></button>
+                </div>
+            </nav>
+            <footer class="menu-footer">
+                <p class="controls-hint">WASD 移动 <span>·</span> 鼠标瞄准 <span>·</span> ESC 暂停</p>
+                <div>
+                    <button id="settings-btn" class="btn btn-quiet"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M12 5h8l1 4 4 2 3 3-3 4-1 5-4 1-3 4-4-3-5-1-1-4-4-3 3-4 1-5 4-1Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="4" fill="none" stroke="currentColor" stroke-width="2"/></svg><span data-ui-label>设置</span></button>
+                    <button id="exit-btn" class="btn btn-quiet"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M18 7H6v20h12M15 17h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span data-ui-label>退出游戏</span></button>
+                </div>
+            </footer>
         </div>
-        <div class="menu-footer">
-            <button id="settings-btn" class="btn">设置</button>
-            <button id="exit-btn" class="btn">退出游戏</button>
-        </div>
-        <p class="controls-hint">WASD 移动 · 鼠标绘画 / 瞄准 · Esc 暂停</p>
         <!-- Legacy frame elements remain hidden for compatibility; their saved data is migrated, never cleared. -->
         <div hidden style="display:none">
             <!-- Left Frames -->
@@ -135,7 +143,8 @@
     </div>
 
     <!-- 无尽模式选择界面 -->
-    <div id="selection-screen" class="overlay" style="display: none; background: rgba(0,0,0,0.95); flex-direction: column; justify-content: flex-start; padding-top: 40px; overflow-y: auto;">
+    <div id="selection-screen" class="overlay" style="display: none;">
+        <p class="eyebrow">BEFORE THE ERASURE / 出击档案</p>
         <h2 id="selection-mode-label" class="title" style="font-size: 40px; margin-bottom: 8px; animation: none; background: white; -webkit-text-fill-color: white;">创造模式 · 出击准备</h2>
         <p id="selection-mode-description" style="color: #bbb; margin: 0 0 12px;">从空白画布开始，战斗并创造你的作品。</p>
         <div id="profile-coins" style="color: #ffd700; font-size: 22px; font-weight: bold; margin: -8px 0 22px;">局外金币：0</div>
@@ -171,13 +180,14 @@
             </div>
         </div>
 
-        <div style="display: flex; gap: 20px; margin-bottom: 40px;">
+        <div class="selection-actions" style="display: flex; gap: 20px; margin-bottom: 40px;">
             <button id="back-to-menu-btn" class="btn" style="font-size: 20px; padding: 10px 30px;">返回主界面</button>
             <button id="start-run-btn" class="btn" style="font-size: 24px; padding: 10px 50px; background: #0f766e; border-color: #0f766e;" disabled>进入创造模式</button>
         </div>
     </div>
     
     <div id="game-over" class="overlay" style="display: none;">
+        <p class="eyebrow">WHAT REMAINS / 留存的痕迹</p>
         <h1 class="title" style="color: #ff4444;">GAME OVER</h1>
         <p class="subtitle" id="final-score">Score: 0</p>
         <button id="replay-btn" class="btn" style="margin-bottom: 10px; background: #8063b8; border-color: #8063b8;" disabled>回放本局画作</button>
@@ -215,8 +225,9 @@
 
     <!-- Level Up UI -->
     <div id="level-up-screen" class="overlay" style="display: none; background: rgba(0,0,0,0.85); flex-direction: column; justify-content: center; align-items: center; z-index: 100;">
-        <h2 class="title" style="font-size: 40px; margin-bottom: 10px; animation: none; background: white; -webkit-text-fill-color: white;">升级！</h2>
-        <p style="color: #ccc; margin-bottom: 30px; font-size: 18px;">选择一个技能</p>
+        <p class="eyebrow">A MARK OF DEFIANCE / 深刻一笔</p>
+        <h2 class="title">力量觉醒</h2>
+        <p>选择一项强化，继续抵抗擦除。</p>
         <div id="level-up-cards" style="display: flex; flex-wrap: nowrap; gap: 20px; max-width: 1200px; width: 90%; justify-content: center; padding: 0 20px; box-sizing: border-box;">
             <!-- Cards injected by JS -->
         </div>
@@ -224,7 +235,7 @@
 
     <!-- Palette UI (Story Mode Exclusive) -->
     <div id="palette-ui" class="hidden" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.85); border: 2px solid #fff; padding: 20px; border-radius: 10px; color: white; text-align: center; z-index: 100; display: none;">
-        <h2>🎨 调色盘 (The Palette)</h2>
+        <h2>调色盘 / The Palette</h2>
         <p style="font-size: 14px; color: #ccc;">融合你的灵感元素，创造新的技能</p>
         
         <div style="display: flex; justify-content: center; gap: 20px; margin: 20px 0;">

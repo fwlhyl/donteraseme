@@ -65,7 +65,7 @@ try {
         return [g.worldWidth, g.worldHeight, g.trailCanvas.width, g.trailCanvas.height,
             ...g.systems.filter(s => 'worldWidth' in s).flatMap(s => [s.worldWidth, s.worldHeight])];
     });
-    for (let i = 0; i < restored.length; i += 2) assert.deepEqual(restored.slice(i, i + 2), [3000, 2000]);
+    for (let i = 0; i < restored.length; i += 2) assert.deepEqual(restored.slice(i, i + 2), [2700, 1800]);
     assert.deepEqual(errors, []);
     console.log('PASS: compact arena, enlarged centered art, all world systems, large viewport/Retina, exact replay, mode-switch restoration.', geometry);
     console.log('Screenshots:', output);

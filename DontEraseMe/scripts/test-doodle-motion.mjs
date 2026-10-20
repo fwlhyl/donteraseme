@@ -17,13 +17,14 @@ export {Health} from './src/components/Health';
 export {Weapon} from './src/components/Weapon';
 export {PlayerStats} from './src/components/PlayerStats';
 export {PlayerArtwork} from './src/components/PlayerArtwork';
+export {PAPER_COLLECTOR_PARTS} from './src/art/PaperCollectorArt';
 export {EnemyBehavior} from './src/components/EnemyBehavior';
 export {RenderSystem} from './src/systems/RenderSystem';
 export {WeaponSystem} from './src/systems/WeaponSystem';
 export {EnemySystem} from './src/systems/EnemySystem';
 export {ENEMY_FRAMES, getDoodleEnemies, drawDoodleEnemy} from './src/art/DoodleArt';
 export {ENEMY_GAITS} from './src/art/DoodleEnemyGait';
-`, resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', loader: { '.png': 'dataurl' }, outfile: out });
+`, resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', loader: { '.png': 'dataurl', '.webp': 'dataurl' }, outfile: out });
 
 globalThis.localStorage = { getItem: () => null, setItem() {} };
 globalThis.Image = class { complete = true; naturalWidth = 1536; naturalHeight = 1024; };
@@ -43,7 +44,7 @@ function context() {
 globalThis.document = { body: { insertBefore() {} }, getElementById: () => null,
     createElement: () => ({ style: {}, dataset: {}, getContext: () => context() }) };
 const { DoodleMotion, signalDoodleAttack, sampleDoodleMotion, PlayerFactory, EnemyFactory,
-    Transform, Renderable, Velocity, Health, Weapon, PlayerStats, PlayerArtwork, EnemyBehavior, RenderSystem, WeaponSystem, EnemySystem,
+    Transform, Renderable, Velocity, Health, Weapon, PlayerStats, PlayerArtwork, PAPER_COLLECTOR_PARTS, EnemyBehavior, RenderSystem, WeaponSystem, EnemySystem,
     ENEMY_FRAMES, getDoodleEnemies, drawDoodleEnemy, ENEMY_GAITS } = await import(pathToFileURL(out));
 
 const sample = (patch = {}) => ({ x: 0, y: 0, hp: 100, attackSerial: 0, ...patch });
@@ -268,7 +269,8 @@ for (let i = 0; i < 60; i++) {
     assert.equal(pulseStrokes().length, 0, 'hidden pilot never draws reaction accents');
 }
 pilotBody.visible = true; pilot.tags.delete('magic_piloting'); renderPilot();
-assert.equal(pilotDraws().length, 1, 'dismount restores exactly one body');
+assert.equal(pilotDraws().filter(call => call.args[1] === PAPER_COLLECTOR_PARTS.body.x && call.args[2] === PAPER_COLLECTOR_PARTS.body.y).length, 1, 'dismount restores exactly one paper body');
+assert.equal(pilotDraws().length, 5, 'dismount restores body, two hands and two shoes');
 assert.equal(pulseStrokes().length, 0, 'dismount does not replay stale hit/attack accents');
 // Read the existing renderer cache with dt zero, which does not advance or consume events.
 const dismountPose = sampleDoodleMotion(pilot, 0, pilotRenderer.doodleMotion);

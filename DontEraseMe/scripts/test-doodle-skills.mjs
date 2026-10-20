@@ -22,7 +22,7 @@ export {Renderable} from './src/components/Renderable';
 export {EnemyBehavior} from './src/components/EnemyBehavior';
 export {MagicManifestation} from './src/components/MagicManifestation';
 export {PlayerArtwork} from './src/components/PlayerArtwork';
-`,resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',loader:{'.png':'dataurl'},outfile:out});
+`,resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',loader:{'.png':'dataurl','.webp':'dataurl'},outfile:out});
 globalThis.localStorage={getItem:()=>null,setItem(){}};
 globalThis.Image=class{complete=true;naturalWidth=1536;naturalHeight=1024;};
 globalThis.window={addEventListener(){},dispatchEvent(){},innerWidth:1000,innerHeight:700,devicePixelRatio:1};

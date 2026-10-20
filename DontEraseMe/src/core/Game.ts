@@ -61,6 +61,9 @@ import type { SkillConfig } from '../config/EndlessConfig';
 
 import { setLang, getLang, t } from '../i18n/index';
 
+// Cap screen rendering only; artwork canvases keep their world resolution.
+const MAX_GAME_DPR = 1; // Mac A/B trial; use 1.5 to compare screen sharpness.
+
 export enum GameState {
     MENU,
     PLAYING,
@@ -524,7 +527,7 @@ export class Game {
         this.width = window.innerWidth;
         this.height = window.innerHeight;
         
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = Math.min(window.devicePixelRatio || 1, MAX_GAME_DPR);
         
         this.gameCanvas.width = this.width * dpr;
         this.gameCanvas.height = this.height * dpr;
@@ -721,7 +724,7 @@ export class Game {
             if (selectedSkills.length === 0) {
                 // No more skills to learn
                 const el = document.createElement('div');
-                el.style.cssText = 'color: white; font-size: 24px; padding: 20px;';
+                el.className = 'upgrade-empty';
                 el.innerText = getLang() === 'zh' ? '所有技能已升至满级！' : 'All skills are fully upgraded!';
                 container.appendChild(el);
                 
@@ -732,35 +735,21 @@ export class Game {
                 return;
             }
 
-            selectedSkills.forEach(skill => {
+            selectedSkills.forEach((skill, index) => {
                 const currentLevel = stats.getSkillLevel(skill.id);
                 const nextLevel = currentLevel + 1;
                 const levelConfig = skill.levels.find(l => l.level === nextLevel) || skill.levels[0];
                 
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.style.cssText = `
-                    background: #333; border: 2px solid #555; border-radius: 8px; padding: 20px; 
-                    cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; 
-                    gap: 10px; flex: 1; min-width: 0; box-sizing: border-box; text-align: center;
-                `;
-                
-                card.onmouseover = () => {
-                    card.style.transform = 'translateY(-5px)';
-                    card.style.borderColor = '#0f766e';
-                    card.style.boxShadow = '0 0 15px rgba(15, 118, 110, 0.5)';
-                };
-                card.onmouseout = () => {
-                    card.style.transform = 'none';
-                    card.style.borderColor = '#555';
-                    card.style.boxShadow = 'none';
-                };
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.className = 'card upgrade-card';
 
                 card.innerHTML = `
-                    <div style="font-size: 12px; color: #888;">${t(skill.category)}</div>
-                    <div style="font-size: 20px; font-weight: bold; color: white;">${t(skill.name)}</div>
-                    <div style="font-size: 14px; color: #0ff;">${currentLevel === 0 ? t('新技能') : `${t('升级至 Lv.')}${nextLevel}`}</div>
-                    <div style="font-size: 14px; color: #ccc; margin-top: 10px; min-height: 40px;">${t(levelConfig.description)}</div>
+                    <span class="upgrade-seal" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
+                    <span class="upgrade-category">${t(skill.category)}</span>
+                    <span class="upgrade-title">${t(skill.name)}</span>
+                    <span class="upgrade-tier">${currentLevel === 0 ? t('新技能') : `${t('升级至 Lv.')}${nextLevel}`}</span>
+                    <span class="upgrade-description">${t(levelConfig.description)}</span>
                 `;
 
                 card.onclick = () => {
@@ -851,7 +840,7 @@ export class Game {
         container.innerHTML = '';
 
         // Add a specialized title if possible, or just reuse the container
-        const titleEl = this.levelUpScreen.querySelector('h1');
+        const titleEl = this.levelUpScreen.querySelector<HTMLElement>('.title');
         const oldTitle = titleEl ? titleEl.innerText : '';
         if (titleEl) {
             let titleText = getLang() === 'zh' ? 'BOSS 击杀：专属觉醒！' : 'BOSS Kill: Unique Awakening!';
@@ -905,7 +894,7 @@ export class Game {
         if (selectedSkills.length === 0) {
             // No awakenings available, give massive gold and health
             const el = document.createElement('div');
-            el.style.cssText = 'color: gold; font-size: 24px; padding: 20px; text-align: center;';
+            el.className = 'upgrade-empty awakening-empty';
             el.innerHTML = getLang() === 'zh' ? '已无专属觉醒<br><br>获得 500 金币与全面恢复！' : 'No awakenings available<br><br>Received 500 Coins & Full Heal!';
             container.appendChild(el);
             
@@ -919,36 +908,21 @@ export class Game {
             return;
         }
 
-        selectedSkills.forEach(skill => {
+        selectedSkills.forEach((skill, index) => {
             const currentLevel = stats.getSkillLevel(skill.id);
             const nextLevel = currentLevel + 1;
             const levelConfig = skill.levels.find(l => l.level === nextLevel) || skill.levels[0];
             
-            const card = document.createElement('div');
-            card.className = 'card';
-            card.style.cssText = `
-                background: #4a0000; border: 2px solid #ff4444; border-radius: 8px; padding: 20px; 
-                cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; 
-                gap: 10px; flex: 1; min-width: 0; box-sizing: border-box; text-align: center;
-                box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
-            `;
-            
-            card.onmouseover = () => {
-                card.style.transform = 'translateY(-5px)';
-                card.style.borderColor = '#ffaaaa';
-                card.style.boxShadow = '0 0 20px rgba(255, 100, 100, 0.8)';
-            };
-            card.onmouseout = () => {
-                card.style.transform = 'none';
-                card.style.borderColor = '#ff4444';
-                card.style.boxShadow = '0 0 10px rgba(255, 0, 0, 0.5)';
-            };
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'card upgrade-card awakening-card';
 
             card.innerHTML = `
-                <div style="font-size: 14px; color: #ffaaaa; font-weight: bold;">${t(skill.category)}</div>
-                <div style="font-size: 22px; font-weight: bold; color: gold; text-shadow: 0 0 5px red;">${t(skill.name)}</div>
-                <div style="font-size: 14px; color: #0ff;">${currentLevel === 0 ? t('觉醒降临') : `${t('觉醒提升 Lv.')}${nextLevel}`}</div>
-                <div style="font-size: 15px; color: #fff; margin-top: 10px; min-height: 40px;">${t(levelConfig.description)}</div>
+                <span class="upgrade-seal" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
+                <span class="upgrade-category">${t(skill.category)}</span>
+                <span class="upgrade-title">${t(skill.name)}</span>
+                <span class="upgrade-tier">${currentLevel === 0 ? t('觉醒降临') : `${t('觉醒提升 Lv.')}${nextLevel}`}</span>
+                <span class="upgrade-description">${t(levelConfig.description)}</span>
             `;
 
             card.onclick = () => {
@@ -993,13 +967,14 @@ export class Game {
             charList.innerHTML = '';
             CHARACTERS.forEach(char => {
                 const unlocked = profile.unlockedCharacterIds.includes(char.id);
-                const el = document.createElement('div');
+                const el = document.createElement('button');
+                el.type = 'button';
                 el.className = `card char-card ${this.selectedCharacterId === char.id ? 'active' : ''} ${unlocked ? '' : 'locked'}`;
-                el.style.opacity = unlocked ? '1' : '0.72';
+                el.setAttribute('aria-pressed', String(this.selectedCharacterId === char.id));
                 el.innerHTML = `
                     <p class="card-title">${t(char.name)}</p>
                     <p class="card-desc">${t(char.description)}</p>
-                    <p style="color: ${unlocked ? '#5eead4' : '#ffd700'}; font-size: 13px; margin: 8px 0 0; font-weight: bold;">${unlocked ? this.profileText('unlocked') : this.profileText('locked', char.unlockPrice)}</p>
+                    <p class="unlock-status ${unlocked ? 'is-unlocked' : 'is-locked'}">${unlocked ? this.profileText('unlocked') : this.profileText('locked', char.unlockPrice)}</p>
                 `;
                 el.onclick = () => {
                     this.selectedCharacterId = char.id;
@@ -1017,13 +992,14 @@ export class Game {
             WEAPONS.forEach(weap => {
                 const unlocked = profile.unlockedWeaponIds.includes(weap.id);
                 const price = getWeaponUnlockPrice(weap.id);
-                const el = document.createElement('div');
+                const el = document.createElement('button');
+                el.type = 'button';
                 el.className = `card weap-card ${this.selectedWeaponId === weap.id ? 'active' : ''} ${unlocked ? '' : 'locked'}`;
-                el.style.opacity = unlocked ? '1' : '0.72';
+                el.setAttribute('aria-pressed', String(this.selectedWeaponId === weap.id));
                 el.innerHTML = `
-                    <p class="card-title" style="color: ${weap.color};">${t(weap.name)}</p>
+                    <p class="card-title">${t(weap.name)}</p>
                     <p class="card-desc">${getLang() === 'zh' ? '射速' : 'Rate'}: ${Math.round(1000 / weap.fireRate)} | ${getLang() === 'zh' ? '伤害' : 'Dmg'}: ${weap.damage}</p>
-                    <p style="color: ${unlocked ? '#5eead4' : '#ffd700'}; font-size: 13px; margin: 8px 0 0; font-weight: bold;">${unlocked ? this.profileText('unlocked') : this.profileText('locked', price)}</p>
+                    <p class="unlock-status ${unlocked ? 'is-unlocked' : 'is-locked'}">${unlocked ? this.profileText('unlocked') : this.profileText('locked', price)}</p>
                 `;
                 el.onclick = () => {
                     this.selectedWeaponId = weap.id;
@@ -1047,11 +1023,13 @@ export class Game {
         document.querySelectorAll('.char-card').forEach((el, i) => {
             const character = CHARACTERS[i];
             el.classList.toggle('active', character.id === this.selectedCharacterId);
+            el.setAttribute('aria-pressed', String(character.id === this.selectedCharacterId));
             el.classList.toggle('locked', !profile.unlockedCharacterIds.includes(character.id));
         });
         document.querySelectorAll('.weap-card').forEach((el, i) => {
             const weapon = WEAPONS[i];
             el.classList.toggle('active', weapon.id === this.selectedWeaponId);
+            el.setAttribute('aria-pressed', String(weapon.id === this.selectedWeaponId));
             el.classList.toggle('locked', !profile.unlockedWeaponIds.includes(weapon.id));
         });
         
@@ -1067,11 +1045,11 @@ export class Game {
             const spdLbl = getLang() === 'zh' ? '移速' : 'Speed';
             const skillLbl = getLang() === 'zh' ? '专属技能' : 'Unique Skill';
             charDetail.innerHTML = `
-                <h4 style="margin-top: 0; color: #0f766e;">${t(selectedChar.name)}</h4>
-                <p style="color: #aaa; font-size: 14px; margin-bottom: 5px;">${t(selectedChar.description)}</p>
-                <p style="color: #fff; font-size: 13px; margin-bottom: 5px;">${hpLbl}: ${selectedChar.baseHp} | ${spdLbl}: ${selectedChar.baseSpeed}</p>
-                <p style="color: #0ff; font-size: 13px; margin: 0;">${skillLbl}: [${t(selectedChar.uniqueSkillName)}] ${t(selectedChar.uniqueSkillDesc)}</p>
-                ${unlocked ? `<p style="color: #5eead4; font-size: 13px; font-weight: bold; margin: 12px 0 0;">${this.profileText('unlocked')}</p>` : `<button id="unlock-character-btn" class="btn" style="margin-top: 14px; padding: 8px 14px; font-size: 15px; background: #9a6700; border-color: #ffd700;" ${profile.coins < selectedChar.unlockPrice ? 'disabled' : ''}>${this.profileText('unlock', selectedChar.unlockPrice)}</button>`}
+                <h4 class="detail-title">${t(selectedChar.name)}</h4>
+                <p class="detail-description">${t(selectedChar.description)}</p>
+                <p class="detail-stat">${hpLbl}: ${selectedChar.baseHp} | ${spdLbl}: ${selectedChar.baseSpeed}</p>
+                <p class="detail-skill">${skillLbl}: [${t(selectedChar.uniqueSkillName)}] ${t(selectedChar.uniqueSkillDesc)}</p>
+                ${unlocked ? `<p class="unlock-status is-unlocked">${this.profileText('unlocked')}</p>` : `<button id="unlock-character-btn" class="btn unlock-action" ${profile.coins < selectedChar.unlockPrice ? 'disabled' : ''}>${this.profileText('unlock', selectedChar.unlockPrice)}</button>`}
             `;
 
             const unlockBtn = document.getElementById('unlock-character-btn') as HTMLButtonElement | null;
@@ -1093,11 +1071,11 @@ export class Game {
             const secLbl = getLang() === 'zh' ? '秒' : 's';
             
             weapDetail.innerHTML = `
-                <h4 style="margin-top: 0; color: ${selectedWeap.color};">${t(selectedWeap.name)}</h4>
-                <p style="color: #aaa; font-size: 14px; margin-bottom: 5px;">${typeStr}</p>
-                <p style="color: #fff; font-size: 13px; margin-bottom: 5px;">${dmgLbl}: ${selectedWeap.damage} | ${rateLbl}: ${Math.round(1000 / selectedWeap.fireRate)}</p>
-                <p style="color: #fff; font-size: 13px; margin: 0;">${magLbl}: ${selectedWeap.magSize} | ${rldLbl}: ${(selectedWeap.reloadTime / 60).toFixed(1)}${secLbl}</p>
-                ${unlocked ? `<p style="color: #5eead4; font-size: 13px; font-weight: bold; margin: 12px 0 0;">${this.profileText('unlocked')}</p>` : `<button id="unlock-weapon-btn" class="btn" style="margin-top: 14px; padding: 8px 14px; font-size: 15px; background: #9a6700; border-color: #ffd700;" ${profile.coins < price ? 'disabled' : ''}>${this.profileText('unlock', price)}</button>`}
+                <h4 class="detail-title">${t(selectedWeap.name)}</h4>
+                <p class="detail-description">${typeStr}</p>
+                <p class="detail-stat">${dmgLbl}: ${selectedWeap.damage} | ${rateLbl}: ${Math.round(1000 / selectedWeap.fireRate)}</p>
+                <p class="detail-stat">${magLbl}: ${selectedWeap.magSize} | ${rldLbl}: ${(selectedWeap.reloadTime / 60).toFixed(1)}${secLbl}</p>
+                ${unlocked ? `<p class="unlock-status is-unlocked">${this.profileText('unlocked')}</p>` : `<button id="unlock-weapon-btn" class="btn unlock-action" ${profile.coins < price ? 'disabled' : ''}>${this.profileText('unlock', price)}</button>`}
             `;
 
             const unlockBtn = document.getElementById('unlock-weapon-btn') as HTMLButtonElement | null;
@@ -1112,8 +1090,7 @@ export class Game {
             startBtn.disabled = !selectedUnlocked || !selectedWeaponUnlocked;
             const isDefense = this.pendingMode === 'defense';
             startBtn.textContent = isDefense ? '进入守卫模式' : '进入创造模式';
-            startBtn.style.background = isDefense ? '#513b82' : '#0f766e';
-            startBtn.style.borderColor = isDefense ? '#b59cff' : '#0f766e';
+            startBtn.dataset.mode = isDefense ? 'defense' : 'endless';
         }
     }
 
@@ -1128,11 +1105,11 @@ export class Game {
     private profileText(kind: 'unlocked' | 'locked' | 'unlock', price?: number): string {
         if (getLang() === 'zh') {
             if (kind === 'unlocked') return '已解锁';
-            if (kind === 'locked') return `🔒 未解锁 · ${price ?? 0} 金币`;
+            if (kind === 'locked') return `未解锁 · ${price ?? 0} 金币`;
             return `花费 ${price ?? 0} 金币解锁`;
         }
         if (kind === 'unlocked') return 'Unlocked';
-        if (kind === 'locked') return `🔒 Locked · ${price ?? 0} Coins`;
+        if (kind === 'locked') return `Locked · ${price ?? 0} Coins`;
         return `Unlock for ${price ?? 0} Coins`;
     }
 
@@ -1272,16 +1249,16 @@ export class Game {
         if (titleEl) {
             if (this.currentMode === 'drawing') {
                 titleEl.innerText = '作品完成';
-                titleEl.style.color = '#287ac0';
+                titleEl.dataset.outcome = 'completed';
             } else if (victory) {
                 titleEl.innerText = this.currentMode === 'defense' ? '守卫成功' : 'VICTORY';
-                titleEl.style.color = 'gold';
+                titleEl.dataset.outcome = 'victory';
             } else if (this.currentMode === 'defense' && this.defenseFailureMessage) {
                 titleEl.innerText = this.defenseFailureMessage;
-                titleEl.style.color = '#ff8aa6';
+                titleEl.dataset.outcome = 'defeat';
             } else {
                 titleEl.innerText = 'GAME OVER';
-                titleEl.style.color = '#ff4444';
+                titleEl.dataset.outcome = 'defeat';
             }
         }
         
@@ -2130,7 +2107,7 @@ export class Game {
     public updateUITexts(): void {
         const setText = (id: string, textKey: string) => {
             const el = document.getElementById(id);
-            if (el) el.textContent = t(textKey);
+            if (el) (el.querySelector('[data-ui-label]') || el).textContent = t(textKey);
         };
 
         setText('endless-btn', '开始游戏');
@@ -2166,6 +2143,8 @@ export class Game {
         setText('fullscreen-btn', '全屏模式 / Fullscreen');
         setText('windowed-btn', '窗口模式 / Windowed');
         setText('close-settings-btn', '返回 (Back)');
+        document.getElementById('lang-zh-btn')?.setAttribute('aria-pressed', String(getLang() === 'zh'));
+        document.getElementById('lang-en-btn')?.setAttribute('aria-pressed', String(getLang() === 'en'));
 
         // Saved artworks are now displayed by the on-demand gallery.
         

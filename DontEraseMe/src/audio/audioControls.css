@@ -1,11 +1,25 @@
-.audio-controls { box-sizing:border-box; border:1px dashed #75674f; border-radius:4px; color:#352e24; background:#f4ead2; padding:10px 14px; margin:8px 0 18px; width:min(440px,90vw); flex-shrink:0; font:14px system-ui,sans-serif; }
-.audio-controls legend { font-weight:700; padding:0 6px; }
-.audio-controls label { display:grid; grid-template-columns:135px minmax(60px,1fr) 42px; gap:8px; align-items:center; margin:6px 0; }
-.audio-controls input[type=range] { width:100%; accent-color:#3d868d; cursor:pointer; }
-.audio-controls output { text-align:right; font-variant-numeric:tabular-nums; }
-.audio-controls .audio-mute { display:flex; gap:8px; }
-.audio-controls small { display:block; opacity:.75; font-size:12px; }
-#settings-modal:has(.audio-controls) { overflow-y:auto; justify-content:flex-start; padding-block:24px; }
-#settings-modal:has(.audio-controls)>* { flex-shrink:0; }
-.sketch-esc-overlay .audio-controls { margin:0; }
-@media(max-width:500px) { .audio-controls label { grid-template-columns:110px minmax(50px,1fr) 40px; } }
+/* Static paper texture; no filters or animated grain over the game canvas. */
+.audio-controls {
+    box-sizing: border-box;
+    width: min(440px, 90vw); min-width: 0; flex-shrink: 0;
+    padding: 10px 14px; margin: 8px 0 18px;
+    border: 1px solid var(--line, #7f7c69); border-radius: 0;
+    color: var(--text, #eee4c8);
+    background: url('../assets/ui/paper-grain.svg') repeat, var(--panel, #2b2c26);
+    font: 13px/1.5 var(--ui, system-ui, sans-serif); color-scheme: dark;
+}
+.audio-controls legend { padding: 0 8px; font-weight: 600; letter-spacing: .06em; color: var(--text, #eee4c8); }
+.audio-controls label { display: grid; grid-template-columns: 135px minmax(50px, 1fr) 42px; gap: 8px; align-items: center; margin: 8px 0; }
+.audio-controls input[type=range] { width: 100%; min-width: 0; height: 24px; margin: 0; accent-color: var(--accent, #b74736); cursor: pointer; }
+.audio-controls input[type=checkbox] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent, #b74736); }
+.audio-controls input:focus-visible { outline: 2px solid var(--text, #eee4c8); outline-offset: 3px; }
+.audio-controls output { text-align: right; font-variant-numeric: tabular-nums; color: var(--text, #eee4c8); }
+.audio-controls .audio-mute { display: flex; gap: 9px; padding-top: 10px; margin-top: 10px; border-top: 1px solid #7f7c6966; }
+.audio-controls small { display: block; color: var(--muted, #b0aa95); font-size: 11px; line-height: 1.6; }
+#settings-modal:has(.audio-controls) { overflow-y: auto; justify-content: flex-start; padding-block: 24px; }
+#settings-modal:has(.audio-controls)>* { flex-shrink: 0; }
+.sketch-esc-overlay .audio-controls { margin: 0; width: 100%; }
+@media (max-width: 500px) {
+    .audio-controls { padding-inline: 10px; }
+    .audio-controls label { grid-template-columns: 110px minmax(40px, 1fr) 35px; gap: 6px; font-size: 12px; }
+}

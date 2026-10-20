@@ -10,6 +10,7 @@ export class PlayerArtwork extends Component {
         public readonly displaySize = 64,
         public readonly baseRadius = 20,
         public readonly frame?: AtlasFrame,
-        public readonly articulated = false
+        public readonly articulated = false,
+        public readonly rig?: 'paper-collector-v1'
     ) { super(); }
 }

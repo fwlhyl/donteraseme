@@ -11,6 +11,7 @@ import { BulletFactory } from '../entities/BulletFactory';
 import { ParticleFactory } from '../entities/ParticleFactory';
 import { getLang } from '../i18n/index';
 import { emitGameSound } from '../audio/AudioEvents';
+import { MagicHud } from '../ui/CombatHud';
 
 interface Point {
     x: number;
@@ -73,6 +74,7 @@ export class MagicPenSystem extends System {
     private readyAnnouncedFor = new Set<string>();
 
     private readonly hud: HTMLElement;
+    private readonly hudView: MagicHud;
     private readonly overlay: HTMLElement;
     private readonly board: HTMLCanvasElement;
     private readonly boardCtx: CanvasRenderingContext2D;
@@ -92,6 +94,7 @@ export class MagicPenSystem extends System {
     ) {
         super();
         this.hud = this.createHud();
+        this.hudView = new MagicHud(this.hud);
         const boardUi = this.createBoard();
         this.overlay = boardUi.overlay;
         this.board = boardUi.canvas;
@@ -143,11 +146,6 @@ export class MagicPenSystem extends System {
         const hud = document.createElement('div');
         hud.id = 'magic-pen-hud';
         hud.className = 'hud-note hud-magic';
-        hud.style.marginTop = '10px';
-        hud.style.color = '#fef08a';
-        hud.style.fontSize = '15px';
-        hud.style.fontWeight = 'bold';
-        hud.style.textShadow = '1px 1px 2px #000';
         document.getElementById('ui')?.appendChild(hud);
         return hud;
     }
@@ -156,32 +154,31 @@ export class MagicPenSystem extends System {
         const overlay = document.createElement('div');
         overlay.id = 'magic-pen-board';
         overlay.className = 'sketch-board-overlay';
-        overlay.style.cssText = 'position:fixed; inset:0; z-index:12000; display:none; align-items:center; justify-content:center; background:rgba(3,7,18,0.88); padding:20px; box-sizing:border-box;';
+        overlay.style.display = 'none';
 
         const panel = document.createElement('section');
         panel.className = 'sketch-board-panel';
-        panel.style.cssText = 'width:min(760px, 96vw); max-height:calc(100vh - 40px); overflow-y:auto; background:linear-gradient(135deg,#172033,#0f172a); border:2px solid #facc15; border-radius:16px; box-shadow:0 0 42px rgba(250,204,21,.35); padding:18px; box-sizing:border-box; color:#f8fafc;';
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-modal', 'true');
+        panel.setAttribute('aria-labelledby', 'magic-pen-board-title');
 
         const title = document.createElement('h2');
         title.className = 'sketch-board-title';
+        title.id = 'magic-pen-board-title';
         title.textContent = '神笔马良 · 描绘具现';
-        title.style.cssText = 'margin:0 0 6px; color:#facc15; text-align:center; letter-spacing:2px;';
         panel.appendChild(title);
 
         const hint = document.createElement('p');
         hint.className = 'sketch-board-hint';
-        hint.style.cssText = 'margin:0 0 14px; color:#cbd5e1; text-align:center; font-size:14px;';
         panel.appendChild(hint);
 
         const choices = document.createElement('div');
         choices.className = 'sketch-board-choices';
-        choices.style.cssText = 'display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:12px;';
         for (const target of Object.values(TARGETS)) {
             const button = document.createElement('button');
             button.className = 'sketch-board-choice';
             button.type = 'button';
             button.textContent = target.label;
-            button.style.cssText = 'padding:8px 18px; border:2px solid #475569; border-radius:999px; background:#1e293b; color:#e2e8f0; cursor:pointer; font-weight:bold;';
             button.onclick = () => {
                 this.selectedType = target.type;
                 this.strokes = [];
@@ -196,12 +193,10 @@ export class MagicPenSystem extends System {
 
         const targetLabel = document.createElement('div');
         targetLabel.className = 'sketch-board-target';
-        targetLabel.style.cssText = 'margin:0 0 8px; text-align:center; color:#f8fafc; font-weight:bold;';
         panel.appendChild(targetLabel);
 
         const canvasWrap = document.createElement('div');
         canvasWrap.className = 'sketch-board-canvas-wrap';
-        canvasWrap.style.cssText = 'border:2px dashed #64748b; border-radius:12px; overflow:hidden; background:#020617; touch-action:none;';
         const canvas = document.createElement('canvas');
         canvas.width = BOARD_WIDTH;
         canvas.height = BOARD_HEIGHT;
@@ -214,12 +209,10 @@ export class MagicPenSystem extends System {
 
         const controls = document.createElement('div');
         controls.className = 'sketch-board-controls';
-        controls.style.cssText = 'display:flex; justify-content:center; gap:12px; margin-top:14px;';
         const clear = document.createElement('button');
         clear.className = 'btn';
         clear.type = 'button';
         clear.textContent = '重画';
-        clear.style.cssText = 'padding:9px 18px; border:1px solid #64748b; border-radius:8px; background:#334155; color:#fff; cursor:pointer;';
         clear.onclick = () => {
             this.strokes = [];
             this.hint.textContent = '沿着半透明轮廓作画；越贴近、覆盖越完整，具现越强。';
@@ -229,13 +222,11 @@ export class MagicPenSystem extends System {
         cancel.className = 'btn';
         cancel.type = 'button';
         cancel.textContent = '取消';
-        cancel.style.cssText = 'padding:9px 18px; border:1px solid #64748b; border-radius:8px; background:#334155; color:#fff; cursor:pointer;';
         cancel.onclick = () => this.closeBoard(true);
         const manifest = document.createElement('button');
-        manifest.className = 'btn sketch-board-manifest';
+        manifest.className = 'btn btn-primary sketch-board-manifest';
         manifest.type = 'button';
         manifest.textContent = '神笔马良';
-        manifest.style.cssText = 'padding:9px 22px; border:2px solid #fde047; border-radius:8px; background:#a16207; color:#fff; cursor:pointer; font-weight:bold;';
         manifest.onclick = () => this.completeDrawing();
         controls.append(clear, cancel, manifest);
         panel.appendChild(controls);
@@ -351,9 +342,8 @@ export class MagicPenSystem extends System {
         this.targetLabel.textContent = `当前描绘：${target.label}`;
         for (const [type, button] of this.targetButtons) {
             const selected = type === this.selectedType;
-            button.style.borderColor = selected ? TARGETS[type].accent : '#475569';
-            button.style.background = selected ? '#334155' : '#1e293b';
-            button.style.color = selected ? '#ffffff' : '#cbd5e1';
+            button.classList.toggle('is-selected', selected);
+            button.setAttribute('aria-pressed', String(selected));
         }
     }
 
@@ -362,9 +352,9 @@ export class MagicPenSystem extends System {
         const ctx = this.boardCtx;
         ctx.clearRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
-        ctx.fillStyle = '#020617';
+        ctx.fillStyle = '#252621';
         ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
-        ctx.strokeStyle = 'rgba(148,163,184,0.12)';
+        ctx.strokeStyle = 'rgba(238,228,200,0.08)';
         ctx.lineWidth = 1;
         for (let x = 0; x <= BOARD_WIDTH; x += 40) {
             ctx.beginPath();
@@ -380,7 +370,7 @@ export class MagicPenSystem extends System {
         }
 
         ctx.save();
-        ctx.strokeStyle = target.accent;
+        ctx.strokeStyle = '#b0aa95';
         ctx.globalAlpha = 0.45;
         ctx.lineWidth = 13;
         ctx.lineCap = 'round';
@@ -390,9 +380,7 @@ export class MagicPenSystem extends System {
         ctx.restore();
 
         ctx.save();
-        ctx.strokeStyle = '#fef08a';
-        ctx.shadowColor = '#facc15';
-        ctx.shadowBlur = 8;
+        ctx.strokeStyle = '#eee4c8';
         ctx.lineWidth = 8;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -400,7 +388,7 @@ export class MagicPenSystem extends System {
             if (stroke.length === 1) {
                 ctx.beginPath();
                 ctx.arc(stroke[0].x, stroke[0].y, 4, 0, Math.PI * 2);
-                ctx.fillStyle = '#fef08a';
+                ctx.fillStyle = '#eee4c8';
                 ctx.fill();
             } else {
                 this.strokePath(ctx, stroke);
@@ -732,15 +720,7 @@ export class MagicPenSystem extends System {
             const manifestation = entity.getComponent(MagicManifestation);
             return entity.active && manifestation?.ownerId === playerId;
         })?.getComponent(MagicManifestation);
-        const isZh = getLang() === 'zh';
-        const activeText = active
-            ? (isZh ? '驾驶中' : 'Piloting')
-            : progress >= MAX_INSPIRATION
-                ? (isZh ? '就绪' : 'Ready')
-                : '';
-        this.hud.textContent = `G · ${isZh ? '神笔' : 'Magic Ink'} ${progress}/${MAX_INSPIRATION}${activeText ? ` · ${activeText}` : ''}`;
-        this.hud.dataset.ready = `${!active && progress >= MAX_INSPIRATION}`;
-        this.hud.style.color = progress >= MAX_INSPIRATION ? '#fef08a' : '#cbd5e1';
-        this.hud.style.display = 'block';
+        this.hudView.update(progress, MAX_INSPIRATION, !!active, getLang() === 'zh');
+        this.hud.style.display = 'flex';
     }
 }

@@ -119,7 +119,9 @@ try {
         assert.equal(await page.locator('#gallery-detail').count(), 0);
 
         await page.locator('#gallery-next-btn').click();
-        await page.waitForFunction(() => window.gallery.page === 1 && document.querySelectorAll('.gallery-thumbnail').length === 3 && window.gallery.renderer.info.memory.textures <= 14);
+        // Two paper maps and an extra archive sign stay alive across pages;
+        // only the room's artwork textures and captions are replaced.
+        await page.waitForFunction(() => window.gallery.page === 1 && document.querySelectorAll('.gallery-thumbnail').length === 3 && window.gallery.renderer.info.memory.textures <= 17);
         assert.equal(await page.locator('.gallery-artwork-card').count(), 3);
         assert.ok(await page.evaluate(() => window.gallery.renderer.info.memory.textures) < first.textures);
         await page.locator('#gallery-previous-btn').click();

@@ -27,7 +27,7 @@ export {PlayerStats} from './src/components/PlayerStats';
 export {Experience} from './src/components/Experience';
 export {ExperienceOrb} from './src/components/ExperienceOrb';
 export {Skill} from './src/components/Skill';
-`, resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', loader: { '.png': 'dataurl' }, outfile: out });
+`, resolveDir: process.cwd() }, bundle: true, platform: 'node', format: 'esm', loader: { '.png': 'dataurl', '.webp': 'dataurl' }, outfile: out });
 
 globalThis.localStorage = { getItem: () => null, setItem() {} };
 globalThis.Image = class { complete = true; naturalWidth = 1536; naturalHeight = 1024; };

@@ -18,6 +18,7 @@ import { PlayerStats } from '../components/PlayerStats';
 import { CHARACTERS } from '../config/EndlessConfig';
 import { PlayerArtwork } from '../components/PlayerArtwork';
 import { getDoodleHeroes, HERO_FRAMES } from '../art/DoodleArt';
+import { getPaperCollector } from '../art/PaperCollectorArt';
 
 export class PlayerFactory {
     public static create(x: number, y: number, characterId?: string, weaponId?: number): Entity {
@@ -34,9 +35,11 @@ export class PlayerFactory {
         player.addComponent(new Velocity());
         
         const renderable = new Renderable('#ffffff', 20, 40, 40, 'circle', 70);
-        // Shared 64px doodle family; visual-only, all collision/stats stay unchanged.
+        // The collector alone trials the approved paper cutout. Hitbox/stats stay unchanged.
         player.addComponent(renderable);
-        player.addComponent(new PlayerArtwork(getDoodleHeroes(), 64, 20, HERO_FRAMES[charConfig.id], true));
+        player.addComponent(charConfig.id === 'collector'
+            ? new PlayerArtwork(getPaperCollector(), 64, 20, undefined, false, 'paper-collector-v1')
+            : new PlayerArtwork(getDoodleHeroes(), 64, 20, HERO_FRAMES[charConfig.id], true));
         
         // Add PlayerStats based on selection
         const stats = new PlayerStats();

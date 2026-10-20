@@ -1,113 +1,150 @@
-/* Inked paper cut-outs: original scalable HUD artwork, no bitmap text. */
-#ui { width:286px; display:flex; gap:13px; }
+/* Approved dark-paper HUD: dry ivory ink, sparse rust red, no filled cards.
+   Screen-space instruments never enter the player's saved artwork. */
+#ui {
+  position:absolute; top:22px !important; left:24px !important; z-index:110;
+  width:256px; display:flex; flex-direction:column; gap:12px;
+  pointer-events:none; user-select:none;
+}
 #ui .hud-paper { margin:0; }
-.hud-paper { position:relative; color:#302d29; background:#f6ecd5; border:2px solid #302d29; border-radius:3px 8px 4px 10px / 8px 3px 8px 4px; box-shadow:3px 4px 0 #171c2799; padding:13px 14px 11px; font-family:var(--ui); background-image:repeating-linear-gradient(7deg,transparent 0 5px,#99733e08 6px 7px),linear-gradient(110deg,#fffaf033,transparent 70%); }
-.hud-paper::before { content:''; position:absolute; width:55px; height:15px; top:-9px; left:20px; transform:rotate(-7deg); background:repeating-linear-gradient(100deg,#f0c14cb8 0 5px,#f8d36dcc 5px 7px); clip-path:polygon(3% 0,100% 8%,97% 100%,0 92%); }
-.hud-paper::after { content:''; position:absolute; inset:4px; border:1px solid #766a4940; border-radius:inherit; pointer-events:none; }
-.hud-card-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; color:#74654f; font-size:10px; font-weight:800; letter-spacing:.08em; }
-.hud-card-heading b { color:#302d29; font:800 14px var(--hand); }
+#ui *,#defense-hud.guard-card,#defense-hud.guard-card * { box-sizing:border-box; }
+.hud-paper {
+  position:relative; padding:0; border:0; border-radius:0;
+  color:var(--text,#eee4c8); background:none; box-shadow:none;
+  font-family:var(--ui,system-ui); text-shadow:0 1px 0 #252621;
+}
+.hud-paper::before,.hud-paper::after { content:none; }
 .hud-icon { display:block; width:100%; height:100%; }
-.hud-health-row,.hud-weapon-row { display:flex; gap:10px; align-items:center; margin-top:4px; }
-.heart-seal { width:43px; height:45px; flex-shrink:0; transform:rotate(-8deg); }
-.hud-health-body,.hud-weapon-body { flex:1; min-width:0; }
-.hud-health-body strong { display:block; font:800 23px/1.2 var(--hand); font-variant-numeric:tabular-nums; margin-bottom:4px; }
-.ink-meter { height:13px; padding:2px; overflow:hidden; border:2px solid #302d29; border-radius:5px 3px 6px 4px; background:#3c424c; transform:rotate(-.5deg); }
-.ink-meter>i { display:block; height:100%; width:var(--fill,100%); background:repeating-linear-gradient(115deg,#ffffff25 0 2px,transparent 2px 7px),#d96b78; clip-path:polygon(0 5%,98% 0,100% 28%,99% 68%,100% 94%,2% 100%); transition:width .16s linear; }
-.hud-xp-row { display:flex; align-items:center; gap:7px; margin-top:7px; font-size:9px; font-weight:800; color:#75664b; }
-.xp-meter { height:7px; border-width:1px; padding:1px; flex:1; }
-.xp-meter>i { background:#4998b5; }
-.shield-note { display:block; margin-top:6px; font-size:10px; border-top:1px dashed #9d8b68; padding-top:5px; }
-.health-card[data-state="critical"] { border-color:#943b46; background-color:#f3d8cd; }
-.health-card[data-state="critical"] .heart-seal { animation:ink-heartbeat 1.4s ease-in-out infinite; }
-.health-card.is-hit { box-shadow:0 0 0 3px #e5787888,4px 5px 0 #171c2799; }
-.health-card[data-state="critical"] .hud-card-heading>span { color:#933541; }
-.weapon-card { transform:rotate(.5deg); }
-.weapon-card::before { left:auto; right:19px; background:repeating-linear-gradient(95deg,#79bad7c4 0 5px,#b9d8dfc9 5px 7px); transform:rotate(7deg); }
-.weapon-stamp { width:49px; height:49px; border:1px solid #8c8065; outline:1px dashed #8c806555; outline-offset:3px; background:#e6dec2; padding:4px; transform:rotate(-5deg); flex-shrink:0; }
-.hud-weapon-body>b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
-.hud-weapon-body>strong { font:800 24px/1.2 var(--hand); font-variant-numeric:tabular-nums; }
-.weapon-card .hud-card-heading small { font-size:10px; letter-spacing:0; color:#475c69; }
-.ammo-pips { display:flex; gap:4px; margin-top:10px; height:13px; }
-.ammo-pips>i { flex:1; display:block; border:1px solid #393935; background:#c6c0b0; transform:skew(-7deg); border-radius:1px 3px 2px 1px; overflow:hidden; }
-.ammo-pips b { display:block; height:100%; width:var(--fill,100%); background:repeating-linear-gradient(110deg,#ffffff35 0 2px,transparent 2px 5px),#458fad; }
-.reload-meter { height:12px; margin-top:7px; }
-.reload-meter>i { background:#d69c38; }
-.weapon-card[data-state="reloading"] .weapon-stamp { background:#f1d790; }
-.weapon-card[data-state="empty"] .hud-card-heading small { color:#933541; }
-#ui .hud-score { order:3; font:700 11px var(--ui) !important; padding:5px 9px; margin:0 !important; background:#ead5a6; width:100%; box-shadow:2px 2px 0 #302d2977; }
-#ui .hud-magic { order:4; margin:0 !important; font-size:11px !important; width:100%; }
-#ui .hud-eye { order:5; }
-#defense-hud.guard-card { position:absolute; left:50%; z-index:120; pointer-events:none; display:flex; gap:10px; width:370px; top:18px; padding:14px 14px 11px; text-align:left; background-color:#f1e3c5 !important; border-radius:3px 9px 2px 8px; }
-.guard-seal { width:41px; height:50px; flex-shrink:0; align-self:center; transform:rotate(-5deg); }
-.guard-content { flex:1; min-width:0; }
-.guard-title { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin:6px 0; }
-#painting-name { font:800 16px var(--hand); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-#painting-integrity-label { font:800 15px var(--hand); flex-shrink:0; }
-#painting-integrity-fill { width:var(--fill,100%); background:repeating-linear-gradient(115deg,#ffffff28 0 2px,transparent 2px 7px),#55a895 !important; }
-.guard-footer { display:flex; gap:7px; margin-top:7px; align-items:baseline; font-size:10px; line-height:1.4; }
-#guard-condition { flex-shrink:0; font-weight:800; color:#37665a; }
-#painting-alert { color:#645843 !important; font:600 10px/1.4 var(--ui) !important; }
-#defense-hud[data-state="worn"] #painting-integrity-fill { background-color:#c6963d !important; }
-#defense-hud[data-state="critical"] #painting-integrity-fill { background:#c45a68 !important; }
-#defense-hud[data-state="critical"] { border-color:#973e49; background-color:#ecd1bc !important; }
-#defense-hud[data-state="critical"]::after { border-style:dashed; border-color:#973e4977; }
-#defense-hud[data-state="critical"] #guard-condition,#defense-hud[data-attacked="true"] #painting-alert { color:#973e49 !important; }
-#defense-hud[data-attacked="true"] .guard-seal { animation:ink-heartbeat 1.5s ease-in-out infinite; }
-.hud-paper [hidden] { display:none !important; }
-@keyframes ink-heartbeat { 0%,100% { transform:rotate(-5deg) scale(1); } 45% { transform:rotate(-5deg) scale(1.09); } }
-@media (max-width:1050px) { #defense-hud.guard-card { top:auto !important; bottom:18px; width:360px; } }
-@media (max-width:650px) { #ui { width:min(245px,calc(100vw - 160px)); gap:10px; } .hud-paper { padding:11px 9px 9px; } .hud-card-heading { font-size:8px; letter-spacing:0; } .heart-seal { width:30px; } .hud-health-row,.hud-weapon-row { gap:6px; } .hud-health-body strong { font-size:17px; } .weapon-stamp { width:34px; height:39px; } .hud-weapon-body>b { font-size:11px; } .hud-weapon-body>strong { font-size:19px; } .ammo-pips { gap:2px; } #defense-hud.guard-card { width:min(360px,calc(100vw - 28px)); bottom:12px; } #combat-field-notes { display:none !important; } }
-@media (prefers-reduced-motion:reduce) { .hud-paper * { animation:none !important; transition:none !important; } }
-
-/* Compact combat layout: preserve the paper language, prioritize the board. */
-#ui { top:12px !important; left:50px !important; width:210px; gap:5px; }
-.hud-paper { padding:6px 8px; border-width:1px; border-radius:3px 5px 2px 4px; box-shadow:1px 2px 0 #171c2766; }
-.hud-paper::before { width:27px; height:7px; top:-4px; left:12px; opacity:.65; }
-.hud-paper::after { display:none; }
-.hud-card-heading { font-size:10px; letter-spacing:0; line-height:12px; }
-.hud-card-heading b { font-size:11px; }
-.hud-health-row,.hud-weapon-row { gap:6px; margin-top:2px; }
-.heart-seal { width:22px; height:24px; }
-.hud-health-body strong { font-size:14px; line-height:17px; margin-bottom:2px; }
-.ink-meter { height:7px; padding:1px; border-width:1px; }
-.hud-xp-row { gap:0; margin-top:4px; }
-.hud-xp-row>span { display:none; }
-.xp-meter { height:3px; border:0; padding:0; }
-.shield-note { font-size:10px; margin-top:3px; padding-top:3px; }
-.health-card.is-hit { box-shadow:0 0 0 1px #e5787888,1px 2px 0 #171c2766; }
-.weapon-card { transform:none; }
-.weapon-card::before { right:12px; }
-.weapon-card .hud-card-heading>span { display:none; }
-.weapon-card .hud-card-heading { justify-content:flex-end; line-height:11px; margin-bottom:2px; }
-.weapon-card[data-state="ready"] .hud-card-heading { display:none; }
-.weapon-stamp { width:23px; height:25px; padding:0; border:0; outline:0; background:none; }
-.hud-weapon-body { display:flex; align-items:center; gap:6px; }
-.hud-weapon-body>b { flex:1; min-width:0; font-size:11px; font-weight:600; }
-.hud-weapon-body>strong { flex-shrink:0; font-size:14px; white-space:nowrap; }
-.ammo-pips { height:5px; gap:3px; margin-top:3px; }
-.reload-meter { height:5px; margin-top:3px; }
+.hud-health-row { display:flex; align-items:baseline; gap:12px; margin-bottom:5px; }
+.hud-health-row>span,.hud-health-row>strong { font:600 17px/1.25 var(--ui,system-ui); letter-spacing:.02em; }
+.hud-health-row>strong { font-variant-numeric:tabular-nums; }
+.ink-meter {
+  height:11px; padding:0; overflow:hidden; border:1px solid var(--text,#eee4c8);
+  border-radius:0; background:rgba(37,38,33,.75);
+}
+.ink-meter>i { display:block; height:100%; width:var(--fill,100%); background:#b74736; transition:width .12s linear; }
+.hud-xp-row { display:flex; align-items:center; gap:13px; margin-top:7px; }
+.hud-xp-row>b { flex-shrink:0; font:600 14px/1.2 var(--ui,system-ui); font-variant-numeric:tabular-nums; }
+.xp-meter { height:6px; flex:1; }
+.xp-meter>i { background:var(--text,#eee4c8); }
+.shield-note { display:block; margin-top:6px; padding-top:5px; border-top:1px solid var(--line,#7f7c69); color:var(--muted,#b0aa95); font-size:11px; line-height:1.4; }
+.health-card[data-state="critical"] .hud-health-row>span { color:#d67a65; }
+.health-card[data-state="critical"]>.ink-meter { border-color:#d67a65; }
+.health-card.is-hit>.ink-meter { outline:1px solid #b74736; outline-offset:2px; }
+.weapon-card { display:flex; align-items:flex-start; gap:10px; transform:none; }
+.weapon-stamp,.hud-magic-stamp {
+  position:relative; width:48px; height:48px; padding:5px; flex-shrink:0;
+  color:var(--text,#eee4c8); border:1px solid var(--text,#eee4c8);
+  background:rgba(37,38,33,.3);
+}
+.weapon-stamp::after,.hud-magic-stamp::after {
+  content:''; position:absolute; inset:-2px 1px 1px -2px; border:1px solid rgba(238,228,200,.45);
+  clip-path:polygon(0 0,35% 0,35% 3%,86% 3%,86% 0,100% 0,100% 100%,67% 100%,67% 97%,12% 97%,12% 100%,0 100%);
+  pointer-events:none;
+}
+.hud-weapon-body { flex:1; min-width:0; padding-top:2px; }
+.hud-weapon-heading { display:flex; align-items:baseline; gap:8px; }
+.hud-weapon-heading>b { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:600 13px/1.3 var(--ui,system-ui); }
+.hud-weapon-heading>strong { flex-shrink:0; font:600 15px/1.3 var(--ui,system-ui); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ammo-pips { display:flex; gap:5px; margin-top:7px; height:17px; }
+.ammo-pips>i { display:block; width:9px; flex:1; max-width:12px; overflow:hidden; border:1px solid rgba(238,228,200,.18); background:#56564b; border-radius:1px; }
+.ammo-pips b { display:block; height:100%; width:var(--fill,100%); background:var(--text,#eee4c8); }
+.hud-card-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted,#b0aa95); font:500 10px/1.3 var(--ui,system-ui); }
+.weapon-card .hud-card-heading { margin-top:4px; }
+.weapon-card .hud-card-heading>span,.weapon-card[data-state="ready"] .hud-card-heading { display:none; }
+.weapon-card .hud-card-heading small { font-size:10px; }
+.weapon-card[data-state="empty"] .hud-card-heading small { color:#d67a65; }
+.reload-meter { height:7px; margin-top:8px; }
+.reload-meter>i { background:var(--text,#eee4c8); }
 .weapon-card[data-state="reloading"] .ammo-pips { display:none; }
-#ui .hud-score,#ui .hud-magic { padding:2px 6px; border-width:1px; box-shadow:none; font:600 10px/1.4 var(--ui) !important; transform:none; }
-#ui .hud-magic[data-ready="true"] { background:#f1d890; }
-#pause-btn { width:29px; height:29px; top:12px !important; left:10px !important; font-size:15px !important; box-shadow:1px 2px 0 #302d2955; }
-#minimapCanvas { width:104px !important; height:104px !important; top:12px !important; right:12px !important; border-width:2px !important; box-shadow:2px 2px 0 #302d2955 !important; }
+#ui .hud-score,#ui .hud-eye {
+  width:100%; margin:0 !important; padding:7px 0 0; border:0; border-top:1px solid var(--line,#7f7c69);
+  border-radius:0; background:none; color:var(--text,#eee4c8) !important;
+  box-shadow:none; font:500 12px/1.5 var(--ui,system-ui) !important;
+  text-shadow:0 1px 0 #252621 !important; transform:none; letter-spacing:.01em;
+}
+#ui .hud-score { order:3; }
+#ui .hud-eye { order:5; border-top-color:#b74736; }
+#ui .hud-magic {
+  position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+  display:flex; align-items:center; gap:11px; width:282px; margin:0 !important; padding:0;
+  border:0; border-radius:0; background:none; color:var(--text,#eee4c8) !important; box-shadow:none;
+  font:500 14px/1.3 var(--ui,system-ui) !important; text-shadow:0 1px 0 #252621 !important;
+}
+.hud-magic-readout { flex:1; min-width:0; }
+.hud-magic-heading { display:flex; align-items:baseline; gap:8px; margin-bottom:7px; font-weight:600; }
+.hud-magic-heading kbd { padding:0; border:0; background:none; font:inherit; }
+.hud-magic-heading strong { margin-left:auto; font:inherit; font-variant-numeric:tabular-nums; }
+.hud-magic-meter { height:9px; }
+.hud-magic-meter>i { background:var(--text,#eee4c8); }
+.hud-magic-status { display:block; margin-top:4px; font-size:10px; color:var(--muted,#b0aa95); }
+#ui .hud-magic[data-ready="true"] .hud-magic-meter { border-color:#b74736; }
+#ui .hud-magic[data-ready="true"] .hud-magic-status { color:#d67a65; }
+#pause-btn {
+  top:22px !important; right:20px !important; left:auto !important; width:27px; height:27px;
+  display:grid; place-items:center; z-index:121; padding:4px; cursor:pointer;
+  color:var(--text,#eee4c8); background:rgba(37,38,33,.85); border:1px solid var(--text,#eee4c8);
+  border-radius:0; box-shadow:none; font:14px var(--ui,system-ui) !important;
+}
+#pause-btn svg { width:13px; height:13px; }
+#pause-btn:hover { background:#34342c; border-color:#b74736; }
+#pause-btn:focus-visible { outline:2px solid var(--text,#eee4c8); outline-offset:4px; }
+#pause-btn[style*="display: none"] { display:none !important; }
+#minimapCanvas {
+  width:126px !important; height:126px !important; top:22px !important; right:59px !important; left:auto !important;
+  padding:4px; border:4px solid var(--text,#eee4c8) !important; border-radius:0;
+  background:#252621 !important; box-shadow:1px 1px 0 #7f7c69,-1px -1px 0 #b0aa95 !important;
+  transform:none; filter:none;
+  clip-path:polygon(0 1%,8% 0,12% 1%,24% 0,39% 1%,45% 0,60% 1%,76% 0,90% 1%,100% 0,99% 15%,100% 30%,99% 48%,100% 67%,99% 86%,100% 99%,90% 100%,77% 99%,66% 100%,51% 99%,35% 100%,21% 99%,8% 100%,0 99%,1% 83%,0 65%,1% 48%,0 33%,1% 17%);
+}
 #combat-field-notes { display:none !important; }
-#defense-hud.guard-card { width:270px; top:12px; bottom:auto; padding:6px 8px; gap:6px; border-width:1px; box-shadow:1px 2px 0 #171c2766; }
-.guard-seal { width:22px; height:26px; }
-.guard-content { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:3px 8px; align-items:baseline; }
+#defense-hud.guard-card {
+  position:absolute; left:50%; top:22px; bottom:auto; z-index:120; pointer-events:none;
+  display:flex; gap:8px; width:280px; padding:0; text-align:left;
+  color:var(--text,#eee4c8); background:none !important; border-radius:0; transform:translateX(-50%);
+}
+.guard-seal { width:25px; height:30px; flex-shrink:0; align-self:center; }
+.guard-content { flex:1; min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:5px 8px; align-items:baseline; }
 .guard-content>.hud-card-heading,.guard-title { display:contents; }
 #guard-caption { display:none; }
-#guard-time { grid-column:3; grid-row:1; font:700 11px var(--ui); }
-#painting-name { grid-column:1; grid-row:1; font-size:12px; }
-#painting-integrity-label { grid-column:2; grid-row:1; font-size:12px; }
-.integrity-meter { grid-column:1/-1; grid-row:2; }
-.guard-footer { grid-column:1/-1; grid-row:3; display:none; margin-top:0; line-height:1.3; }
+#guard-time { grid-column:3; grid-row:1; font:600 12px var(--ui,system-ui); font-variant-numeric:tabular-nums; }
+#painting-name { grid-column:1; grid-row:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:500 12px var(--ui,system-ui); }
+#painting-integrity-label { grid-column:2; grid-row:1; font:600 12px var(--ui,system-ui); font-variant-numeric:tabular-nums; }
+.integrity-meter { grid-column:1/-1; grid-row:2; height:7px; }
+#painting-integrity-fill { width:var(--fill,100%); background:var(--text,#eee4c8) !important; }
+.guard-footer { grid-column:1/-1; grid-row:3; display:none; align-items:baseline; gap:7px; margin-top:0; font-size:10px; line-height:1.4; }
+#guard-condition { flex-shrink:0; font-weight:500; color:var(--text,#eee4c8); }
+#painting-alert { color:var(--muted,#b0aa95) !important; font:400 10px/1.4 var(--ui,system-ui) !important; }
+#defense-hud[data-state="worn"] #painting-integrity-fill { background:#b0aa95 !important; }
+#defense-hud[data-state="critical"] #painting-integrity-fill { background:#b74736 !important; }
+#defense-hud[data-state="critical"] #guard-condition,#defense-hud[data-attacked="true"] #painting-alert { color:#d67a65 !important; }
 #defense-hud[data-state="worn"] .guard-footer,#defense-hud[data-state="critical"] .guard-footer,#defense-hud[data-attacked="true"] .guard-footer { display:flex; }
-#defense-hud[data-attacked="false"] #painting-alert { display:none; }
-#defense-hud[data-state="safe"][data-attacked="true"] #guard-condition { display:none; }
-@media (max-width:1050px) { #defense-hud.guard-card { top:auto !important; bottom:10px; width:260px; } }
-@media (max-width:650px) {
-  #ui { width:min(210px,calc(100vw - 154px)); gap:4px; }
-  #minimapCanvas { width:88px !important; height:88px !important; }
-  #defense-hud.guard-card { width:min(260px,calc(100vw - 24px)); }
+#defense-hud[data-attacked="false"] #painting-alert,#defense-hud[data-state="safe"][data-attacked="true"] #guard-condition { display:none; }
+.hud-paper [hidden],.hud-magic [hidden] { display:none !important; }
+@media(max-width:1050px) {
+  #defense-hud.guard-card { top:auto !important; left:24px; bottom:25px; width:250px; transform:none; }
+  #ui .hud-magic { left:auto; right:24px; bottom:25px; transform:none; width:250px; }
 }
+@media(max-width:650px) {
+  #ui { top:16px !important; left:16px !important; width:min(220px,calc(100vw - 164px)); gap:10px; }
+  .hud-health-row { gap:8px; }
+  .hud-health-row>span,.hud-health-row>strong { font-size:14px; }
+  .hud-xp-row>b { font-size:12px; }
+  .weapon-stamp { width:36px; height:36px; padding:3px; }
+  .weapon-card { gap:7px; }
+  .hud-weapon-heading { gap:5px; }
+  .hud-weapon-heading>b { font-size:11px; }
+  .hud-weapon-heading>strong { font-size:12px; }
+  .ammo-pips { height:12px; gap:3px; margin-top:6px; }
+  #ui .hud-score { font-size:10px !important; }
+  #minimapCanvas { width:94px !important; height:94px !important; top:16px !important; right:49px !important; padding:3px; border-width:3px !important; }
+  #pause-btn { top:16px !important; right:12px !important; width:25px; height:25px; }
+  #defense-hud.guard-card { left:16px; bottom:76px; width:220px; }
+  #ui .hud-magic { left:50%; right:auto; bottom:16px; transform:translateX(-50%); width:250px; }
+  .hud-magic-stamp { width:40px; height:40px; }
+}
+@media(max-height:500px) {
+  #ui { top:12px !important; gap:8px; }
+  #defense-hud.guard-card { left:16px; bottom:12px; width:220px; transform:none; }
+  #ui .hud-magic { left:auto; right:16px; bottom:12px; transform:none; width:220px; }
+}
+@media(prefers-reduced-motion:reduce) { .hud-paper *,.hud-magic * { animation:none !important; transition:none !important; } }
