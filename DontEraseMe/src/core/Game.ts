@@ -489,7 +489,7 @@ export class Game {
         this.courtyardBoundary = new CourtyardBoundarySystem(() => this.currentMode === 'endless');
         this.addSystem(this.courtyardBoundary);
         this.addSystem(new RenderSystem(this.gameCtx, this.camera, this.worldWidth, this.worldHeight,
-            () => this.currentMode === 'endless', () => this.currentMode === 'defense', () => this.currentMode === 'drawing'));
+            () => this.currentMode === 'endless', () => this.currentMode === 'defense', () => this.currentMode === 'drawing', true));
         this.addSystem(new MinimapSystem(this.minimapCtx, this.worldWidth, this.worldHeight, this.camera, () => this.currentMode === 'endless'));
         this.addSystem(new UISystem());
         this.addSystem(new QuestSystem());
@@ -936,6 +936,7 @@ export class Game {
 
     public showSelectionScreen(mode?: SelectablePlayMode): void {
         if (this.state === GameState.GALLERY) return;
+        this.setCombatFieldNotesVisible(false);
         if (mode) this.pendingMode = mode;
         this.state = GameState.SELECTION;
         this.mainMenu.style.display = 'none';
@@ -1770,6 +1771,9 @@ export class Game {
     }
 
     private setCombatFieldNotesVisible(visible: boolean): void {
+        if (!visible) for (const system of this.systems) {
+            if (system instanceof RenderSystem) system.hideScenery();
+        }
         const scene = document.getElementById('courtyardCanvas');
         if(scene && !visible)scene.style.display='none';
         const notes = document.getElementById('combat-field-notes');
@@ -1949,6 +1953,7 @@ export class Game {
 
     private async openGallery(): Promise<void> {
         if (this.state !== GameState.MENU) return;
+        this.setCombatFieldNotesVisible(false);
         this.stop();
         this.clearInput();
         this.state = GameState.GALLERY;

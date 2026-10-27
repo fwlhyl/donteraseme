@@ -1,60 +1,65 @@
-import courtyardUrl from '../assets/paper-scenes/atelier-clarity-v1.webp';
-import ruinsUrl from '../assets/paper-scenes/ruins-clarity-v1.webp';
-import { sceneBounds, type CourtyardTheme } from './SceneLayout';
-import { DOODLE_FLOOR, drawDoodleFloor, drawBlendedDoodleFloor, isDoodleFloorTextureReady } from './DoodleFloor';
-import { drawDoodleLights } from './DoodleLights';
+import { COURTYARD_OUTLINE } from './CourtyardGeometry';
+import type { CourtyardTheme } from './SceneLayout';
 
-/** Separate scenery layer below painting/trails: never baked into saved art. */
+/** Temporary neutral stage after retiring the illustrated scenery.
+ * Uses the existing playable boundary; decoration never changes collisions or ink. */
 export class CourtyardScene {
-    private image=new Image();
-    private ruinsImage=new Image();
-    private canvas=document.createElement('canvas');
-    private ctx:CanvasRenderingContext2D;
-    private reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    private lastFrame='';
-    constructor() {
-        this.canvas.id='courtyardCanvas';
-        this.canvas.style.cssText='position:absolute;inset:0;z-index:0;pointer-events:none;display:none';
-        document.body.insertBefore(this.canvas,document.getElementById('paintingCanvas'));
-        this.ctx=this.canvas.getContext('2d')!;
-        this.image.src=courtyardUrl;
-        this.ruinsImage.src=ruinsUrl;
+    private canvas = document.createElement('canvas');
+    private ctx: CanvasRenderingContext2D;
+    private lastFrame = '';
+
+    constructor(_enable3d = false) {
+        this.canvas.id = 'courtyardCanvas';
+        this.canvas.style.cssText = 'position:absolute;inset:0;z-index:0;pointer-events:none;display:none';
+        document.body.insertBefore(this.canvas, document.getElementById('paintingCanvas'));
+        this.ctx = this.canvas.getContext('2d')!;
     }
-    draw(camera:{x:number;y:number},worldWidth:number,worldHeight:number,enabled:boolean,theme:CourtyardTheme='atelier',timeSeconds=0):void {
-        this.canvas.style.display=enabled?'block':'none';
-        if(!enabled){this.lastFrame='';return;}
-        const ownsCanvas=this.canvas.dataset.scene===theme;
-        this.canvas.dataset.scene=theme;
-        const dpr=window.devicePixelRatio||1,w=window.innerWidth,h=window.innerHeight;
-        const image=theme==='ruins'?this.ruinsImage:this.image;
-        const ready=image.complete&&image.naturalWidth>0;
-        // Static camera needs only 30 light frames/sec; cached pixels remain visible
-        // in between. Moving cameras still redraw every frame to avoid judder.
-        const lightTick=this.reducedMotion?.matches?0:Math.floor(timeSeconds*30);
-        // A late-loading floor texture must also refresh a stationary or
-        // reduced-motion scene; it is not tied to camera movement or flicker.
-        const floorReady=isDoodleFloorTextureReady();
-        const frameKey=[camera.x,camera.y,w,h,dpr,worldWidth,worldHeight,theme,ready,floorReady,lightTick].join(':');
-        if(frameKey===this.lastFrame&&ownsCanvas)return;
-        this.lastFrame=frameKey;
-        if(this.canvas.width!==Math.round(w*dpr)||this.canvas.height!==Math.round(h*dpr)) {
-            this.canvas.width=Math.round(w*dpr);this.canvas.height=Math.round(h*dpr);
-            this.canvas.style.width=`${w}px`;this.canvas.style.height=`${h}px`;
+
+    /** No obsolete foreground plate is painted over the combat layer. */
+    drawForeground(_ctx: CanvasRenderingContext2D, _width: number, _height: number): void {}
+
+    hide(): void {
+        this.canvas.style.display = 'none';
+        this.lastFrame = '';
+    }
+
+    draw(camera: {x: number; y: number}, worldWidth: number, worldHeight: number,
+        enabled: boolean, theme: CourtyardTheme = 'atelier', _timeSeconds = 0): void {
+        if (!enabled) { this.hide(); return; }
+        const width = window.innerWidth, height = window.innerHeight;
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+        const ownsCanvas = this.canvas.dataset.scene === theme;
+        this.canvas.style.display = 'block';
+        this.canvas.dataset.scene = theme;
+        this.canvas.dataset.renderer = 'neutral-line';
+        const key = [camera.x, camera.y, width, height, dpr, worldWidth, worldHeight, theme].join(':');
+        if (key === this.lastFrame && ownsCanvas) return;
+        this.lastFrame = key;
+        if (this.canvas.width !== Math.round(width * dpr) || this.canvas.height !== Math.round(height * dpr)) {
+            this.canvas.width = Math.round(width * dpr);
+            this.canvas.height = Math.round(height * dpr);
+            this.canvas.style.width = `${width}px`;
+            this.canvas.style.height = `${height}px`;
         }
-        this.ctx.setTransform(dpr,0,0,dpr,0,0);
-        this.ctx.fillStyle=DOODLE_FLOOR;this.ctx.fillRect(0,0,w,h);
-        this.ctx.imageSmoothingEnabled=true;this.ctx.imageSmoothingQuality='high';
-        if(ready) {
-            const bounds=sceneBounds(worldWidth,worldHeight,theme);
-            this.ctx.drawImage(image,bounds.x-camera.x,bounds.y-camera.y,bounds.width,bounds.height);
-            this.ctx.save();this.ctx.translate(-camera.x,-camera.y);
-            drawDoodleLights(this.ctx,worldWidth,worldHeight,theme,this.reducedMotion?.matches?0:timeSeconds,{...camera,width:w,height:h});
-            this.ctx.restore();
-        }
-        this.ctx.save();
-        this.ctx.translate(-camera.x,-camera.y);
-        if(ready)drawBlendedDoodleFloor(this.ctx,worldWidth,worldHeight,theme);
-        else drawDoodleFloor(this.ctx,worldWidth,worldHeight,theme);
-        this.ctx.restore();
+        const ctx = this.ctx;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = '#deddd5';
+        ctx.fillRect(0, 0, width, height);
+        ctx.save();
+        ctx.translate(-camera.x, -camera.y);
+        ctx.beginPath();
+        if (theme === 'ruins') ctx.rect(0, 0, worldWidth, worldHeight);
+        else COURTYARD_OUTLINE.forEach(([x, y], index) => {
+            const px = x / 1536 * worldWidth, py = y / 1024 * worldHeight;
+            if (index === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        });
+        ctx.closePath();
+        ctx.fillStyle = '#f3f1e9';
+        ctx.fill();
+        ctx.strokeStyle = '#77786f';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
     }
 }

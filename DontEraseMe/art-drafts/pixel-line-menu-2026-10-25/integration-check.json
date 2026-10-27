@@ -1,0 +1,31 @@
+{
+  "status": "complete",
+  "menuAsset": "src/assets/menu/main-menu.png",
+  "menuPresentation": "Approved image unchanged with five aligned semantic buttons",
+  "retiredVisualResources": 353,
+  "archive": "../DontEraseMe-art-archive/2026-10-25-menu-reset",
+  "runtimeExternalImages": [
+    "src/assets/menu/main-menu.png"
+  ],
+  "preserved": [
+    "music and sound effects",
+    "saved player artworks",
+    "gameplay mechanics and progression"
+  ],
+  "temporaryPresentation": [
+    "procedural monochrome player, enemies, weapons and skills",
+    "neutral scene and gallery surfaces"
+  ],
+  "passed": [
+    "TypeScript and Vite production build",
+    "202 procedural rendering checks",
+    "settings, endless, defense, drawing and gallery browser smoke checks",
+    "four desktop viewport sizes",
+    "zero missing resource responses or runtime errors in smoke test",
+    "archive hashes verified",
+    "approved menu image exact byte match"
+  ],
+  "notRun": [
+    "Additional drawing save/export/replay regression: automatic approval review unavailable due to usage limit"
+  ]
+}

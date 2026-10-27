@@ -3,7 +3,7 @@
 .art-gallery {
     position: fixed; inset: 0; z-index: 10000;
     color: var(--text, #eee4c8);
-    background: url('../assets/paper-scenes/floor-clarity-v1.webp') center / 640px repeat, var(--bg, #252621);
+    background: var(--bg, #252621);
     font: 14px/1.5 var(--ui, system-ui, sans-serif);
     outline: none; isolation: isolate; color-scheme: dark;
 }
@@ -60,7 +60,7 @@
 .gallery-notice-warning { border-color: #92504b; color: #d0aaa0; }
 .gallery-detail { position: absolute; inset: 0; z-index: 5; padding: 24px; display: grid; place-items: center; background: #1f211ce8; }
 .gallery-detail-panel { width: min(1120px, 100%); height: min(820px, calc(100vh - 48px)); min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; border: 1px solid #7f7c69; background: var(--panel, #2b2c26); box-shadow: 0 12px 40px #11141188; }
-.gallery-detail-image-area { min-height: 0; flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden; background: url('../assets/paper-scenes/floor-clarity-v1.webp') center / 640px repeat, #252621; }
+.gallery-detail-image-area { min-height: 0; flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden; background: #252621; }
 .gallery-detail-image-area img { width: 100%; height: 100%; object-fit: contain; }
 .gallery-detail-loading { max-width: 440px; text-align: center; }
 .gallery-detail-info { flex-shrink: 0; padding: 16px 22px; border-top: 1px solid #7f7c69; }

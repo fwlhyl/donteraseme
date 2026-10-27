@@ -1,13 +1,13 @@
 #art-replay {
     position: fixed; inset: 0; z-index: 10000; box-sizing: border-box;
     display: flex; flex-direction: column; gap: 12px; padding: 22px;
-    color: var(--text, #eee4c8); background: url('../assets/ui/paper-grain.svg') repeat, var(--bg, #252621);
+    color: var(--text, #eee4c8); background: var(--bg, #252621);
     font-family: var(--ui, system-ui, sans-serif); color-scheme: dark;
 }
 #art-replay .art-replay-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line, #7f7c69); }
 #art-replay h2 { margin: 0 0 5px; font: 650 clamp(19px, 3vw, 27px)/1.3 var(--ui, system-ui, sans-serif); letter-spacing: .06em; }
 #art-replay p { margin: 0; color: var(--muted, #b0aa95); font-size: 12px; line-height: 1.6; }
-#art-replay button { position: relative; border: 1px solid var(--line, #7f7c69); background: url('../assets/ui/paper-grain.svg') repeat, var(--panel, #2b2c26); color: var(--text, #eee4c8); border-radius: 0; min-height: 36px; padding: 8px 15px; cursor: pointer; font: 13px/1.5 var(--ui, system-ui, sans-serif); white-space: nowrap; transition: border-color 120ms ease, background-color 120ms ease; }
+#art-replay button { position: relative; border: 1px solid var(--line, #7f7c69); background: var(--panel, #2b2c26); color: var(--text, #eee4c8); border-radius: 0; min-height: 36px; padding: 8px 15px; cursor: pointer; font: 13px/1.5 var(--ui, system-ui, sans-serif); white-space: nowrap; transition: border-color 120ms ease, background-color 120ms ease; }
 #art-replay button:hover:not(:disabled) { border-color: var(--text, #eee4c8); background-color: #34352d; }
 #art-replay button:focus-visible { outline: 2px solid var(--text, #eee4c8); outline-offset: 3px; }
 #art-replay button[aria-pressed="true"] { border-color: var(--text, #eee4c8); box-shadow: inset 0 -3px 0 var(--accent, #b74736); }

@@ -17,7 +17,7 @@
   --ink: var(--text); --ink-soft: var(--muted); --hand: var(--display);
   --blue: var(--sage); --teal: var(--sage); --pink: var(--danger);
   --yellow: var(--accent); --violet: var(--accent); --red: var(--danger);
-  --etch: url('./assets/ui/paper-grain.svg');
+  --etch: none;
 }
 * { box-sizing: border-box; }
 body { margin: 0; overflow: hidden; background: var(--bg); color: var(--text); font: 14px/1.5 var(--ui); user-select: none; touch-action: none; }
@@ -54,31 +54,20 @@ canvas { display: block; position: absolute; top: 0; left: 0; }
 .btn-quiet { background: none !important; border-color: transparent !important; box-shadow: none; }
 kbd { font: 10px/1.2 var(--ui); color: var(--text); padding: 3px 5px; border: 1px solid var(--line); background: #242724; border-radius: 0; }
 
-/* Approved composition uses the clarity redraw in an uncropped 16:9 stage;
-   all controls remain live DOM, never text baked into the background. */
-#main-menu { padding:0; overflow:hidden; background:var(--etch), #252621 !important; }
+/* Approved menu artwork is kept intact. Live semantic controls share the
+   artwork's coordinates, including when the stage is letterboxed. */
+#main-menu { padding:0; overflow:hidden; background:#f7f6f1 !important; }
 #main-menu::before, #main-menu::after { content:none; }
-.menu-stage { position:absolute; top:50%; left:50%; width:min(100vw, 177.68vh); height:min(56.28vw, 100vh); transform:translate(-50%,-50%); background:url('./assets/ui/paper-menu-clarity-v1.webp') center/100% 100% no-repeat; }
-.menu-paths { position:absolute; left:76%; top:24%; width:20.5%; height:49%; }
-.new-mode-menu { height:100%; display:flex; flex-direction:column; justify-content:space-between; gap:12px; }
-#main-menu .mode-entry { width:100%; height:21%; min-height:38px; display:flex; align-items:center; justify-content:center; padding:4px 8px; border:0 !important; background:url('./assets/ui/rough-frame.svg') center/100% 100% no-repeat, #25262170 !important; box-shadow:none; color:var(--text); font-size:clamp(17px,2.25vw,38px); font-weight:700; letter-spacing:.09em; }
-#main-menu .mode-entry::before { content:''; position:absolute; left:8%; width:0; height:0; border-top:.32em solid transparent; border-bottom:.32em solid transparent; border-left:.56em solid var(--accent); opacity:0; }
-#main-menu .mode-entry::after { content:''; position:absolute; left:10%; right:8%; bottom:13%; height:3px; background:var(--accent); clip-path:polygon(0 44%,38% 8%,72% 30%,98% 0,100% 70%,45% 100%,5% 85%); opacity:0; }
-#main-menu .mode-entry:first-child::before, #main-menu .mode-entry:first-child::after { opacity:1; }
-#main-menu .menu-paths:has(.mode-entry:hover) .mode-entry::before, #main-menu .menu-paths:has(.mode-entry:hover) .mode-entry::after,
-#main-menu .menu-paths:has(.mode-entry:focus-visible) .mode-entry::before, #main-menu .menu-paths:has(.mode-entry:focus-visible) .mode-entry::after { opacity:0; }
-#main-menu .mode-entry:hover::before, #main-menu .mode-entry:hover::after, #main-menu .mode-entry:focus-visible::before, #main-menu .mode-entry:focus-visible::after { opacity:1 !important; }
-#main-menu .mode-entry:hover, #main-menu .mode-entry:focus-visible { background-color:#39372bd9 !important; }
-#main-menu .mode-entry:focus-visible { outline:1px solid var(--text); outline-offset:4px; }
-.menu-footer { position:absolute; left:2.8%; right:2.8%; bottom:3.5%; display:flex; justify-content:space-between; align-items:flex-end; gap:18px; }
-.menu-footer > div { display:flex; align-items:center; gap:clamp(10px,2vw,34px); }
-.menu-footer .btn { padding:0; display:flex; align-items:center; gap:12px; font-weight:400; font-size:clamp(12px,1.2vw,20px); }
-.menu-footer .btn + .btn { padding-left:24px; border-left:1px solid #eee4c866 !important; }
-.menu-footer svg { width:clamp(30px,3vw,48px); height:clamp(30px,3vw,48px); padding:6px; border:1px solid var(--text); }
-.menu-footer .btn:hover { color:var(--text) !important; background:none !important; }
-.menu-footer .btn:hover svg { color:var(--accent); }
-.controls-hint { margin:0; padding-top:8px; border-top:1px solid #eee4c880; color:var(--text) !important; font-size:clamp(10px,1vw,16px); line-height:1.7; letter-spacing:.03em; }
-.controls-hint span { padding:0 6px; }
+.menu-stage { position:absolute; top:50%; left:50%; width:min(100vw, 177.6833vh); aspect-ratio:1672/941; transform:translate(-50%,-50%); background:url('./assets/menu/main-menu.png') center/100% 100% no-repeat; }
+.menu-paths { position:absolute; left:71.11%; top:21.36%; width:23.03%; height:54.10%; display:flex; flex-direction:column; justify-content:space-between; }
+#main-menu .mode-entry, #main-menu .menu-settings { appearance:none; padding:0; margin:0; border:0; border-radius:0; background:transparent; box-shadow:none; cursor:pointer; color:#282824; }
+#main-menu .mode-entry { position:relative; width:100%; height:20%; flex:none; }
+#main-menu .mode-entry:hover { background:#2727220c; }
+#main-menu .mode-entry:active { background:#27272220; }
+#main-menu .mode-entry:focus-visible { outline:2px solid #282824; outline-offset:4px; background:#2727220c; }
+#main-menu .menu-settings { position:absolute; left:93.05%; top:87.1%; width:4.8%; height:8.6%; }
+#main-menu .menu-settings:hover { background:#2727220c; }
+#main-menu .menu-settings:focus-visible { outline:2px solid #282824; outline-offset:2px; }
 
 /* Preparation / loadout. Selected, locked and focus states are not color-only. */
 #selection-screen { justify-content: flex-start; padding: 36px clamp(24px, 5vw, 80px) 20px !important; }
@@ -225,13 +214,6 @@ kbd { font: 10px/1.2 var(--ui); color: var(--text); padding: 3px 5px; border: 1p
   #level-up-screen { justify-content: flex-start !important; }
   #level-up-cards { flex-wrap: wrap !important; }
   #level-up-cards .card { min-height: 170px; }
-}
-@media (max-width: 700px) and (orientation:portrait) {
-  .menu-stage { width:100vw; height:100vh; background-size:auto 64%; background-position:left top; background-color:var(--bg); }
-  .menu-paths { top:auto; bottom:15%; left:10%; width:80%; height:37%; }
-  #main-menu .mode-entry { font-size:23px; min-height:44px; background-color:#252621ed !important; }
-  .menu-footer { bottom:3%; align-items:center; flex-direction:column-reverse; }
-  .menu-footer .controls-hint { font-size:10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .overlay *, .sketch-dialog *, .sketch-board-panel * { animation: none !important; transition: none !important; }

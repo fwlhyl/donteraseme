@@ -24,6 +24,7 @@ import { Paperclip } from '../components/Paperclip';
 import { PlayerAnimation } from '../components/PlayerAnimation';
 import { SkillVisual } from '../components/SkillVisual';
 import { emitGameSound } from '../audio/AudioEvents';
+import { sweptProjectileCircleTime, sweptWallTime } from './ProjectileSweep';
 
 /** Broad phase only: the original AABB and shape tests remain authoritative. */
 class EnemyCollisionIndex {
@@ -569,8 +570,12 @@ export class CollisionSystem extends System {
         // knockback below updates the index before the next projectile sees it.
         const enemyIndex = enemies.length >= 48 && projectiles.length > 0 ? new EnemyCollisionIndex(enemies) : null;
 
+        // Non-piercing fast shots stop at the first wall, even if the endpoint lies beyond it.
+        const blockingWalls = new Map<Entity, Entity>();
+
         // 2. Projectile vs Enemy
         for (const projectile of projectiles) {
+            if (!projectile.active) continue;
             const pTransform = projectile.getComponent(Transform)!;
             const pRender = projectile.getComponent(Renderable)!;
             const pData = projectile.getComponent(Projectile)!;
@@ -594,10 +599,47 @@ export class CollisionSystem extends System {
             else if (pData.type === 'rocket' || pData.type === 'mine') aabbRange = 200;
             else if (pData.type === 'compass' && (pData as any).isAwakened) aabbRange = 200;
 
+            const swept = pData.sweptCollision && Number.isFinite(pData.previousX) && Number.isFinite(pData.previousY);
+            const fromX = swept ? pData.previousX! : pTransform.x;
+            const fromY = swept ? pData.previousY! : pTransform.y;
+            const queryX = (fromX + pTransform.x) / 2;
+            const queryY = (fromY + pTransform.y) / 2;
+            // Index the whole travelled segment, including fast upgraded bullets.
+            aabbRange += Math.max(Math.abs(pTransform.x-fromX), Math.abs(pTransform.y-fromY)) / 2;
+
             // Awakened mines move other enemies during this same loop. Keep
             // their live ordered scan; all other shapes only move their current target.
-            const candidates = pData.type === 'mine' && (pData as any).isAwakened
-                ? enemies : enemyIndex?.query(pTransform.x, pTransform.y, aabbRange) ?? enemies;
+            let candidates = pData.type === 'mine' && (pData as any).isAwakened
+                ? enemies : enemyIndex?.query(queryX, queryY, aabbRange) ?? enemies;
+            const sweepHits = new Map<Entity, number>();
+            if (swept) {
+                let wallTime = Infinity;
+                if (pData.pierceCount <= 0) {
+                    const bodyRadius = pRender.shape === 'circle' ? (pRender.radius || 5)
+                        : Math.max(pRender.radius || 10, Math.max(pRender.width || 10, pRender.height || 10) / 2);
+                    for (const wall of walls) {
+                        const wt = wall.getComponent(Transform), wr = wall.getComponent(Renderable), wh = wall.getComponent(Health);
+                        if (!wall.active || !wt || !wr || !wh || wh.current <= 0) continue;
+                        const time = sweptWallTime(fromX, fromY, pTransform.x, pTransform.y, wt.x, wt.y,
+                            wr.shape === 'wall_line' ? (wr.width || wt.x) : wt.x,
+                            wr.shape === 'wall_line' ? (wr.height || wt.y) : wt.y, bodyRadius + (wr.radius || 25));
+                        if (time !== null && time < wallTime) { wallTime = time; blockingWalls.set(projectile, wall); }
+                    }
+                }
+                // Sort only contacted targets, so a non-piercing shot hits the first
+                // physical body along the path rather than entity insertion order.
+                candidates = candidates.filter(enemy => {
+                    const et = enemy.getComponent(Transform), er = enemy.getComponent(Renderable);
+                    if (!enemy.active || !et || !er || pData.hitEnemies?.has(enemy.id)) return false;
+                    if (Math.abs(queryX-et.x) > aabbRange || Math.abs(queryY-et.y) > aabbRange) return false;
+                    const time = sweptProjectileCircleTime(fromX, fromY, pTransform.x, pTransform.y,
+                        pTransform.rotation, pRender.shape, pRender.width, pRender.height, pRender.radius,
+                        et.x, et.y, er.radius || 15);
+                    if (time === null || time >= wallTime) return false;
+                    sweepHits.set(enemy, time);
+                    return true;
+                }).sort((a, b) => sweepHits.get(a)! - sweepHits.get(b)!);
+            }
             for (const enemy of candidates) {
                 if (!enemy.active) continue;
 
@@ -606,7 +648,7 @@ export class CollisionSystem extends System {
                 
                 const eTransform = enemy.getComponent(Transform)!;
                 if (!eTransform) continue;
-                if (Math.abs(pTransform.x - eTransform.x) > aabbRange || Math.abs(pTransform.y - eTransform.y) > aabbRange) {
+                if (Math.abs(queryX - eTransform.x) > aabbRange || Math.abs(queryY - eTransform.y) > aabbRange) {
                     continue; // 距离太远直接跳过所有复杂计算
                 }
                 const eBeh = enemy.getComponent(EnemyBehavior);
@@ -617,8 +659,17 @@ export class CollisionSystem extends System {
                 // Check collision based on projectile shape
                 let hit = false;
 
+                if (swept) {
+                    hit = sweepHits.has(enemy);
+                    // Preserve the existing small forward shove on rectangular shots.
+                    if (hit && (pRender.shape === 'rect' || pRender.shape === 'crescent')) {
+                        eTransform.x += Math.cos(pTransform.rotation) * 8;
+                        eTransform.y += Math.sin(pTransform.rotation) * 8;
+                        enemyIndex?.update(enemy, eTransform);
+                    }
+                }
                 // Gravity Gun: Check if enemy is in range of black hole
-                if (pData.type === 'gravity') {
+                else if (pData.type === 'gravity') {
                     const isAwakened = (pData as any).isAwakened;
                     // 如果觉醒，引力范围扩大3倍（基础250 -> 750）
                     const gravityRadius = isAwakened ? 750 : 250; 
@@ -2235,7 +2286,7 @@ export class CollisionSystem extends System {
 
             // 3. Wall vs Projectiles (Player only for now, to let player break it)
             for (const proj of projectiles) {
-                if (!proj.active) continue;
+                if (!proj.active || (blockingWalls.has(proj) && blockingWalls.get(proj) !== wall)) continue;
                 const projData = proj.getComponent(Projectile);
                 if (!projData || (player && projData.ownerId !== player.id)) continue;
 
@@ -2247,7 +2298,17 @@ export class CollisionSystem extends System {
                 let hitX = wT.x;
                 let hitY = wT.y;
                 
-                if (pR.shape === 'line') {
+                if (projData.sweptCollision && Number.isFinite(projData.previousX) && Number.isFinite(projData.previousY)) {
+                    const fromX = projData.previousX!, fromY = projData.previousY!;
+                    const radius = (pR.shape === 'circle' ? (pR.radius || 5)
+                        : Math.max(pR.radius || 10, Math.max(pR.width || 10, pR.height || 10) / 2)) + wRadius;
+                    const time = sweptWallTime(fromX, fromY, pT.x, pT.y, wX1, wY1, wX2, wY2, radius);
+                    hit = time !== null;
+                    if (time !== null) {
+                        hitX = fromX + (pT.x - fromX) * time;
+                        hitY = fromY + (pT.y - fromY) * time;
+                    }
+                } else if (pR.shape === 'line') {
                     // raycast logic for sniper beam against wall line
                     hit = this.segmentsIntersect(pT.x, pT.y, pR.width, pR.height, wX1, wY1, wX2, wY2) ||
                           this.lineCircleCollision(pT.x, pT.y, pR.width, pR.height, wX1, wY1, wRadius) ||

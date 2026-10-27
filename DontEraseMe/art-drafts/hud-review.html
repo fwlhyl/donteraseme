@@ -1,9 +1,0 @@
-<!doctype html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dont Erase Me · HUD 资源审阅</title>
-<style>
-body{overflow:auto!important;background:#27394d!important;padding:32px;color:#f8f1de!important}main{max-width:1100px;margin:auto}h1{font-size:26px}header p{color:#b9cbd2}section{margin:28px 0}.review-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:24px}.sample>p{font-size:12px;color:#c5cbd1}.review-grid .hud-paper{width:100%;min-height:110px}.review-tools{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}.review-tools button{padding:8px 14px;border:1px solid #dcc79c;background:#f8f1de;color:#302d29;cursor:pointer}#defense-hud.guard-card{position:relative!important;inset:auto!important;transform:none!important;width:min(440px,100%)!important;display:flex!important}#icon-gallery{display:flex;flex-wrap:wrap;gap:14px}.icon-tile{width:70px;padding:7px;background:#f8f1de;color:#302d29;text-align:center;border:2px solid #302d29}.icon-tile svg{height:48px}.icon-tile small{font-size:10px}footer{color:#b9cbd2;font-size:12px;padding:15px 0}
-.review-grid .hud-paper{width:210px;max-width:100%;min-height:0}#defense-hud.guard-card{width:270px!important}
-</style></head><body><main><header><h1>战地速写本 · 精简 HUD</h1><p>生产组件的静态状态样张，不读取或修改玩家存档。紧凑状态条，异常时才展开提示。</p></header>
-<section><h2>生命与画笔</h2><div class="review-grid" id="samples"></div></section>
-<section><h2>守卫修复记录</h2><div class="review-tools"><button data-state="safe">完好</button><button data-state="worn">受损</button><button data-state="critical">危急 / 正在擦除</button></div><div id="defense-hud"></div></section>
-<section><h2>十二种画笔图标</h2><div id="icon-gallery"></div></section><footer>墨线边框 / 半透明胶带 / 纸纹 / 矢量图标。所有数字、刻度与状态均为实时 UI。</footer></main><script type="module" src="./hud-review.ts"></script></body></html>

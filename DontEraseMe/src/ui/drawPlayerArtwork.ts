@@ -1,4 +1,5 @@
 import { PlayerArtwork } from '../components/PlayerArtwork';
+import { PLAYER_PRESENTATION } from '../config/PlayerPresentation';
 import { drawAtlasFrame } from '../art/AtlasFrame';
 import { applyDoodlePose, drawDoodleAccent, type DoodlePose } from '../art/DoodleMotion';
 import { drawDoodleWeapon } from '../art/DoodleWeapons';
@@ -72,21 +73,22 @@ export function drawPlayerArtwork(
     pose?: DoodlePose,
     weapon?: Weapon | null
 ): boolean {
-    if (!artwork || !artwork.image.complete || artwork.image.naturalWidth <= 0 || artwork.image.naturalHeight <= 0) return false;
+    if (!artwork) return false;
+    if (artwork.rig !== 'neutral-player' && (!artwork.image.complete || artwork.image.naturalWidth <= 0 || artwork.image.naturalHeight <= 0)) return false;
 
     // Keep the figure upright; horizontal hysteresis avoids jitter at vertical aim.
     const direction = Math.cos(aim);
-    if (direction < -0.12) artwork.facingLeft = true;
-    else if (direction > 0.12) artwork.facingLeft = false;
+    if (direction < -PLAYER_PRESENTATION.facingDeadZone) artwork.facingLeft = true;
+    else if (direction > PLAYER_PRESENTATION.facingDeadZone) artwork.facingLeft = false;
     const size = artwork.displaySize * radius / artwork.baseRadius;
     ctx.save();
     ctx.shadowBlur = 0;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     if (pose) {
-        ctx.fillStyle='#0c15294d';ctx.beginPath();ctx.ellipse(0,size*.44,size*.23*pose.shadowScale,size*.055,0,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#30382b24';ctx.beginPath();ctx.ellipse(0,size*.44,size*.23*pose.shadowScale,size*.055,0,0,Math.PI*2);ctx.fill();
     }
-    if (artwork.rig === 'paper-collector-v1') {
+    if (artwork.rig === 'paper-collector-v1' || artwork.rig === 'neutral-player') {
         drawPaperCollector(ctx, artwork.image, size, artwork.facingLeft, aim, pose, weapon);
     } else if (artwork.articulated && artwork.frame) {
         drawArticulatedPlayer(ctx, artwork, size, aim, pose, weapon);
@@ -98,7 +100,11 @@ export function drawPlayerArtwork(
         else ctx.drawImage(artwork.image, -size / 2, -size / 2, size, size);
         ctx.restore();
     }
-    drawDoodleAccent(ctx,pose,size,aim);
+    // Ballistic feedback now comes from the actual weapon muzzle. Keep the
+    // existing damage signal without drawing a second shot halo on the torso.
+    if (artwork.rig === 'neutral-player') {
+        if (pose && pose.hit > 0) drawDoodleAccent(ctx, {...pose, attack: 0}, size, aim);
+    } else drawDoodleAccent(ctx,pose,size,aim);
     ctx.restore();
     return true;
 }

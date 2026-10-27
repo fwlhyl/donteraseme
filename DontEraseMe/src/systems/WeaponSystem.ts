@@ -765,7 +765,8 @@ export class WeaponSystem extends System {
                         bulletColor,
                         owner.id,
                         weapon.speedMul,
-                        stats.trailWidthMultiplier
+                        stats.trailWidthMultiplier,
+                        true
                     );
                     const renderable = bullet.getComponent(Renderable);
                     if (renderable) {
@@ -815,7 +816,7 @@ export class WeaponSystem extends System {
                             (proj as any).isAwakened = true;
                         }
                         if (config.id === 0) { // Pistol
-                            proj.life = Math.floor((config.range || 600) / (config.speed * weapon.speedMul || 9));
+                            // BulletFactory owns the speed-adjusted lifetime and exact range budget.
                             if (stats?.hasSkill('mastery_pistol')) {
                                 (proj as any).isAwakened = true;
                             }
@@ -1336,7 +1337,8 @@ export class WeaponSystem extends System {
                 bulletColor, // Use bulletColor
                 owner.id,
                 weapon.speedMul,
-                stats ? stats.trailWidthMultiplier : 1.0
+                stats ? stats.trailWidthMultiplier : 1.0,
+                true
             );
             const renderable = bullet.getComponent(Renderable);
             if (renderable) {
@@ -1393,7 +1395,7 @@ export class WeaponSystem extends System {
                     }
                 }
                 if (config.id === 0) { // Pistol
-                    proj.life = Math.floor((config.range || 600) / (config.speed * weapon.speedMul || 9));
+                    // BulletFactory owns the speed-adjusted lifetime and exact range budget.
                     if (stats?.hasSkill('mastery_pistol')) {
                         (proj as any).isAwakened = true;
                     }

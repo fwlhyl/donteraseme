@@ -32,11 +32,13 @@ import { sceneBounds, sceneCameraAxis } from '../world/SceneLayout';
 export class RenderSystem extends System {
     private tempCanvas: HTMLCanvasElement;
     private tempCtx: CanvasRenderingContext2D;
-    private courtyardScene = new CourtyardScene();
+    private courtyardScene: CourtyardScene;
     private drawingScene = new DrawingScene();
     private doodleMotion = new WeakMap<Entity,DoodleMotion>();
     private skillMotion = new WeakMap<Entity,DoodleMotion>();
     private artTime = 0;
+
+    public hideScenery(): void { this.courtyardScene.hide(); }
 
     public override onEntityAdded(entity:Entity):void {
         if(entity.tags.has('player')||entity.tags.has('enemy')) sampleDoodleMotion(entity,0,this.doodleMotion);
@@ -45,14 +47,16 @@ export class RenderSystem extends System {
 
     constructor(
         private ctx: CanvasRenderingContext2D,
-        private camera: { x: number, y: number },
+        private camera: { x: number, y: number, shakeX?: number, shakeY?: number },
         private worldWidth: number,
         private worldHeight: number,
         private useCourtyard: () => boolean = () => false,
         private useRuins: () => boolean = () => false,
-        private clipDrawingToWorld: () => boolean = () => false
+        private clipDrawingToWorld: () => boolean = () => false,
+        enable3dCourtyard = false
     ) {
         super();
+        this.courtyardScene = new CourtyardScene(enable3dCourtyard);
         this.tempCanvas = document.createElement('canvas');
         this.tempCtx = this.tempCanvas.getContext('2d') as CanvasRenderingContext2D;
         
@@ -139,15 +143,7 @@ export class RenderSystem extends System {
             }
         }
 
-        // 2. Draw Background Grid
-        this.courtyardScene.draw(this.camera,this.worldWidth,this.worldHeight,illustratedScene,ruins?'ruins':'atelier',this.artTime);
-        this.drawingScene.draw(this.camera, this.worldWidth, this.worldHeight, boundedDrawing);
-        if(!illustratedScene && !boundedDrawing) this.drawGrid();
-
-
-        this.ctx.save();
-        
-        // Camera Transform with screenshake
+        // Sample once so scenery, actors and persistent ink move together.
         let shakeX = 0, shakeY = 0;
         if (this.shakeFrames > 0) {
             const decay = this.shakeFrames / Math.max(1, (this.shakeMag * 2));
@@ -155,6 +151,14 @@ export class RenderSystem extends System {
             shakeY = (Math.random() - 0.5) * this.shakeMag * decay;
             this.shakeFrames -= 1;
         }
+        this.camera.shakeX = shakeX;
+        this.camera.shakeY = shakeY;
+        const sceneryCamera = { x: this.camera.x - shakeX, y: this.camera.y - shakeY };
+        this.courtyardScene.draw(sceneryCamera,this.worldWidth,this.worldHeight,illustratedScene,ruins?'ruins':'atelier',this.artTime);
+        this.drawingScene.draw(sceneryCamera, this.worldWidth, this.worldHeight, boundedDrawing);
+        if(!illustratedScene && !boundedDrawing) this.drawGrid();
+
+        this.ctx.save();
         this.ctx.translate(-this.camera.x + shakeX, -this.camera.y + shakeY);
 
         // Cull drawing only. Hidden enemies still consume every motion sample,
@@ -467,7 +471,7 @@ export class RenderSystem extends System {
 
                     const beh = entity.getComponent(EnemyBehavior);
                     const playerArt = entity.getComponent(PlayerArtwork);
-                    const readyPlayerArt = entity.tags.has('player') && playerArt?.image.complete && playerArt.image.naturalWidth > 0;
+                    const readyPlayerArt = entity.tags.has('player') && playerArt && (playerArt.rig === 'neutral-player' || (playerArt.image.complete && playerArt.image.naturalWidth > 0));
                     const useDoodleBody = readyPlayerArt || (entity.tags.has('enemy') && hasDoodleEnemyArtwork(beh?.type));
 
                     this.ctx.save();
@@ -952,6 +956,7 @@ export class RenderSystem extends System {
             this.ctx.restore();
         }
         this.ctx.restore(); // overlay pass
+        if (this.useCourtyard()) this.courtyardScene.drawForeground(this.ctx, this.worldWidth, this.worldHeight);
         this.ctx.restore(); // camera transform
         this.ctx.restore(); // frame state
     }

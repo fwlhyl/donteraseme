@@ -17,8 +17,8 @@ import type { QuestStep } from '../components/Quest';
 import { PlayerStats } from '../components/PlayerStats';
 import { CHARACTERS } from '../config/EndlessConfig';
 import { PlayerArtwork } from '../components/PlayerArtwork';
-import { getDoodleHeroes, HERO_FRAMES } from '../art/DoodleArt';
 import { getPaperCollector } from '../art/PaperCollectorArt';
+import { PLAYER_PRESENTATION } from '../config/PlayerPresentation';
 
 export class PlayerFactory {
     public static create(x: number, y: number, characterId?: string, weaponId?: number): Entity {
@@ -34,12 +34,11 @@ export class PlayerFactory {
         player.addComponent(new Transform(x, y));
         player.addComponent(new Velocity());
         
-        const renderable = new Renderable('#ffffff', 20, 40, 40, 'circle', 70);
-        // The collector alone trials the approved paper cutout. Hitbox/stats stay unchanged.
+        const { hitRadius, displaySize } = PLAYER_PRESENTATION;
+        const renderable = new Renderable('#ffffff', hitRadius, hitRadius * 2, hitRadius * 2, 'circle', 70);
+        // Appearance and collision share one scale, including subsequent body-size upgrades.
         player.addComponent(renderable);
-        player.addComponent(charConfig.id === 'collector'
-            ? new PlayerArtwork(getPaperCollector(), 64, 20, undefined, false, 'paper-collector-v1')
-            : new PlayerArtwork(getDoodleHeroes(), 64, 20, HERO_FRAMES[charConfig.id], true));
+        player.addComponent(new PlayerArtwork(getPaperCollector(), displaySize, hitRadius, undefined, false, 'neutral-player'));
         
         // Add PlayerStats based on selection
         const stats = new PlayerStats();

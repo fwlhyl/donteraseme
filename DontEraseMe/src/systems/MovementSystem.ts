@@ -375,8 +375,23 @@ export class MovementSystem extends System {
                     }
                 }
 
+                if (projectile?.sweptCollision) {
+                    projectile.previousX = transform.x;
+                    projectile.previousY = transform.y;
+                }
                 let nextX = transform.x + velocity.x;
                 let nextY = transform.y + velocity.y;
+                if (projectile?.remainingRange !== undefined && !projectile.calligrapherBoomerang) {
+                    const length = Math.hypot(velocity.x, velocity.y);
+                    const allowed = Math.min(length, Math.max(0, projectile.remainingRange));
+                    if (length > 0) {
+                        nextX = transform.x + velocity.x * allowed / length;
+                        nextY = transform.y + velocity.y * allowed / length;
+                    }
+                    projectile.remainingRange = Math.max(0, projectile.remainingRange - allowed);
+                    // Leave one collision pass at the exact range endpoint before expiring.
+                    if (projectile.remainingRange <= .000001) projectile.life = Math.min(projectile.life, 2);
+                }
 
                 if(this.useCourtyard() && (entity.tags.has('player')||entity.tags.has('enemy'))) {
                     const radius=courtyardRadius(entity);

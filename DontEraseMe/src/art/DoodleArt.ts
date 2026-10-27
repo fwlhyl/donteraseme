@@ -1,76 +1,54 @@
-import heroesUrl from '../assets/doodle/heroes-body-v2.png';
-import enemiesUrl from '../assets/doodle/enemies-v1.png';
 import type { AtlasFrame } from './AtlasFrame';
-import { drawAtlasFrame } from './AtlasFrame';
 import type { EnemyType } from '../components/EnemyBehavior';
-import { applyDoodlePose, drawDoodleAccent, type DoodlePose } from './DoodleMotion';
-import { drawWalkingDoodleEnemy, getEnemyGait } from './DoodleEnemyGait';
+import { drawDoodleAccent, type DoodlePose } from './DoodleMotion';
+import { getEnemyGait } from './DoodleEnemyGait';
+import { neutralArtImage } from './NeutralArtImage';
 
-// Measured alpha bounds + 2px padding; generated sheets are NOT uniform grids.
-const frame = (x: number, y: number, width: number, height: number, pivotY = .5): AtlasFrame =>
-    ({ x: x - 2, y: y - 2, width: width + 4, height: height + 4, pivotY });
+const neutralFrame: AtlasFrame = {x:0,y:0,width:64,height:64};
+export const HERO_FRAMES: Readonly<Record<string, AtlasFrame>> = Object.fromEntries(
+    ['collector','graffiti','classical','sketcher','watercolor','digital','calligrapher','ink'].map(id=>[id,neutralFrame]));
+const TYPES: readonly EnemyType[] = ['chaser','eraser','shield','shooter','summoner','paper_plane','boss','boss_roller','boss_prism','boss_slime','boss_eraser','blackhole'];
+export const ENEMY_FRAMES: Readonly<Partial<Record<EnemyType, AtlasFrame>>> = Object.fromEntries(TYPES.map(type=>[type,neutralFrame]));
+export function getDoodleHeroes(): HTMLImageElement { return neutralArtImage('player'); }
+export function getDoodleEnemies(): HTMLImageElement { return neutralArtImage('enemy'); }
+export function hasDoodleEnemyArtwork(type: EnemyType | undefined): boolean { return !!type && TYPES.includes(type); }
 
-export const HERO_FRAMES: Readonly<Record<string, AtlasFrame>> = {
-    collector: frame(41,137,301,344,.58), graffiti: frame(402,113,327,368,.58),
-    classical: frame(802,109,297,372,.58), sketcher: frame(1192,118,294,365,.58),
-    watercolor: frame(16,576,336,338,.58), digital: frame(432,583,297,331,.58),
-    calligrapher: frame(782,582,322,333,.58), ink: frame(1156,583,333,332,.58),
-};
-
-export const ENEMY_FRAMES: Readonly<Partial<Record<EnemyType, AtlasFrame>>> = {
-    chaser: frame(105,129,192,243), eraser: frame(387,162,318,209),
-    shield: frame(756,149,316,223), shooter: frame(1139,71,262,309),
-    summoner: frame(49,432,297,264), paper_plane: frame(390,471,337,199),
-    boss: frame(750,416,275,273), boss_roller: frame(1085,431,331,273,.25),
-    boss_prism: frame(59,728,243,304), boss_slime: frame(341,775,383,258),
-    boss_eraser: frame(744,715,327,322), blackhole: frame(1105,746,318,291),
-};
-
-let heroes: HTMLImageElement | undefined, enemies: HTMLImageElement | undefined;
-export function getDoodleHeroes(): HTMLImageElement {
-    if (!heroes) { heroes = new Image(); heroes.src = heroesUrl; }
-    return heroes;
-}
-export function getDoodleEnemies(): HTMLImageElement {
-    if (!enemies) { enemies = new Image(); enemies.src = enemiesUrl; }
-    return enemies;
-}
-
-/** Only replaces the body. Caller still draws shield/status/attack telegraphs. */
-export function hasDoodleEnemyArtwork(type: EnemyType | undefined): boolean {
-    if (!type || !ENEMY_FRAMES[type]) return false;
-    const image=getDoodleEnemies();
-    return image.complete && image.naturalWidth>0 && image.naturalHeight>0;
-}
-
-export function drawDoodleEnemy(ctx: CanvasRenderingContext2D, type: EnemyType | undefined, radius: number, rotation: number, pose?: DoodlePose, bossTimer?: number): boolean {
-    const source = type && ENEMY_FRAMES[type];
-    if (!source) return false;
-    const image = getDoodleEnemies();
-    if (!image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) return false;
-    ctx.save();
-    ctx.shadowBlur = 0; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    const size=radius*2.5;
-    const gait = getEnemyGait(type);
-    if (pose) {
-        const floorY = gait ? (gait.floor-source.y-source.height*(source.pivotY??.5))*size/Math.max(source.width,source.height) : size*.35;
-        ctx.fillStyle='#0c15294d';ctx.beginPath();ctx.ellipse(0,floorY,size*.25*pose.shadowScale,size*.055,0,0,Math.PI*2);ctx.fill();
-    }
-    ctx.save();
-    let drawn: boolean;
-    if (gait) {
-        drawn = drawWalkingDoodleEnemy(ctx,image,source,gait,size,rotation,pose);
+/** Lightweight transitional silhouettes; collision sizes and hostile telegraphs are unchanged. */
+export function drawDoodleEnemy(ctx: CanvasRenderingContext2D, type: EnemyType | undefined, radius: number,
+    rotation: number, pose?: DoodlePose, bossTimer?: number): boolean {
+    if (!hasDoodleEnemyArtwork(type)) return false;
+    const size=radius*2.5, ratio=size/64, step=pose?.step??0;
+    ctx.save();ctx.shadowBlur=0;ctx.setLineDash([]);ctx.scale(ratio,ratio);
+    ctx.strokeStyle='#30332e';ctx.fillStyle='#d9dbd1';ctx.lineWidth=1.6;ctx.lineJoin='miter';
+    const facing=Math.cos(rotation)<-.12?-1:1;
+    if (type==='paper_plane') {
+        ctx.rotate(rotation);ctx.beginPath();ctx.moveTo(30,0);ctx.lineTo(-23,-14);ctx.lineTo(-13,0);ctx.lineTo(-23,14);ctx.closePath();ctx.fill();ctx.stroke();
+        ctx.beginPath();ctx.moveTo(-13,0);ctx.lineTo(30,0);ctx.stroke();
+    } else if (type==='blackhole'||type==='boss_slime') {
+        const n=type==='blackhole'?10:7;
+        ctx.beginPath();
+        for(let i=0;i<n*2;i++){const angle=i*Math.PI/n;const r=i%2?19:26;const x=Math.cos(angle)*r,y=Math.sin(angle)*r*(type==='boss_slime'?.7:1);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}
+        ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#30332e';ctx.beginPath();ctx.ellipse(0,0,13,7,0,0,Math.PI*2);ctx.fill();
     } else {
-        applyDoodlePose(ctx,pose,size,rotation);
-        if (type === 'paper_plane') ctx.rotate(rotation);
-        drawn = drawAtlasFrame(ctx, image, source, size);
+        ctx.scale(facing,1);
+        if (getEnemyGait(type)) {
+            ctx.fillStyle='#30332e';
+            for(const side of [-1,1]){const stride=step*side*2.3;ctx.beginPath();ctx.moveTo(side*16-4,8);ctx.lineTo(side*16+3,11);ctx.lineTo(side*16+stride,21-Math.max(0,step*side)*2);ctx.lineTo(side*16-4+stride,16);ctx.closePath();ctx.fill();}
+        }
+        ctx.translate(0,(pose?.y??0)*.6);ctx.fillStyle='#d9dbd1';
+        ctx.beginPath();ctx.moveTo(-25,-15);ctx.lineTo(21,-15);ctx.lineTo(27,-9);ctx.lineTo(24,14);ctx.lineTo(-22,16);ctx.lineTo(-15,6);ctx.lineTo(-25,2);ctx.lineTo(-17,-6);ctx.lineTo(-26,-9);ctx.closePath();ctx.fill();ctx.stroke();
+        ctx.fillStyle='#656c60';ctx.beginPath();ctx.moveTo(9,-15);ctx.lineTo(21,-15);ctx.lineTo(27,-9);ctx.lineTo(24,14);ctx.lineTo(9,15);ctx.closePath();ctx.fill();ctx.stroke();
+        ctx.fillStyle='#30332e';ctx.beginPath();ctx.moveTo(-24,-7);ctx.lineTo(-8,-4);ctx.lineTo(-16,1);ctx.lineTo(-6,5);ctx.lineTo(-21,12);ctx.lineTo(-15,5);ctx.lineTo(-25,1);ctx.lineTo(-17,-3);ctx.closePath();ctx.fill();
+        if(type==='shield'){ctx.fillStyle='#babfb1';ctx.beginPath();ctx.moveTo(-28,-17);ctx.lineTo(-17,-13);ctx.lineTo(-18,13);ctx.lineTo(-29,17);ctx.closePath();ctx.fill();ctx.stroke();}
+        if(type==='shooter'||type==='summoner'){ctx.strokeStyle='#30332e';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-4,-14);ctx.lineTo(2,-23);ctx.lineTo(7,-15);ctx.stroke();}
+        if(type?.startsWith('boss')){ctx.fillStyle='#30332e';ctx.beginPath();ctx.moveTo(-9,-15);ctx.lineTo(-5,-24);ctx.lineTo(0,-15);ctx.lineTo(5,-24);ctx.lineTo(9,-15);ctx.fill();}
+        if(type==='boss_roller'){ctx.fillStyle='#30332e';ctx.fillRect(-18,14,38,6);}
+        if(type==='boss_prism'){ctx.fillStyle='#30332e';ctx.beginPath();ctx.moveTo(-2,-10);ctx.lineTo(6,0);ctx.lineTo(-2,10);ctx.lineTo(-10,0);ctx.closePath();ctx.fill();}
     }
-    ctx.restore();
+    ctx.restore();ctx.save();ctx.shadowBlur=0;
     drawDoodleAccent(ctx,pose,size,rotation);
-    // PNG bodies do not inherit Renderable.color. Preserve actual boss warning phases.
-    if (bossTimer !== undefined) drawDoodleWarning(ctx,type,radius,rotation,bossTimer);
-    ctx.restore();
-    return drawn;
+    if(bossTimer!==undefined)drawDoodleWarning(ctx,type,radius,rotation,bossTimer);
+    ctx.restore();return true;
 }
 
 function drawDoodleWarning(ctx:CanvasRenderingContext2D,type:EnemyType|undefined,r:number,heading:number,timer:number):void {

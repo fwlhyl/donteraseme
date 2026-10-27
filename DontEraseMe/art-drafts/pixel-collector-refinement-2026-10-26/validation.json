@@ -1,0 +1,74 @@
+{
+  "character": "collector",
+  "displaySize": 52,
+  "status": "integrated",
+  "details": [
+    "layered hair silhouette",
+    "high collar and split coat",
+    "shoulder strap, belt and backpack",
+    "knee and boot highlights",
+    "separate weapon and gloves"
+  ],
+  "motion": [
+    "idle breathing",
+    "distance-driven stepping and foot lift",
+    "backward travel",
+    "independent aiming with visible upward gun",
+    "short recoil and muzzle flash",
+    "three-phase reload using gameplay timer",
+    "small hit reaction"
+  ],
+  "validation": {
+    "build": "passed",
+    "motionRates": [
+      30,
+      60,
+      120,
+      144
+    ],
+    "weaponRenderCombinations": 6912,
+    "browserActions": [
+      "idle",
+      "walk",
+      "back",
+      "shoot",
+      "reload",
+      "turn",
+      "hurt"
+    ],
+    "actualCombatReload": "passed: ammo expenditure, R input, active timer, full magazine on completion",
+    "runtimeErrors": 0,
+    "missingAssets": 0,
+    "actualRuntimeSize": {
+      "displaySize": 52,
+      "hitRadius": 16.25
+    },
+    "contactTests": "passed: proportional body-size upgrades, enemy overlap and hostile projectile contact",
+    "motion": "passed: 30/60/120/144 Hz, visible idle with planted boots, faster direction response, reload and frozen-state suppression",
+    "weaponGrip": "tucked chest grip with visible upward barrel and shared facing hysteresis",
+    "projectiles": {
+      "speedMultiplier": 1.8,
+      "types": [
+        "standard",
+        "shotgun",
+        "chain",
+        "ribbon",
+        "rocket"
+      ],
+      "range": "unchanged",
+      "continuousCollision": "passed: final frame, small targets, nearest enemy, wall blocking",
+      "customSkills": "original speed/lifetime preserved"
+    },
+    "regressions": [
+      "test-player-scale",
+      "test-pixel-motion",
+      "test-fast-projectiles",
+      "test-projectile-art",
+      "test-render-performance",
+      "test-performance-combat"
+    ]
+  },
+  "updated": "2026-10-27",
+  "hitRadius": 16.25,
+  "productionStandard": "docs/PixelCharacterProductionStandard.md"
+}

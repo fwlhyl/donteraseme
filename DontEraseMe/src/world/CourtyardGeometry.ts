@@ -1,11 +1,12 @@
 import { CREATE_WORLD } from '../config/WorldConfig';
+import { COMIC_ATELIER_SOURCE, COMIC_WALKABLE, comicAtelierBounds } from './ComicAtelierLayout';
 
 export interface Point { x: number; y: number }
 
 /** Courtyard walkable edge traced in pixels on atelier-courtyard-v1.png
  * (1536 × 1024). The outside is solid scenery; vertices follow the inner
  * faces of planters, shop displays, terrace railings and stairs. */
-export const COURTYARD_OUTLINE: ReadonlyArray<readonly [number, number]> = [
+export const LEGACY_COURTYARD_OUTLINE: ReadonlyArray<readonly [number, number]> = [
     [250,280],[330,238],[407,204],[520,160],[572,129],[685,152],
     [722,137],[858,137],[928,165],[985,218],[1130,275],[1175,266],
     [1240,344],[1340,407],[1372,445],[1335,490],[1335,557],
@@ -15,6 +16,14 @@ export const COURTYARD_OUTLINE: ReadonlyArray<readonly [number, number]> = [
     [313,711],[328,645],[346,605],[305,548],[290,487],[324,438],
     [323,400],[287,381],[281,334],[249,311],
 ];
+
+// Retain the normalized 1536×1024 API used by floor/debug/3D consumers. The
+// actual playable polygon is authored on the new plate, not the older street.
+const normalizedBounds = comicAtelierBounds(1536, 1024);
+export const COURTYARD_OUTLINE: ReadonlyArray<readonly [number, number]> = COMIC_WALKABLE.map(([x, y]) => [
+    normalizedBounds.x + x / COMIC_ATELIER_SOURCE.width * normalizedBounds.width,
+    normalizedBounds.y + y / COMIC_ATELIER_SOURCE.height * normalizedBounds.height,
+] as const);
 
 function closest(p: Point, a: Point, b: Point): Point {
     const dx = b.x-a.x, dy = b.y-a.y;
@@ -32,7 +41,11 @@ export class CourtyardGeometry {
     private readonly clearance = new Map<number, number>();
     private readonly clearanceCols: number;
     constructor(readonly width: number, readonly height: number) {
-        this.points = COURTYARD_OUTLINE.map(([x,y]) => ({x:x/1536*width,y:y/1024*height}));
+        const bounds = comicAtelierBounds(width, height);
+        this.points = COMIC_WALKABLE.map(([x,y]) => ({
+            x: bounds.x + x / COMIC_ATELIER_SOURCE.width * bounds.width,
+            y: bounds.y + y / COMIC_ATELIER_SOURCE.height * bounds.height,
+        }));
         this.center = {x:width/2,y:height/2};
         this.clearanceCols = Math.ceil(width / this.clearanceCell);
     }

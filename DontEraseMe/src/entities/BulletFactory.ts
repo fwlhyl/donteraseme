@@ -37,7 +37,8 @@ export class BulletFactory {
         bulletColor: string,
         ownerId: string,
         speedMul: number = 1.0,
-        radiusMul: number = 1.0
+        radiusMul: number = 1.0,
+        trackWeaponPath: boolean = false
     ): Entity {
         const bullet = new Entity();
         
@@ -93,6 +94,14 @@ export class BulletFactory {
         }
         
         const projComp = new Projectile(config.type, config.damage, ownerId, life);
+        if (trackWeaponPath && ['standard', 'shotgun', 'chain', 'ribbon', 'rocket'].includes(config.type)) {
+            // Collision runs after movement: retain the final travelled segment for one check.
+            projComp.life += 1;
+            projComp.sweptCollision = true;
+            projComp.previousX = ownerX;
+            projComp.previousY = ownerY;
+            projComp.remainingRange = config.range || 600;
+        }
         if (config.type === 'flamethrower') {
             projComp.baseColorRGB = BulletFactory.parseColorToRGB(color);
         }

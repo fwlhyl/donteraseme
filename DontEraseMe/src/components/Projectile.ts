@@ -2,6 +2,13 @@ import { Component } from '../core/Component';
 import type { WeaponType } from './Weapon';
 
 export class Projectile extends Component {
+    /** Opt-in path tracking for moving weapon bullets; never used by hostile shots. */
+    public sweptCollision = false;
+    public previousX?: number;
+    public previousY?: number;
+    /** Exact outward path budget. Boomerang returns intentionally ignore it. */
+    public remainingRange?: number;
+
     constructor(
         public type: WeaponType = 'standard',
         public damage: number = 10,

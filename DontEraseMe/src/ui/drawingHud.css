@@ -3,7 +3,7 @@
   position:fixed; left:50%; bottom:16px; top:auto; transform:translateX(-50%); z-index:120;
   width:min(1040px,calc(100vw - 32px)); box-sizing:border-box; padding:12px 16px;
   display:grid; grid-template-columns:176px minmax(180px,1fr) 108px 196px; gap:9px 18px;
-  color:var(--text,#eee4c8); background:url('../assets/ui/paper-grain.svg') repeat, #292923f5;
+  color:var(--text,#eee4c8); background:#292923f5;
   border:1px solid var(--line,#7f7c69); border-top:1px solid var(--text,#eee4c8); border-radius:0;
   box-shadow:0 5px 18px #17171344; font:12px/1.5 var(--ui,system-ui);
 }

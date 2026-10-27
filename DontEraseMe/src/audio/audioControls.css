@@ -5,7 +5,7 @@
     padding: 10px 14px; margin: 8px 0 18px;
     border: 1px solid var(--line, #7f7c69); border-radius: 0;
     color: var(--text, #eee4c8);
-    background: url('../assets/ui/paper-grain.svg') repeat, var(--panel, #2b2c26);
+    background: var(--panel, #2b2c26);
     font: 13px/1.5 var(--ui, system-ui, sans-serif); color-scheme: dark;
 }
 .audio-controls legend { padding: 0 8px; font-weight: 600; letter-spacing: .06em; color: var(--text, #eee4c8); }

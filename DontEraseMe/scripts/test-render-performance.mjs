@@ -79,7 +79,7 @@ function renderer(entities, unculled = false, camera = { x: 0, y: 0 }) {
     const ctx = context();
     const system = new RenderSystem(ctx, camera, 6000, 4000, () => true);
     // Count entity work only; scene caching is covered by the scene tests.
-    system.courtyardScene = { draw() {} };
+    system.courtyardScene = { draw() {}, drawForeground() {} };
     if (unculled) system.isOutsideViewport = () => false;
     for (const entity of entities) system.addEntity(entity);
     return { ctx, system, camera };

@@ -659,7 +659,7 @@ export class MagicPenSystem extends System {
         const rocketConfig = WEAPONS.find(weapon => weapon.type === 'rocket');
         if (!targetTransform || !rocketConfig) return;
         const angle = Math.atan2(targetTransform.y - origin.y, targetTransform.x - origin.x);
-        const rocket = BulletFactory.create(rocketConfig, origin.x, origin.y, angle, color, ownerId, 1.25, 1.1);
+        const rocket = BulletFactory.create({ ...rocketConfig, speed: 6 }, origin.x, origin.y, angle, color, ownerId, 1.25, 1.1);
         const projectile = rocket.getComponent(Projectile);
         if (projectile) {
             projectile.damage = Math.round(45 * multiplier);
@@ -676,7 +676,7 @@ export class MagicPenSystem extends System {
         if (!targetTransform || !pulseConfig) return;
 
         const angle = Math.atan2(targetTransform.y - origin.y, targetTransform.x - origin.x);
-        const pulse = BulletFactory.create(pulseConfig, origin.x, origin.y, angle, '#93c5fd', ownerId, 1.65, 1.8);
+        const pulse = BulletFactory.create({ ...pulseConfig, speed: 9 }, origin.x, origin.y, angle, '#93c5fd', ownerId, 1.65, 1.8);
         const projectile = pulse.getComponent(Projectile);
         if (projectile) {
             projectile.damage = Math.round(42 * multiplier);

@@ -2,6 +2,8 @@ import type { Entity } from '../core/Entity';
 import { Transform } from '../components/Transform';
 import { Health } from '../components/Health';
 import { EnemyBehavior } from '../components/EnemyBehavior';
+import { Weapon } from '../components/Weapon';
+import { PlayerStats } from '../components/PlayerStats';
 import { getEnemyGait } from './DoodleEnemyGait';
 
 export interface DoodlePose {
@@ -11,9 +13,22 @@ export interface DoodlePose {
     step: number;
     /** Smoothed actual travel speed, normalized to 0..1. */
     moving: number;
+    /** Optional player rig channels; existing enemy and atlas callers remain compatible. */
+    gaitPhase?: number;
+    time?: number;
+    /** Smoothed unit travel direction, retained during the short stop blend. */
+    travelX?: number;
+    travelY?: number;
+    /** Read-only progress of the current gameplay reload, including speed upgrades. */
+    reloadProgress?: number;
+    /** Quiet ready-stance channels; fade away while moving or handling the weapon. */
+    idleWeight?: number;
+    idleBreath?: number;
 }
 export interface DoodleSample {
     x: number; y: number; hp: number; attackSerial: number; frozen?: boolean; kind?: string;
+    reloadProgress?: number;
+    reloading?: boolean;
 }
 const TAU = Math.PI * 2;
 const neutral = (): DoodlePose => ({x:0,y:0,angle:0,scaleX:1,scaleY:1,attack:0,hit:0,shadowScale:1,step:0,moving:0});
@@ -24,6 +39,8 @@ export class DoodleMotion {
     private time = 0;
     private gait = 0;
     private moving = 0;
+    private travelAngle = 0;
+    private hasTravelDirection = false;
     private attackAge = 1;
     private hitAge = 1;
     private pose = neutral();
@@ -42,18 +59,44 @@ export class DoodleMotion {
         const attack = Math.max(0,1-this.attackAge/.16);
         const hit = Math.max(0,1-this.hitAge/.2);
         if (sample.kind === 'player') {
-            // The torso stays upright: only separate feet stride. Advance phase by travel,
-            // not elapsed time, so a blocked/stopped player never keeps walking in place.
-            const travel = sample.frozen || distance > 80 ? 0 : distance;
-            this.moving += (speed-this.moving) * (1-Math.exp(-dt*24));
-            if (sample.frozen || distance > 80 || this.moving < .005) this.moving = 0;
+            // Actual displacement drives the phase: blocked input cannot cycle feet.
+            // Separate arrival/release easing lets the stance settle without torso sway.
+            const reset = !!sample.frozen || !Number.isFinite(distance) || distance > 80;
+            const travel = reset || distance < .001 ? 0 : distance;
+            const target = travel === 0 ? 0 : Math.min(1, travel / dt / 190);
+            const response = target > this.moving ? 18 : 28;
+            this.moving += (target-this.moving) * (1-Math.exp(-dt*response));
+            if (reset || this.moving < .005) this.moving = 0;
+            if (reset) {
+                this.gait = 0;
+                this.hasTravelDirection = false;
+            } else if (travel > 0 && prev) {
+                const targetAngle = Math.atan2(sample.y-prev.y, sample.x-prev.x);
+                if (!this.hasTravelDirection) this.travelAngle = targetAngle;
+                else {
+                    const delta = Math.atan2(Math.sin(targetAngle-this.travelAngle), Math.cos(targetAngle-this.travelAngle));
+                    this.travelAngle += delta * (1-Math.exp(-dt*42));
+                }
+                this.hasTravelDirection = true;
+            }
             this.gait = (this.gait + travel/108*TAU) % TAU;
             const step = this.moving === 0 ? 0 : Math.sin(this.gait)*this.moving;
-            const bounce = .65 * this.moving * Math.sin(this.gait)**2;
-            const breathing = sample.frozen ? 0 : .1*(1-this.moving)*Math.sin(this.time*2.8+this.seed);
+            const bounce = .7 * this.moving * Math.sin(this.gait)**2;
+            const reloadProgress = Number.isFinite(sample.reloadProgress)
+                ? Math.max(0, Math.min(1, sample.reloadProgress!)) : 0;
+            const reloading = sample.reloading ?? (reloadProgress > 0 && reloadProgress < 1);
+            const idleWeight = sample.frozen || reloading ? 0
+                : (1-this.moving)**2 * (1-attack)**3 * (1-hit);
+            const idleBreath = Math.sin(this.time*2.2+this.seed) * idleWeight;
+            // Half a display pixel at the 52px size is visible but remains restrained.
+            const breathing = .65 * idleBreath;
             this.pose = {
                 x: 0, y: -bounce+breathing-hit*.12, angle: 0, scaleX: 1, scaleY: 1,
                 attack, hit, shadowScale: 1-bounce*.035, step, moving: this.moving,
+                gaitPhase: this.gait, time: this.time, reloadProgress,
+                idleWeight, idleBreath,
+                travelX: this.hasTravelDirection ? Math.cos(this.travelAngle) : 0,
+                travelY: this.hasTravelDirection ? Math.sin(this.travelAngle) : 0,
             };
             this.previous = {...sample};
             return this.pose;
@@ -106,7 +149,14 @@ export function signalDoodleAttack(entity: Entity): void {
 }
 export function sampleDoodleMotion(entity: Entity, dt: number, cache: WeakMap<Entity,DoodleMotion>): DoodlePose {
     const t=entity.getComponent(Transform), h=entity.getComponent(Health), e=entity.getComponent(EnemyBehavior);
-    const sample={x:t?.x??0,y:t?.y??0,hp:h?.current??0,attackSerial:attackSerials.get(entity)??0,frozen:(e?.frozenFrames??0)>0,kind:entity.tags.has('player')?'player':e?.type};
+    const player = entity.tags.has('player');
+    const weapon = player ? entity.getComponent(Weapon) : undefined;
+    const stats = player ? entity.getComponent(PlayerStats) : undefined;
+    const config = weapon?.config;
+    const reloadFrames = config && weapon
+        ? Math.max(1, Math.floor(config.reloadTime * weapon.reloadTimeMul / (stats?.totalReloadMultiplier ?? 1))) : 1;
+    const reloadProgress = weapon?.reloading ? Math.max(0, Math.min(1, 1-weapon.reloadTimer/reloadFrames)) : 0;
+    const sample={x:t?.x??0,y:t?.y??0,hp:h?.current??0,attackSerial:attackSerials.get(entity)??0,frozen:(e?.frozenFrames??0)>0,kind:player?'player':e?.type,reloadProgress,reloading:weapon?.reloading??false};
     let motion = cache.get(entity);
     if (!motion) {
         let hash=0; for (const ch of entity.id) hash=(hash*31+ch.charCodeAt(0))>>>0;

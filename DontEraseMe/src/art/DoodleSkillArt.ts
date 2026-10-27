@@ -1,6 +1,5 @@
-import skillsUrl from '../assets/doodle/skills-v1.png';
 import type { AtlasFrame } from './AtlasFrame';
-import { drawAtlasFrame } from './AtlasFrame';
+import { neutralArtImage } from './NeutralArtImage';
 import type { DoodlePose } from './DoodleMotion';
 import type { Entity } from '../core/Entity';
 import { Summon } from '../components/Summon';
@@ -24,32 +23,51 @@ export function getDoodleUprightFacing(entity: Entity, angle: number): -1 | 1 {
     uprightFacing.set(entity, facing);
     return facing;
 }
-const frame = (x: number, y: number, width: number, height: number, pivotY = .5): AtlasFrame =>
-    ({ x: x - 2, y: y - 2, width: width + 4, height: height + 4, pivotY });
-/** Measured alpha bounds, not assumed uniform cells. */
-export const SKILL_FRAMES: Readonly<Record<SkillSprite, AtlasFrame>> = {
-    digital_pen: frame(36,47,344,252), stickman: frame(428,39,292,259,.68),
-    palette: frame(806,43,294,259), scythe: frame(1156,22,349,301),
-    drone: frame(32,358,336,229), turret: frame(431,393,334,239),
-    paperclip: frame(833,350,300,286), ink_dummy: frame(1191,357,298,287),
-    // Adjacent silhouettes meet the cell divider: no padding across x=414.
-    tank: {x:24,y:686,width:390,height:272}, robot: {x:414,y:668,width:349,height:323},
-    bomber: frame(797,673,372,300), paper_shard: frame(1232,698,237,281),
-};
-let atlas: HTMLImageElement | undefined;
-export function getDoodleSkills(): HTMLImageElement {
-    if (!atlas) { atlas = new Image(); atlas.src = skillsUrl; }
-    return atlas;
-}
+const KINDS: readonly SkillSprite[] = ['digital_pen','stickman','palette','scythe','drone','turret','paperclip','ink_dummy','tank','robot','bomber','paper_shard'];
+export const SKILL_FRAMES: Readonly<Record<SkillSprite, AtlasFrame>> = Object.fromEntries(
+    KINDS.map(kind => [kind,{x:0,y:0,width:64,height:64}])) as Record<SkillSprite, AtlasFrame>;
+export function getDoodleSkills(): HTMLImageElement { return neutralArtImage('skill'); }
+
+/** Simple monochrome stand-ins retain each skill's readable silhouette. */
 export function drawDoodleSkillSprite(ctx: CanvasRenderingContext2D, kind: SkillSprite,
     size: number, angle = 0): boolean {
-    const f = SKILL_FRAMES[kind];
-    if (!f || !Number.isFinite(size) || size <= 0 || !Number.isFinite(angle)) return false;
-    const image = getDoodleSkills();
-    if (!image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) return false;
-    ctx.save(); ctx.shadowBlur = 0; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    ctx.rotate(angle); drawAtlasFrame(ctx, image, f, size); ctx.restore();
-    return true;
+    if (!KINDS.includes(kind) || !Number.isFinite(size) || size <= 0 || !Number.isFinite(angle)) return false;
+    ctx.save();ctx.shadowBlur=0;ctx.rotate(angle);ctx.scale(size/32,size/32);
+    ctx.fillStyle='#d7dbce';ctx.strokeStyle='#30382b';ctx.lineWidth=1.2;ctx.lineJoin='miter';ctx.setLineDash([]);
+    const box=(x:number,y:number,w:number,h:number)=>{ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h);};
+    const polygon=(points:readonly (readonly [number,number])[])=>{ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fill();ctx.stroke();};
+    switch(kind){
+        case 'digital_pen':
+        case 'bomber':
+            polygon([[15,0],[-12,-5],[-6,0],[-12,5]]);polygon([[0,-11],[7,0],[0,11],[-2,0]]);break;
+        case 'stickman':
+            ctx.fillStyle='#30382b';box(-4,-8,8,14);box(-4,-15,8,6);
+            ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-3,-5);ctx.lineTo(-8,1);ctx.moveTo(3,-5);ctx.lineTo(9,-1);ctx.stroke();break;
+        case 'palette':
+            polygon([[0,-14],[12,-7],[12,7],[0,14],[-12,7],[-12,-7]]);
+            ctx.fillStyle='#30382b';box(-3,-3,6,6);break;
+        case 'scythe':
+            ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-10,11);ctx.lineTo(7,-9);ctx.stroke();
+            polygon([[3,-11],[12,-10],[15,-3],[6,-6],[-4,-7]]);break;
+        case 'drone':
+            box(-8,-4,16,10);ctx.fillStyle='#30382b';box(4,-1,5,4);
+            ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-12,-8);ctx.lineTo(-6,-2);ctx.moveTo(12,-8);ctx.lineTo(6,-2);ctx.stroke();
+            ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-16,-8);ctx.lineTo(-7,-8);ctx.moveTo(7,-8);ctx.lineTo(16,-8);ctx.stroke();break;
+        case 'turret':
+            polygon([[-11,9],[11,9],[7,3],[-7,3]]);box(-8,-5,15,10);box(4,-2,12,4);break;
+        case 'paperclip':
+            ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(5,8);ctx.lineTo(5,-9);ctx.quadraticCurveTo(5,-15,-1,-15);ctx.quadraticCurveTo(-8,-15,-8,-8);ctx.lineTo(-8,9);ctx.quadraticCurveTo(-8,16,0,16);ctx.quadraticCurveTo(8,16,8,9);ctx.lineTo(8,-7);ctx.stroke();break;
+        case 'ink_dummy':
+            ctx.fillStyle='#30382b';polygon([[-5,-14],[5,-14],[6,-5],[11,13],[-11,13],[-6,-5]]);break;
+        case 'tank':
+            ctx.fillStyle='#30382b';box(-15,5,29,8);ctx.fillStyle='#d7dbce';box(-13,-2,25,9);box(-6,-8,15,7);box(5,-6,12,3);
+            ctx.strokeStyle='#8d9683';for(let x=-10;x<12;x+=6){ctx.beginPath();ctx.arc(x,9,2,0,Math.PI*2);ctx.stroke();}break;
+        case 'robot':
+            ctx.fillStyle='#30382b';box(-10,6,7,9);box(3,6,7,9);ctx.fillStyle='#d7dbce';box(-10,-7,20,16);box(-6,-14,12,7);box(10,-3,6,4);break;
+        case 'paper_shard':
+            polygon([[-10,-12],[9,-8],[6,10],[-8,13],[-5,1]]);ctx.beginPath();ctx.moveTo(-5,1);ctx.lineTo(6,10);ctx.stroke();break;
+    }
+    ctx.restore();return true;
 }
 
 function shadow(ctx: CanvasRenderingContext2D, width: number, y: number): void {
@@ -67,11 +85,7 @@ export function drawDoodleSkillEntity(ctx: CanvasRenderingContext2D, entity: Ent
     const kind = summon?.type ?? (entity.tags.has('ink_dummy') ? 'ink_dummy'
         : entity.tags.has('paperclip') ? 'paperclip' : vehicle ?? visual?.kind);
     if (!kind) return drawSkillBullet(ctx, entity, r, t);
-    const image = getDoodleSkills();
-    const ready = image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
-    // Keep even the drone's loading/error fallback upright instead of dropping
-    // through to the old freely rotating triangle in RenderSystem.
-    if (!ready && kind !== 'drone') return false;
+    // Procedural stand-ins are immediately available and never request retired atlases.
     ctx.save(); ctx.shadowBlur = 0; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.setLineDash([]);
     if (kind === 'stickman') {
         shadow(ctx, 8, 16);
@@ -97,15 +111,9 @@ export function drawDoodleSkillEntity(ctx: CanvasRenderingContext2D, entity: Ent
         // Read the actual movement heading, but only mirror the upright artwork.
         const aim = t.rotation-Math.PI/2;
         ctx.scale(getDoodleUprightFacing(entity,aim),1);
-        if (ready) drawDoodleSkillSprite(ctx,'drone',32);
-        else {
-            ctx.fillStyle='#eee3cc'; ctx.strokeStyle='#18212b'; ctx.lineWidth=1.5;
-            ctx.fillRect(-10,-3,20,13); ctx.strokeRect(-10,-3,20,13);
-            ctx.fillStyle='#e88b89'; ctx.fillRect(-9,-2,18,4);
-            ctx.fillStyle='#18212b'; ctx.fillRect(4,4,2,3);
-        }
+        drawDoodleSkillSprite(ctx,'drone',32);
         // Short rotor ticks animate without rotating or shaking the whole vehicle.
-        ctx.strokeStyle = '#b7e6e5'; ctx.lineWidth = 1.2;
+        ctx.strokeStyle = '#79846e'; ctx.lineWidth = 1.2;
         const blade = 2+Math.abs(Math.sin(time*24))*2;
         ctx.beginPath(); ctx.moveTo(-10-blade,-5); ctx.lineTo(-10+blade,-5);
         ctx.moveTo(10-blade,-9); ctx.lineTo(10+blade,-9); ctx.stroke();
@@ -162,7 +170,7 @@ export function drawDoodleTurret(ctx: CanvasRenderingContext2D, angle: number, l
     const drawn = drawDoodleSkillSprite(ctx,'turret',42);
     ctx.restore();
     if (!drawn) return false;
-    ctx.save(); ctx.shadowBlur=0; ctx.strokeStyle='#81d1da'; ctx.lineWidth=2; ctx.setLineDash([5,3]);
+    ctx.save(); ctx.shadowBlur=0; ctx.strokeStyle='#79846e'; ctx.lineWidth=2; ctx.setLineDash([5,3]);
     ctx.beginPath(); ctx.arc(0,0,30,-Math.PI/2,-Math.PI/2+Math.max(0,Math.min(1,life/300))*Math.PI*2); ctx.stroke(); ctx.restore();
     return true;
 }
