@@ -9,6 +9,8 @@ export function getDoodleWeapons(): HTMLImageElement { return neutralArtImage('w
 export interface DoodleWeaponStyle {
     detachedHand?: boolean;
     drawGrip?: (ctx: CanvasRenderingContext2D, ratio: number) => void;
+    /** Smaller arms and equipment for the compact collector silhouette. */
+    compact?: boolean;
     /** Visual progress from the existing reload timer; never changes ammunition. */
     reloadProgress?: number;
     /** Reuse the body rig’s horizontal hysteresis for a stable shoulder near vertical aim. */
@@ -57,29 +59,45 @@ export function drawDoodleWeapon(
     const ratio=size/64, attack=clamp(pose?.attack??0);
     const facing=style?.facingLeft===undefined ? (Math.cos(aim)<0?-1:1) : (style.facingLeft?-1:1);
     const reload=clamp(style?.reloadProgress??.5);
-    const lowered=reloading?smoothRange(0,.2,reload)*(1-smoothRange(.72,1,reload)):0;
-    const magazineShift=reloading?Math.sin(Math.PI*smoothRange(.22,.72,reload))*9:0;
+    // Pull in, spin the held tool once, insert the magazine and snap back to aim.
+    // Every phase is sampled from the real reload timer, including speed upgrades.
+    const lowered=reloading?smoothRange(0,.14,reload)*(1-smoothRange(.83,1,reload)):0;
+    const spin=reloading?smoothRange(.12,.56,reload):0;
+    const magazineShift=reloading?Math.sin(Math.PI*smoothRange(.55,.87,reload))*9:0;
+    const flourish=reloading?smoothRange(.14,.23,reload)*(1-smoothRange(.48,.57,reload)):0;
+    const seat=reloading?smoothRange(.82,.87,reload)*(1-smoothRange(.87,.94,reload)):0;
     const movement=clamp(pose?.moving??0), phase=pose?.gaitPhase??0;
     // An immediate short kick, then a damped return; aim variation remains under four degrees.
-    const recoil=attack*attack*2.4+Math.sin((1-attack)*Math.PI*1.5)*attack*.35;
+    const recoil=attack*attack*(style?.compact ? 3.1 : 2.4)+Math.sin((1-attack)*Math.PI*1.5)*attack*.35;
     // Chest-level grip keeps elbows tucked in. Rear aims raise it beside the
     // shoulder so the barrel clears the head while still following full aim.
     const upward=Math.max(0,-Math.sin(aim));
     const handX=Math.cos(aim)*(11-recoil-lowered*2)+facing*13*upward**4;
     const handY=3+Math.sin(aim)*(8-recoil)-upward*upward*5+lowered*3+Math.sin(phase*2)*movement*.35;
     const swing=type==='melee'?Math.sin(attack*Math.PI)*.52*facing:0;
-    const angle=aim+swing+lowered*.48*facing-(type==='melee'?0:attack*attack*.045*facing);
+    const angle=aim+swing+(lowered*.48+spin*Math.PI*2)*facing-(type==='melee'?0:attack*attack*.045*facing);
     const longWeapon=type!=='standard'&&type!=='melee'&&type!=='compass';
     const support=longWeapon||reloading;
-    const supportX=reloading?7:9, supportY=reloading?9+magazineShift:5;
+    const supportX=reloading && type==='standard'?2:9;
+    const supportY=reloading?(type==='standard'?15:10)+magazineShift:5;
     const cosine=Math.cos(angle),sine=Math.sin(angle);
     const offhandX=handX+cosine*supportX-sine*supportY*facing;
     const offhandY=handY+sine*supportX+cosine*supportY*facing;
-    ctx.save();ctx.scale(ratio,ratio);ctx.shadowBlur=0;ctx.setLineDash([]);
+    // Scale the complete held rig around the body anchor: hands, weapon, recoil,
+    // and magazine stay connected at every aim and reload angle.
+    const heldScale=ratio*(style?.compact ? .78 : 1);
+    ctx.save();ctx.scale(heldScale,heldScale);ctx.shadowBlur=0;ctx.setLineDash([]);
     ctx.imageSmoothingEnabled=false;ctx.lineJoin='miter';ctx.lineCap='square';
     if (!style?.detachedHand) {
         if(support)sleeve(ctx,-facing*4,3,offhandX,offhandY,true);
         sleeve(ctx,facing*8,2,handX,handY);
+    }
+    // Small ink dashes make the spin legible without covering the canvas artwork.
+    if (flourish > 0) {
+        ctx.save(); ctx.globalAlpha *= flourish * .65; ctx.fillStyle=EDGE;
+        ctx.fillRect(Math.round(handX-facing*14),Math.round(handY-14),4,1);
+        ctx.fillRect(Math.round(handX+facing*13),Math.round(handY+13),3,1);
+        ctx.restore();
     }
     ctx.translate(handX,handY);ctx.rotate(angle);ctx.scale(1,facing);
     const rect=(x:number,y:number,w:number,h:number,color=INK)=>{ctx.fillStyle=color;ctx.fillRect(x,y,w,h);};
@@ -129,6 +147,11 @@ export function drawDoodleWeapon(
         rect(muzzle+2,-1,reach-2,2,'#e3d9b9');
         rect(muzzle+2,-3,2,1,'#ad9870');
         rect(muzzle+2,2,2,1,'#ad9870');
+    }
+    if (seat > 0) {
+        ctx.save(); ctx.globalAlpha *= seat; ctx.fillStyle=SEAM;
+        ctx.fillRect(5,15,3,1); ctx.fillRect(9,12,1,3);
+        ctx.restore();
     }
     if(support && !style?.detachedHand)glove(ctx,supportX,supportY);
     if(style?.drawGrip)style.drawGrip(ctx,1);

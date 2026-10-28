@@ -51,6 +51,7 @@ import type { DefenseArtwork } from './DefenseArtwork';
 import { CREATE_WORLD, DEFENSE_WORLD } from '../config/WorldConfig';
 import { emitGameSound } from '../audio/AudioEvents';
 import { DrawingHud } from '../ui/DrawingHud';
+import { OutcomePortrait } from '../ui/OutcomePortrait';
 import { GalleryStore } from './GalleryStore';
 import type { ArtGallery } from '../gallery/ArtGallery';
 import { Skill } from '../components/Skill';
@@ -97,6 +98,7 @@ export class Game {
     private mainMenu: HTMLElement;
     private selectionScreen: HTMLElement;
     private gameOverMenu: HTMLElement;
+    private outcomePortrait!: OutcomePortrait;
     private gameUI: HTMLElement;
     private scoreDisplay: HTMLElement;
     private levelUpScreen: HTMLElement;
@@ -163,6 +165,7 @@ export class Game {
         this.mainMenu = document.getElementById('main-menu')!;
         this.selectionScreen = document.getElementById('selection-screen')!;
         this.gameOverMenu = document.getElementById('game-over')!;
+        this.outcomePortrait = new OutcomePortrait(this.gameOverMenu);
         this.gameUI = document.getElementById('ui')!;
         this.scoreDisplay = document.getElementById('final-score')!;
         this.levelUpScreen = document.getElementById('level-up-screen')!;
@@ -1293,6 +1296,11 @@ export class Game {
         if (this.trailCanvas) this.trailCanvas.style.opacity = '1.0';
         
         if (this.gameOverMenu) this.gameOverMenu.style.display = 'flex';
+        const player = [...this.entities.values()].find(entity => entity.tags.has('player'));
+        const playerDead = (player?.getComponent(Health)?.current ?? 1) <= 0;
+        if (this.currentMode !== 'drawing' && (victory || playerDead)) {
+            this.outcomePortrait.show(victory ? 'victory' : 'defeat', player?.getComponent(Transform)?.rotation ?? 0, player?.getComponent(Weapon), player?.getComponent(PlayerStats)?.characterId);
+        } else this.outcomePortrait.hide();
     }
 
     private openArtReplay(): void {

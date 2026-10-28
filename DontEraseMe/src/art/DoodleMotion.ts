@@ -24,11 +24,14 @@ export interface DoodlePose {
     /** Quiet ready-stance channels; fade away while moving or handling the weapon. */
     idleWeight?: number;
     idleBreath?: number;
+    /** Brief horizontal squash when aim crosses the left/right boundary. */
+    turnScale?: number;
 }
 export interface DoodleSample {
     x: number; y: number; hp: number; attackSerial: number; frozen?: boolean; kind?: string;
     reloadProgress?: number;
     reloading?: boolean;
+    aim?: number;
 }
 const TAU = Math.PI * 2;
 const neutral = (): DoodlePose => ({x:0,y:0,angle:0,scaleX:1,scaleY:1,attack:0,hit:0,shadowScale:1,step:0,moving:0});
@@ -43,13 +46,15 @@ export class DoodleMotion {
     private hasTravelDirection = false;
     private attackAge = 1;
     private hitAge = 1;
+    private turnAge = 1;
+    private aimFacing = 0;
     private pose = neutral();
     constructor(private readonly seed = 0, initial?: DoodleSample) { this.previous=initial; }
 
     update(sample: DoodleSample, dt: number): DoodlePose {
         if (dt <= 0 || !Number.isFinite(dt)) return this.pose;
         dt = Math.min(dt, .1);
-        this.time += dt; this.attackAge += dt; this.hitAge += dt;
+        this.time += dt; this.attackAge += dt; this.hitAge += dt; this.turnAge += dt;
         const prev = this.previous;
         if (sample.attackSerial > (prev?.attackSerial ?? 0)) this.attackAge = 0;
         if (prev && sample.hp < prev.hp) this.hitAge = 0;
@@ -59,6 +64,14 @@ export class DoodleMotion {
         const attack = Math.max(0,1-this.attackAge/.16);
         const hit = Math.max(0,1-this.hitAge/.2);
         if (sample.kind === 'player') {
+            // Keep the body's direction tied to aim; a brief squash softens a flip.
+            if (Number.isFinite(sample.aim)) {
+                const horizontal = Math.cos(sample.aim!);
+                const facing = horizontal < -.06 ? -1 : horizontal > .06 ? 1 : this.aimFacing;
+                if (facing && this.aimFacing && facing !== this.aimFacing) this.turnAge = 0;
+                if (facing) this.aimFacing = facing;
+            }
+
             // Actual displacement drives the phase: blocked input cannot cycle feet.
             // Separate arrival/release easing lets the stance settle without torso sway.
             const reset = !!sample.frozen || !Number.isFinite(distance) || distance > 80;
@@ -88,13 +101,14 @@ export class DoodleMotion {
             const idleWeight = sample.frozen || reloading ? 0
                 : (1-this.moving)**2 * (1-attack)**3 * (1-hit);
             const idleBreath = Math.sin(this.time*2.2+this.seed) * idleWeight;
-            // Half a display pixel at the 52px size is visible but remains restrained.
-            const breathing = .65 * idleBreath;
+            // A slightly stronger breath reads at game size while the feet remain planted.
+            const breathing = .85 * idleBreath;
             this.pose = {
                 x: 0, y: -bounce+breathing-hit*.12, angle: 0, scaleX: 1, scaleY: 1,
                 attack, hit, shadowScale: 1-bounce*.035, step, moving: this.moving,
                 gaitPhase: this.gait, time: this.time, reloadProgress,
                 idleWeight, idleBreath,
+                turnScale: 1 - .12 * Math.max(0, 1 - this.turnAge / .12),
                 travelX: this.hasTravelDirection ? Math.cos(this.travelAngle) : 0,
                 travelY: this.hasTravelDirection ? Math.sin(this.travelAngle) : 0,
             };
@@ -156,7 +170,7 @@ export function sampleDoodleMotion(entity: Entity, dt: number, cache: WeakMap<En
     const reloadFrames = config && weapon
         ? Math.max(1, Math.floor(config.reloadTime * weapon.reloadTimeMul / (stats?.totalReloadMultiplier ?? 1))) : 1;
     const reloadProgress = weapon?.reloading ? Math.max(0, Math.min(1, 1-weapon.reloadTimer/reloadFrames)) : 0;
-    const sample={x:t?.x??0,y:t?.y??0,hp:h?.current??0,attackSerial:attackSerials.get(entity)??0,frozen:(e?.frozenFrames??0)>0,kind:player?'player':e?.type,reloadProgress,reloading:weapon?.reloading??false};
+    const sample={x:t?.x??0,y:t?.y??0,hp:h?.current??0,attackSerial:attackSerials.get(entity)??0,frozen:(e?.frozenFrames??0)>0,kind:player?'player':e?.type,reloadProgress,reloading:weapon?.reloading??false,aim:player?t?.rotation:undefined};
     let motion = cache.get(entity);
     if (!motion) {
         let hash=0; for (const ch of entity.id) hash=(hash*31+ch.charCodeAt(0))>>>0;

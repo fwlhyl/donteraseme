@@ -40,6 +40,16 @@ for (const hz of [30, 60, 120, 144]) {
 }
 for (const pose of runs.slice(1)) for (const key of ['time','gaitPhase','moving','step','y','travelX','travelY']) near(pose[key],runs[0][key],`${key} is refresh-rate independent`);
 
+// Aim direction drives a brief turn pose, independent of travel.
+const look = new DoodleMotion(0, sample({aim: 0}));
+assert.equal(look.update(sample({aim: 0}), 1/60).turnScale, 1);
+const flip = look.update(sample({aim: Math.PI}), 1/60);
+assert(flip.turnScale < 1 && flip.turnScale >= .88, 'turn has a subtle visible transition');
+const middle = look.update(sample({aim: Math.PI}), 1/60);
+assert(middle.turnScale > flip.turnScale, 'turn relaxes after changing direction');
+for (let i = 0; i < 12; i++) look.update(sample({aim: Math.PI}), 1/60);
+assert.equal(look.update(sample({aim: Math.PI}), 1/60).turnScale, 1);
+
 // Stopping settles once; time alone never advances a walk cycle.
 const motion = new DoodleMotion(3, sample());
 let last;
@@ -80,7 +90,7 @@ const idle=new DoodleMotion(0,sample()),idlePoses=[];
 for(let i=0;i<240;i++){const pose=idle.update(sample(),1/60);valid(pose);idlePoses.push(pose);}
 const low=idlePoses.reduce((a,b)=>a.y<b.y?a:b),high=idlePoses.reduce((a,b)=>a.y>b.y?a:b);
 const displayRange=(high.y-low.y)*52/64;
-assert(displayRange>.9 && displayRange<1.2,'idle breathing remains visible but restrained at 52px');
+assert(displayRange>1.3 && displayRange<1.5,'idle breathing remains visible but restrained at 52px');
 function renderIdle(pose){
     const calls=[],stack=[];let transform={x:0,y:0,sx:1,sy:1};
     const ctx={

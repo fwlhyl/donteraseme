@@ -38,7 +38,7 @@ export class PlayerFactory {
         const renderable = new Renderable('#ffffff', hitRadius, hitRadius * 2, hitRadius * 2, 'circle', 70);
         // Appearance and collision share one scale, including subsequent body-size upgrades.
         player.addComponent(renderable);
-        player.addComponent(new PlayerArtwork(getPaperCollector(), displaySize, hitRadius, undefined, false, 'neutral-player'));
+        player.addComponent(new PlayerArtwork(getPaperCollector(), displaySize, hitRadius, undefined, false, 'neutral-player', charConfig.id));
         
         // Add PlayerStats based on selection
         const stats = new PlayerStats();

@@ -11,6 +11,7 @@ export class PlayerArtwork extends Component {
         public readonly baseRadius = 20,
         public readonly frame?: AtlasFrame,
         public readonly articulated = false,
-        public readonly rig?: 'paper-collector-v1' | 'neutral-player'
+        public readonly rig?: 'paper-collector-v1' | 'neutral-player',
+        public readonly characterId = 'collector'
     ) { super(); }
 }

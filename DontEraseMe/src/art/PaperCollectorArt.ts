@@ -1,3 +1,6 @@
+import { drawVariantABody, drawVariantAHead } from './CharacterVariantsA';
+import { drawVariantBBody, drawVariantBHead } from './CharacterVariantsB';
+import { drawVariantCBody, drawVariantCHead } from './CharacterVariantsC';
 import type { DoodlePose } from './DoodleMotion';
 import { drawDoodleWeapon } from './DoodleWeapons';
 import type { Weapon } from '../components/Weapon';
@@ -128,10 +131,45 @@ function head(ctx: CanvasRenderingContext2D, backView: boolean, aim: number, hit
     ctx.restore();
 }
 
+// The small marker grows from the same ground anchor as the collector's feet.
+function drawGrave(ctx: CanvasRenderingContext2D, progress: number): void {
+    const rise = Math.max(0, Math.min(1, (progress - .32) / .35));
+    if (rise <= 0) return;
+    const eased = 1 - (1 - rise) ** 3;
+    const bounce = Math.sin(Math.PI * rise) * 2;
+    ctx.save();
+    ctx.translate(0, 28);
+    ctx.scale(1, eased);
+    ctx.translate(0, -28 - bounce);
+    // Rounded, stepped stone silhouette and a simple inked cross.
+    patch(ctx, C.ink, -10, 1, 20, 25);
+    patch(ctx, C.ink, -8, -3, 16, 4);
+    patch(ctx, C.ink, -5, -5, 10, 2);
+    patch(ctx, '#d6d2c6', -8, 1, 16, 22);
+    patch(ctx, '#d6d2c6', -6, -2, 12, 3);
+    patch(ctx, '#e8e5dd', -6, 1, 3, 19);
+    patch(ctx, C.shadow, -1, 4, 2, 11);
+    patch(ctx, C.shadow, -4, 7, 8, 2);
+    patch(ctx, C.ink, -13, 24, 26, 4);
+    patch(ctx, C.cloth, -10, 25, 20, 2);
+    ctx.restore();
+    // A few restrained paper flecks accompany the appearance.
+    const puff = Math.sin(Math.PI * rise);
+    if (puff > 0) {
+        ctx.save(); ctx.globalAlpha *= puff;
+        patch(ctx, C.light, -17 - 3 * rise, 24 - 4 * rise, 3, 2);
+        patch(ctx, C.light, 14 + 3 * rise, 22 - 5 * rise, 3, 2);
+        patch(ctx, C.trim, -12 - 3 * rise, 17 - 7 * rise, 2, 2);
+        ctx.restore();
+    }
+}
+
 /** 64px collector rig. All motion is presentation-only; the hitbox and aim are untouched. */
+export interface CollectorOutcome { type: 'defeat' | 'victory'; progress: number; }
+
 export function drawPaperCollector(
     ctx: CanvasRenderingContext2D, _image: HTMLImageElement, size: number,
-    facingLeft: boolean, aim: number, pose?: DoodlePose, weapon?: Weapon | null
+    facingLeft: boolean, aim: number, pose?: DoodlePose, weapon?: Weapon | null, outcome?: CollectorOutcome, characterId = 'collector'
 ): void {
     if (!Number.isFinite(size) || size <= 0 || !Number.isFinite(aim)) return;
     const facing = facingLeft ? -1 : 1;
@@ -139,10 +177,28 @@ export function drawPaperCollector(
     const phase = pose?.gaitPhase ?? Math.asin(Math.max(-1, Math.min(1, pose?.step ?? 0)));
     const localX = (pose?.travelX ?? facing) * facing;
     const travelY = pose?.travelY ?? 0;
-    const backView = Math.sin(aim) < -.42;
+    const backView = false;
     const idleBreath = weapon?.reloading ? 0 : Math.max(-1, Math.min(1, pose?.idleBreath ?? 0));
     ctx.save(); ctx.scale(size / 64, size / 64); ctx.imageSmoothingEnabled = false;
-    ctx.save(); ctx.scale(facing, 1);
+    const defeat = outcome?.type === 'defeat' ? Math.max(0, Math.min(1, outcome.progress)) : 0;
+    if (outcome?.type === 'defeat' && defeat >= .5) {
+        drawGrave(ctx, defeat); ctx.restore(); return;
+    }
+    if (outcome?.type === 'defeat') {
+        const vanish = Math.max(0, Math.min(1, (defeat - .05) / .45));
+        const eased = vanish * vanish * (3 - 2 * vanish);
+        ctx.globalAlpha *= 1 - eased;
+        ctx.translate(0, 28); ctx.scale(1 - .55 * eased, 1 - .8 * eased); ctx.translate(0, -28);
+    }
+    const hit = Math.max(0, Math.min(1, pose?.hit ?? 0));
+    ctx.translate(-facing * hit * 2, hit * 1.5);
+    if (outcome) {
+        const t = Math.max(0, Math.min(1, outcome.progress));
+        if (outcome.type === 'victory') ctx.translate(0, -Math.sin(t * Math.PI) * 3);
+    }
+    const turnScale = Math.max(.88, Math.min(1, pose?.turnScale ?? 1));
+    ctx.save(); ctx.scale(facing * .72 * turnScale, 1);
+    ctx.translate(0, 28); ctx.scale(1, .75); ctx.translate(0, -28);
     leg(ctx, -1, phase, moving, localX, travelY);
     leg(ctx, 1, phase, moving, localX, travelY);
     ctx.restore();
@@ -150,12 +206,14 @@ export function drawPaperCollector(
     // Quarter-pixel vertical settling keeps breathing visible without rocking the torso.
     ctx.translate(0, Math.round((pose?.y ?? 0) * 4) / 4);
     const tool = () => drawDoodleWeapon(ctx, weapon?.config?.type, 64, aim, pose, weapon?.reloading,
-        {reloadProgress: pose?.reloadProgress, facingLeft});
+        {reloadProgress: pose?.reloadProgress, facingLeft, compact: true});
     if (backView) tool();
-    ctx.save(); ctx.scale(facing, 1);
-    body(ctx, phase, moving, backView, idleBreath);
-    head(ctx, backView, aim, pose?.hit ?? 0, idleBreath);
-    // Empty hands hang in short sleeves when the player has no equipped weapon.
+    // Compact torso and limbs support a larger, readable head silhouette.
+    ctx.save(); ctx.scale(facing * .70 * turnScale, 1);
+    ctx.translate(0, 15); ctx.scale(1, .72); ctx.translate(0, -15);
+    const variantPose = pose ? {...pose, idleBreath} : undefined;
+    if (!drawVariantABody(ctx, characterId, variantPose) && !drawVariantBBody(ctx, characterId, variantPose) && !drawVariantCBody(ctx, characterId, variantPose))
+        body(ctx, phase, moving, backView, idleBreath);
     if (!weapon?.config) {
         for (const side of [-1, 1]) {
             patch(ctx, C.ink, side * 14 - 3, -4, 7, 13);
@@ -164,6 +222,18 @@ export function drawPaperCollector(
         }
     }
     ctx.restore();
+    // Anchor the head at the shortened torso's collar, preserving its identity.
+    ctx.save(); ctx.scale(facing * .95 * turnScale, 1);
+    ctx.translate(0, -3); ctx.scale(1, 1.16); ctx.translate(0, 10);
+    // Variant faces sit closer to the collar of the shortened torso.
+    if (characterId !== 'collector') ctx.translate(0, 3);
+    if (!drawVariantAHead(ctx, characterId, variantPose) && !drawVariantBHead(ctx, characterId, variantPose) && !drawVariantCHead(ctx, characterId, variantPose))
+        head(ctx, backView, aim, pose?.hit ?? 0, idleBreath);
+    ctx.restore();
     if (!backView) tool();
     ctx.restore();
+    if (outcome?.type === 'defeat') {
+        ctx.save(); ctx.scale(size / 64, size / 64);
+        drawGrave(ctx, defeat); ctx.restore();
+    }
 }
