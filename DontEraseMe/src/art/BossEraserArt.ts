@@ -27,7 +27,6 @@ export function drawBossEraserDraft(ctx: CanvasRenderingContext2D, size: number,
     };
     ctx.save(); ctx.scale(size / 64, size / 64); ctx.imageSmoothingEnabled = false;
     // A heavy smear and broken, pointed supports make the weight feel grounded.
-    px(shadow,-26,28,52,2); px(ink,-17,30,34,1);
     for (let i = 0; i < 5; i++) {
         const x = [-22,-12,0,12,22][i];
         const cycle = t * .55 + i * Math.PI;

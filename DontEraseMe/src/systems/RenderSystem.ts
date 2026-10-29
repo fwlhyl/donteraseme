@@ -15,6 +15,7 @@ import { SpriteAnimation } from '../components/SpriteAnimation';
 import { PlayerArtwork } from '../components/PlayerArtwork';
 import { Weapon } from '../components/Weapon';
 import { drawPlayerArtwork } from '../ui/drawPlayerArtwork';
+import { drawActorShadow } from '../art/ActorShadow';
 import { drawDoodleEnemy, hasDoodleEnemyArtwork } from '../art/DoodleArt';
 import { DoodleMotion, sampleDoodleMotion } from '../art/DoodleMotion';
 import { drawDoodleSkillEntity, drawDoodleSkillSprite, drawDoodleTurret, getDoodleUprightFacing, DOODLE_VEHICLE_SCALE } from '../art/DoodleSkillArt';
@@ -250,6 +251,19 @@ export class RenderSystem extends System {
                     if (spine) rotation = spine.worldRotation;
                 }
                 this.ctx.translate(drawX, drawY);
+
+                // Shadows stay fixed to the ground, before hit flashes, pose
+                // bobbing or aim rotation. Skill vehicles draw their own.
+                const isPlayer = entity.tags.has('player');
+                const enemyArt = entity.tags.has('enemy') ? entity.getComponent(EnemyBehavior) : undefined;
+                const vehicle = renderable.shape === 'magic_tank' || renderable.shape === 'magic_robot' || renderable.shape === 'magic_bomber';
+                if ((isPlayer && !vehicle) || enemyArt) {
+                    const art = isPlayer ? entity.getComponent(PlayerArtwork) : undefined;
+                    const boss = entity.tags.has('boss');
+                    const size = art ? art.displaySize * renderable.radius / art.baseRadius
+                        : renderable.radius * (boss ? 2.5 : 2);
+                    drawActorShadow(this.ctx, size, isPlayer ? 'player' : enemyArt!.type, boss);
+                }
                 
                 // Blink if invincible
                 let isInvincibleBlink = false;

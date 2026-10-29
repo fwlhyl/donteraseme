@@ -5,6 +5,11 @@ export type MagicPenGrade = 'A' | 'B' | 'C';
 
 /** A short-lived combat creation made by the Magic Pen drawing board. */
 export class MagicManifestation extends Component {
+    /** Visual-only motion; combat and player movement remain authoritative. */
+    public visualMoving = 0;
+    public visualAttackFrames = 0;
+    public visualAim = 0;
+    public visualFacing: -1 | 1 = 1;
     constructor(
         public type: MagicManifestationType,
         public ownerId: string,

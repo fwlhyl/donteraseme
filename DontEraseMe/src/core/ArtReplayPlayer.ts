@@ -204,7 +204,7 @@ export class ArtReplayPlayer {
         this.lastMagic = index;
         const drawing = drawings[index];
         const names: Record<string, string> = getLang() === 'zh' ? { tank: '坦克', robot: '机器人', bomber: '轰炸机' } : { tank: 'Tank', robot: 'Robot', bomber: 'Bomber' };
-        this.magicCaption.textContent = `${getLang() === 'zh' ? '神笔马良' : 'Magic Pen'} · ${names[drawing.type] || drawing.type} · ${drawing.grade}`;
+        this.magicCaption.textContent = `${getLang() === 'zh' ? '画笔成真' : 'Brush to Life'} · ${names[drawing.type] || drawing.type} · ${drawing.grade}`;
         const ctx = this.magicCanvas.getContext('2d')!;
         ctx.clearRect(0, 0, 640, 360);
         ctx.save();

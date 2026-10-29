@@ -120,6 +120,8 @@ export const dictEn: Record<string, string> = {
     "换弹触发系": "Reload Trigger",
     "命中/暴击触发系": "Hit/Crit Trigger",
     "击杀触发系": "Kill Trigger",
+    "画笔成真": "Brush to Life",
+    "击杀 100 个敌人后，按 G 作画具现一次载具。": "Defeat 100 enemies, then press G to draw and summon a vehicle once.",
     "召唤物系": "Summon",
     "防御/受击触发系": "Defense/Hit Trigger",
     "走位互动系": "Movement Interaction",

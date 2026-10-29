@@ -23,6 +23,7 @@ import { Puddle } from '../components/Puddle';
 import { Paperclip } from '../components/Paperclip';
 import { PlayerAnimation } from '../components/PlayerAnimation';
 import { SkillVisual } from '../components/SkillVisual';
+import { MagicManifestation } from '../components/MagicManifestation';
 import { emitGameSound } from '../audio/AudioEvents';
 import { sweptProjectileCircleTime, sweptWallTime } from './ProjectileSweep';
 
@@ -192,6 +193,9 @@ export class CollisionSystem extends System {
     }
     private frame: number = 0;
     private enemyContactCooldown: Map<string, number> = new Map();
+    // Per enemy, separate from damage dealt to the player; weak keys do not
+    // retain dead enemies or carry cooldowns into a later run.
+    private vehicleRamCooldown = new WeakMap<Entity, number>();
 
     // Helper: Draw Blood / Splash
     private drawSplash(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, radius: number) {
@@ -1747,6 +1751,12 @@ export class CollisionSystem extends System {
             const pRender = player.getComponent(Renderable)!;
             const pSkill = player.getComponent(Skill);
             const pHealth = player.getComponent(Health);
+            const ramType = player.tags.has('magic_piloting_tank') ? 'tank'
+                : player.tags.has('magic_piloting_robot') ? 'robot' : null;
+            const vehicle = ramType ? Array.from(this.entities).find(entity => {
+                const m = entity.getComponent(MagicManifestation);
+                return entity.active && m?.ownerId === player!.id && m.type === ramType;
+            })?.getComponent(MagicManifestation) : undefined;
 
             for (const enemy of enemies) {
                 if (!enemy.active) continue;
@@ -1760,6 +1770,34 @@ export class CollisionSystem extends System {
                 const minDist = (pRender.radius || 20) + (eRender.radius || 15);
 
                 if (dist < minDist) {
+                    // Flying avoids body contact only; hostile projectiles and
+                    // other damage sources still run in their normal branches.
+                    if (player.tags.has('magic_piloting_bomber')) continue;
+                    if (vehicle && enemy.tags.has('enemy') && !enemy.tags.has('ink_dummy') && this.frame >= (this.vehicleRamCooldown.get(enemy) ?? 0)) {
+                        this.vehicleRamCooldown.set(enemy, this.frame + 30);
+                        const behavior = enemy.getComponent(EnemyBehavior);
+                        const health = enemy.getComponent(Health);
+                        const directionX = dist > .001 ? -dx / dist : Math.cos(pTransform.rotation);
+                        const directionY = dist > .001 ? -dy / dist : Math.sin(pTransform.rotation);
+                        const damage = Math.round((ramType === 'tank' ? 50 : 42) * vehicle.damageMultiplier);
+                        const shielded = behavior?.type === 'shield' && behavior.shield > 0
+                            && directionX * Math.cos(eTransform.rotation) + directionY * Math.sin(eTransform.rotation) > Math.cos(Math.PI / 3);
+                        const invulnerableBoss = behavior?.type === 'boss_eraser' && behavior.bossTimer % 600 >= 400;
+                        if (shielded && behavior) {
+                            behavior.shield -= damage;
+                            emitGameSound('shield', { x: eTransform.x, y: eTransform.y, gain: .65 });
+                        } else if (health && health.current > 0 && !invulnerableBoss) {
+                            health.current -= damage;
+                            emitGameSound('hit-heavy', { x: eTransform.x, y: eTransform.y });
+                            if (health.current <= 0) this.handleEnemyDeath(enemy, player, eTransform.x, eTransform.y, eRender.color);
+                        }
+                        if (!invulnerableBoss) {
+                            eTransform.x += directionX * 18;
+                            eTransform.y += directionY * 18;
+                            enemyIndex?.update(enemy, eTransform);
+                            if (health && damage > 0) DamageTextSystem.addDamageText(eTransform.x, eTransform.y - 15, damage, shielded ? '#66ccff' : '#ffffff', false);
+                        }
+                    }
                     if (pSkill && pSkill.eraserShieldFrames > 0) {
                         if (dist > 0) {
                             const nx = (pTransform.x - eTransform.x) / dist;

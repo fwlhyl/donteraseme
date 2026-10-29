@@ -240,7 +240,7 @@ export class InputSystem extends System {
             const dx = mouseWorldX - transform.x;
             const dy = mouseWorldY - transform.y;
             
-            if (!autoAttack) {
+            if (!autoAttack || entity.tags.has('magic_piloting_tank') || entity.tags.has('magic_piloting_robot')) {
                 transform.rotation = Math.atan2(dy, dx);
             }
 

@@ -8,8 +8,6 @@ export function drawBossPrismDraft(ctx: CanvasRenderingContext2D, size: number, 
         ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), w, h);
     };
     ctx.save(); ctx.scale(size/64, size/64); ctx.imageSmoothingEnabled = false;
-    // A heavy hovering shadow grounds the silhouette without obscuring painted trails.
-    block('#7a7f72', -14, 27, 28, 2); block('#a5a99c', -10, 29, 20, 1);
     ctx.translate(0, Math.round(-2 + Math.sin(t*.38) * (motion ? 1.5 : 1)));
 
     // Four separate chipped guards surround the central prism. Their offsets

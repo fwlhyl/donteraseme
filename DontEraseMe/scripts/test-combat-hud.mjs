@@ -53,17 +53,22 @@ weapon.update(brush); assert.equal(part(weaponRoot, 'pips').children.length, 12)
 assert.equal(part(weaponRoot, 'reload').hidden, true);
 
 const magicRoot = new Element(), magic = new MagicHud(magicRoot);
-magic.update(32, 45, false, true);
-assert.equal(part(magicRoot, 'count').textContent, '32 / 45');
-assert.equal(part(magicRoot, 'inspiration').style['--fill'], '71%');
+magic.update(0, 100, false, true, false);
+assert.equal(magicRoot.hidden, true, 'unselected skill hides the progress display');
+magic.update(32, 100, false, true, true);
+assert.equal(magicRoot.hidden, false, 'selecting the skill shows the progress display');
+assert.equal(part(magicRoot, 'count').textContent, '32 / 100');
+assert.equal(part(magicRoot, 'inspiration').style['--fill'], '32%');
 assert.equal(part(magicRoot, 'status').hidden, true);
-magic.update(45, 45, false, true);
+magic.update(100, 100, false, true, true);
 assert.equal(magicRoot.dataset.ready, 'true');
 assert.equal(part(magicRoot, 'status').textContent, '就绪 · 按 G 描绘');
-magic.update(0, 45, true, false);
+magic.update(0, 100, true, false, true);
 assert.equal(magicRoot.dataset.ready, 'false');
 assert.equal(part(magicRoot, 'status').textContent, 'Piloting');
 assert.equal(part(magicRoot, 'status').hidden, false);
+magic.update(0, 100, false, true, false);
+assert.equal(magicRoot.hidden, true, 'a new run without the skill hides the display again');
 
 const guard = new Element(); mountDefenseHud(guard);
 updateDefenseHud(guard, { name: '<img onerror=alert(1)>', integrity: .2, attackers: 3, remaining: 65.1, zh: true });

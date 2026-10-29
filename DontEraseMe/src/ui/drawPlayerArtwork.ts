@@ -85,9 +85,6 @@ export function drawPlayerArtwork(
     ctx.shadowBlur = 0;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    if (pose) {
-        ctx.fillStyle='#30382b24';ctx.beginPath();ctx.ellipse(0,size*.44,size*.23*pose.shadowScale,size*.055,0,0,Math.PI*2);ctx.fill();
-    }
     if (artwork.rig === 'paper-collector-v1' || artwork.rig === 'neutral-player') {
         drawPaperCollector(ctx, artwork.image, size, artwork.facingLeft, aim, pose, weapon, undefined, artwork.characterId);
     } else if (artwork.articulated && artwork.frame) {

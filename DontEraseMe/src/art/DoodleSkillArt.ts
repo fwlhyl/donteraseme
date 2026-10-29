@@ -7,6 +7,10 @@ import { Transform } from '../components/Transform';
 import { Renderable } from '../components/Renderable';
 import { SkillVisual } from '../components/SkillVisual';
 import { Velocity } from '../components/Velocity';
+import { MagicManifestation } from '../components/MagicManifestation';
+import { drawMagicTank } from './MagicTankArt';
+import { drawMagicRobot } from './MagicRobotArt';
+import { drawMagicBomber } from './MagicBomberArt';
 
 export type SkillSprite = 'digital_pen' | 'stickman' | 'palette' | 'scythe' | 'drone' | 'turret'
     | 'paperclip' | 'ink_dummy' | 'tank' | 'robot' | 'bomber' | 'paper_shard';
@@ -137,7 +141,12 @@ export function drawDoodleSkillEntity(ctx: CanvasRenderingContext2D, entity: Ent
         // All piloted cutouts remain upright. Only flip X; never rotate the hull
         // or mirror Y. The untouched transform still aims actual attacks in 360°.
         ctx.scale(getDoodleUprightFacing(entity,t.rotation),1);
-        drawDoodleSkillSprite(ctx,vehicle,size);
+        const manifestation = entity.getComponent(MagicManifestation);
+        const moving = manifestation?.visualMoving ?? 0;
+        const attack = Math.max(0, Math.min(1, (manifestation?.visualAttackFrames ?? 0) / 12));
+        if (vehicle === 'tank') drawMagicTank(ctx, size, time, moving, attack, manifestation?.visualAim ?? 0);
+        else if (vehicle === 'robot') drawMagicRobot(ctx, size, time * 7, moving, attack, manifestation?.visualAim ?? 0);
+        else drawMagicBomber(ctx, size, time, moving, attack);
     }
     ctx.restore(); return true;
 }

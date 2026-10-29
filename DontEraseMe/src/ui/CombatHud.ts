@@ -74,7 +74,7 @@ export class WeaponHud {
         const ammo = ammoModel(data.ammo, data.capacity, data.type === 'melee');
         const iconKey = vehicle ? 'vehicle' : weaponIcons[data.type] || 'brush';
         if (this.iconKey !== iconKey) { this.icon.innerHTML = hudIcon(iconKey); this.iconKey = iconKey; }
-        text(this.caption, vehicle ? (data.zh ? '神笔具现 / PILOT' : 'PILOT') : (data.zh ? '主画笔 / BRUSH' : 'BRUSH'));
+        text(this.caption, vehicle ? (data.zh ? '画笔成真 / PILOT' : 'PILOT') : (data.zh ? '主画笔 / BRUSH' : 'BRUSH'));
         text(this.name, data.name); this.name.title = data.name;
         text(this.count, vehicle ? `${Math.max(0, data.remaining!).toFixed(1)}s` : unarmed ? '—' : ammo.infinite ? '∞' : `${Math.max(0, Math.ceil(data.ammo))} / ${data.capacity}`);
         text(this.status, vehicle ? (data.zh ? '驾驶中' : 'PILOTING') : unarmed ? (data.zh ? '未装备' : 'UNARMED') : data.reloading
@@ -100,13 +100,15 @@ export class MagicHud {
         this.label = find(root, 'label'); this.count = find(root, 'count');
         this.bar = find(root, 'inspiration'); this.status = find(root, 'status');
     }
-    update(progress: number, maximum: number, piloting: boolean, zh: boolean) {
+    update(progress: number, maximum: number, piloting: boolean, zh: boolean, enabled: boolean) {
+        this.root.hidden = !enabled;
+        if (!enabled) return;
         const ready = !piloting && progress >= maximum;
-        text(this.label, zh ? '神笔' : 'Magic Ink');
+        text(this.label, zh ? '画笔成真' : 'Brush to Life');
         text(this.count, `${progress} / ${maximum}`);
         text(this.status, piloting ? (zh ? '驾驶中' : 'Piloting') : ready ? (zh ? '就绪 · 按 G 描绘' : 'Ready · press G') : '');
         this.status.hidden = !piloting && !ready;
-        meter(this.bar, hudRatio(progress, maximum), zh ? '神笔灵感' : 'Inspiration');
+        meter(this.bar, hudRatio(progress, maximum), zh ? '画笔成真充能' : 'Brush to Life charge');
         this.root.dataset.ready = String(ready);
     }
 }

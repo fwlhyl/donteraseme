@@ -344,6 +344,10 @@ export const SKILLS: SkillConfig[] = [
 
     // ================== 击杀触发系 ==================
     {
+        id: 'magic_pen', name: '画笔成真', category: SkillCategory.KILL, maxLevel: 1,
+        levels: [{ level: 1, description: '击杀 100 个敌人后，按 G 作画具现一次载具。' }]
+    },
+    {
         id: 'kill_bloom', name: '颜料绽放', category: SkillCategory.KILL, maxLevel: 3,
         levels: [
             { level: 1, description: '击杀敌人后尸体炸开，造成相当于其最大生命值 5% 的真实伤害' },

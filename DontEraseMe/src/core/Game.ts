@@ -22,7 +22,8 @@ import { DamageTextSystem } from '../systems/DamageTextSystem';
 import { PlayerFactory } from '../entities/PlayerFactory';
 import { EnemyFactory } from '../entities/EnemyFactory';
 import { SkeletonSystem } from '../systems/SkeletonSystem';
-import { ObjectiveSystem } from '../systems/ObjectiveSystem';
+// Occupation points are temporarily disabled; keep the system for future use.
+// import { ObjectiveSystem } from '../systems/ObjectiveSystem';
 import { LevelSystem } from '../systems/LevelSystem';
 import { SummonSystem } from '../systems/SummonSystem';
 import { MagicPenSystem } from '../systems/MagicPenSystem';
@@ -486,7 +487,7 @@ export class Game {
         this.addSystem(new ParticleSystem());
         this.addSystem(new TrailSystem(this.trailCtx, this.camera));
         this.addSystem(new SkeletonSystem());
-        this.addSystem(new ObjectiveSystem(this.worldWidth, this.worldHeight, (e) => this.addEntity(e)));
+        // this.addSystem(new ObjectiveSystem(this.worldWidth, this.worldHeight, (e) => this.addEntity(e)));
         this.addSystem(new LevelSystem(() => this.currentMode === 'drawing' ? 'endless' : this.currentMode));
         this.addSystem(new PrologueSystem(this.worldWidth, this.worldHeight));
         this.courtyardBoundary = new CourtyardBoundarySystem(() => this.currentMode === 'endless');
