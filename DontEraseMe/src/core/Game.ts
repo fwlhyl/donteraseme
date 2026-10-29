@@ -1145,6 +1145,7 @@ export class Game {
     public startGame(mode: PlayMode = 'endless'): void {
         if (this.state === GameState.DEFENSE_INTRO || this.state === GameState.GALLERY) return;
         this.currentMode = mode;
+        this.gameUI.dataset.mode = mode;
         // 暂时屏蔽皮肤绘制提示，直接使用默认皮肤进入无尽模式
         /*
         const savedSkin = localStorage.getItem('player_custom_skin');

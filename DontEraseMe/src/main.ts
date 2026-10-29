@@ -1,4 +1,5 @@
 import './style.css'
+import { mountMenuArtwork } from './ui/MenuArtwork';
 import './ui/combatHud.css'
 import { Game } from './core/Game';
 import { ElementDictionary, PaletteSystem } from './systems/PaletteSystem';
@@ -16,6 +17,7 @@ declare global {
 
 // Initialize game
 const game = new Game();
+mountMenuArtwork();
 window.gameInstance = game; // Expose to global for UI and systems
 window.audioManager = mountGameAudio(game);
 

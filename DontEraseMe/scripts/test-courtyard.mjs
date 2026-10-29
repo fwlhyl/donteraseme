@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 
 const out=join(await mkdtemp(join(tmpdir(),'courtyard-tests-')),'geometry.mjs');
 await build({entryPoints:['src/world/CourtyardGeometry.ts'],bundle:true,platform:'node',format:'esm',outfile:out});
-const {courtyard:g,CourtyardNavigation}=await import(pathToFileURL(out));
+const {courtyard:g,CourtyardGeometry,CourtyardNavigation}=await import(pathToFileURL(out));
 assert(g.fits(g.center,150),'central drawing space accepts large bosses');
 assert(!g.fits({x:100,y:100},10),'building corner is solid');
 let checked=0;
@@ -29,27 +29,46 @@ for(const radius of [10,24,60,114]) {
     }
 }
 
-// Find actual concave-edge routes and verify arrival, not just safe endpoints.
-const nav=new CourtyardNavigation(g);
+// New artwork has a broadly convex arena. Check that real perimeter spawn
+// recovery and the direct routes into the center remain valid for each size.
+for(const radius of [18,60,114]) {
+    const nav=new CourtyardNavigation(g);
+    for(let i=0;i<48;i++) {
+        const angle=i*Math.PI*2/48;
+        const spawn=g.project({x:g.center.x+1300*Math.cos(angle),y:g.center.y+1000*Math.sin(angle)},radius);
+        assert(g.fits(spawn,radius),`perimeter spawn radius ${radius}, angle ${i}`);
+        assert(g.segmentClear(spawn,g.center,radius),`perimeter route radius ${radius}, angle ${i}`);
+        assert(g.fits(nav.waypoint(spawn,g.center,radius),radius),`navigation waypoint radius ${radius}, angle ${i}`);
+    }
+}
+
+// Retain obstacle-routing coverage in a synthetic concave arena; the new
+// scene no longer has the old artwork's recessed corners.
+const concave=new CourtyardGeometry(1800,1200);
+concave.points.splice(0,concave.points.length,...[
+    [250,200],[700,200],[700,550],[1100,550],
+    [1100,200],[1550,200],[1550,1000],[250,1000]
+].map(([x,y])=>({x,y})));
+const nav=new CourtyardNavigation(concave);
 let routed=0;
 for(const radius of [18,60,114]) {
-    const samples=g.points.map(p=>g.project(p,radius+3));
+    const samples=concave.points.map(p=>concave.project(p,radius+3));
     let count=0;
     for(let i=0;i<samples.length&&count<4;i++) for(let j=i+1;j<samples.length&&count<4;j++) {
         const goal=samples[j];let p=samples[i];
-        if(g.segmentClear(p,goal,radius))continue;
+        if(concave.segmentClear(p,goal,radius))continue;
         for(let step=0;step<900&&Math.hypot(goal.x-p.x,goal.y-p.y)>8;step++) {
-            const target=g.segmentClear(p,goal,radius)?goal:nav.waypoint(p,goal,radius);
+            const target=concave.segmentClear(p,goal,radius)?goal:nav.waypoint(p,goal,radius);
             const dx=target.x-p.x,dy=target.y-p.y,len=Math.hypot(dx,dy);
-            p=g.move(p,{x:p.x+dx/Math.max(1,len)*Math.min(8,len),y:p.y+dy/Math.max(1,len)*Math.min(8,len)},radius);
-            assert(g.fits(p,radius),'route stays outside architecture');
+            p=concave.move(p,{x:p.x+dx/Math.max(1,len)*Math.min(8,len),y:p.y+dy/Math.max(1,len)*Math.min(8,len)},radius);
+            assert(concave.fits(p,radius),'route stays outside architecture');
         }
         assert(Math.hypot(goal.x-p.x,goal.y-p.y)<=8,`route stuck radius ${radius}, ${i}->${j}: ${JSON.stringify(p)}`);
         count++;routed++;
     }
     assert(count>0,'concave route cases were exercised');
 }
-console.log(`PASS: ${checked} projection / collision checks; ${routed} concave routes including bosses.`);
+console.log(`PASS: ${checked} projection / collision checks; 144 new-arena perimeter routes; ${routed} synthetic concave routes including bosses.`);
 
 const systemsOut=join(await mkdtemp(join(tmpdir(),'courtyard-systems-')),'systems.mjs');
 await build({stdin:{contents:`

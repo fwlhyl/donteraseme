@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Boss 形象小样</title><style>
+*{box-sizing:border-box}body{margin:0;background:#f5f3eb;color:#282d25;font:15px/1.6 system-ui,sans-serif}main{max-width:1200px;margin:auto;padding:30px 24px}h1{font-size:25px;margin:0}p,small{color:#687160}button{font:inherit;border:1px solid #a2aa96;background:transparent;color:#30392c;padding:7px 16px;cursor:pointer;margin-right:8px}button[aria-pressed=true]{background:#30392c;color:#faf9f5}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.panel{background:#eeeee6;border:1px solid #c9cdbf;padding:16px}h2{font-size:18px;margin:0}canvas{display:block;width:100%;height:auto;image-rendering:pixelated;background:#faf9f5;margin-top:12px}@media(max-width:700px){.grid{grid-template-columns:1fr}}
+</style></head><body><main><h1>四个 Boss · 形象小样</h1><p>每张画布左侧为放大造型，右侧为尺寸参考；收藏家用于比较比例。尺寸为设计建议，正式对局需结合碰撞和战斗画面调整。</p><div><button id="motion" aria-pressed="true">动作</button><button id="background" aria-pressed="false">切换到彩色笔迹背景</button></div><div class="grid">
+<section class="panel"><h2>色彩剥夺者 · 多面棱镜</h2><small>护盾机制</small><canvas id="prism" width="720" height="400"></canvas></section>
+<section class="panel"><h2>清道夫 · 巨型滚刷</h2><small>冲锋与清理</small><canvas id="roller" width="720" height="400"></canvas></section>
+<section class="panel"><h2>混沌污染源 · 泼墨巨兽</h2><small>泼墨与分裂</small><canvas id="slime" width="720" height="400"></canvas></section>
+<section class="panel"><h2>空白法则 · 终极橡皮擦</h2><small>多阶段压迫</small><canvas id="eraser" width="720" height="400"></canvas></section>
+</div><p>Boss 形象已接入游戏，预览与对局使用相同绘制代码。</p></main><script type="module" src="./review.ts"></script></body></html>

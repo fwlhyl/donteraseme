@@ -152,4 +152,13 @@ const malformed=new DoodleMotion(7);
 assert.equal(malformed.update(sample({reloadProgress:Infinity}),1/60).reloadProgress,0);
 assert.equal(malformed.update(sample({reloadProgress:2}),1/60).reloadProgress,1);
 
+// The scraper's visual swing stays readable longer than a shot without touching cadence.
+const slash = new DoodleMotion(0, sample({weaponType:'melee'}));
+slash.update(sample({weaponType:'melee', attackSerial:1}), 1/60);
+let slashPose;
+for (let i=0; i<12; i++) slashPose=slash.update(sample({weaponType:'melee', attackSerial:1}), 1/60);
+assert(slashPose.attack > 0, 'scraper is still swinging at 200ms');
+for (let i=0; i<7; i++) slashPose=slash.update(sample({weaponType:'melee', attackSerial:1}), 1/60);
+assert.equal(slashPose.attack, 0, 'scraper settles after the swing');
+
 console.log('PASS: pixel motion refresh-rate consistency, fast directional turns, visible 52px idle with planted feet, busy-state idle suppression, stop/freeze/teleport handling, upright torso, attack/hit continuity, upgraded reload timing and unchanged gameplay components.');

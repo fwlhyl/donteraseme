@@ -305,6 +305,8 @@ export class EnemySystem extends System {
                     if (dist > 0) {
                         velocity.x = (dx / dist) * currentSpeed;
                         velocity.y = (dy / dist) * currentSpeed;
+                        // The visual rig mirrors its damaged front toward the chase target.
+                        transform.rotation = Math.atan2(dy, dx);
                     }
 
                     // Guard Mode erasers make a soft, tick-based pass over the
@@ -315,7 +317,7 @@ export class EnemySystem extends System {
                         enemy.defenseEraseCooldown--;
                         if (enemy.defenseEraseCooldown <= 0) {
                             const renderable = entity.getComponent(Renderable);
-                            const radius = renderable ? renderable.radius : 30;
+                            const radius = enemy.eraseRadius ?? (renderable ? renderable.radius : 30);
                             defensePainting.eraseAt(transform.x, transform.y, radius + 8, 0.045);
                             enemy.defenseEraseCooldown = 9;
                             signalDoodleAttack(entity);
@@ -327,7 +329,7 @@ export class EnemySystem extends System {
                         // Only erase if it's active and alive
                         if (entity.active) {
                             const renderable = entity.getComponent(Renderable);
-                            const radius = renderable ? renderable.radius : 30;
+                            const radius = enemy.eraseRadius ?? (renderable ? renderable.radius : 30);
                             
                             this.trailCtx.save();
                             this.trailCtx.globalCompositeOperation = 'destination-out';
@@ -399,7 +401,7 @@ export class EnemySystem extends System {
                             const minion = new Entity();
                             minion.addComponent(new Transform(transform.x + ox, transform.y + oy));
                             minion.addComponent(new Velocity(0, 0, 1.2)); // 降低母体召唤的小怪移速 (原来是3)
-                            minion.addComponent(new Renderable('#66ff66', 12, 0, 0, 'circle', 5));
+                            minion.addComponent(new Renderable('#66ff66', 34, 0, 0, 'circle', 5));
                             minion.addComponent(new Health(30, 30));
                             minion.addComponent(new EnemyBehavior('chaser'));
                             minion.tags.add('enemy');
@@ -708,7 +710,7 @@ export class EnemySystem extends System {
                             const ang = (Math.PI / 2) * i;
                             minion.addComponent(new Transform(transform.x + Math.cos(ang) * 180, transform.y + Math.sin(ang) * 180));
                             minion.addComponent(new Velocity(0, 0, 2.5));
-                            minion.addComponent(new Renderable('#ffaa00', 16, 0, 0, 'circle', 5));
+                            minion.addComponent(new Renderable('#ffaa00', 25, 0, 0, 'circle', 5));
                             minion.addComponent(new Health(60, 60));
                             minion.addComponent(new EnemyBehavior('shooter'));
                             minion.tags.add('enemy');

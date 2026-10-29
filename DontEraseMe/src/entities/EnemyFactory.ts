@@ -13,38 +13,43 @@ export class EnemyFactory {
         enemy.addComponent(new Transform(x, y));
         
         if (type === 'chaser') {
-            const radius = 10 + Math.random() * 15; // 10-25
+            const oldRadius = 10 + Math.random() * 15; // Preserve the original health variation.
+            const radius = 34; // 68px approved artwork and hitbox.
             const color = `hsl(${Math.random() * 360}, 70%, 50%)`; // Random color
-            const hp = Math.floor(radius); // HP proportional to size
+            const hp = Math.floor(oldRadius); // Preserve original health distribution.
             
             enemy.addComponent(new Velocity(0, 0, 1.5)); // Speed 1.5 (Reduced from 3)
             enemy.addComponent(new Renderable(color, radius, 0, 0, 'circle', 10));
             enemy.addComponent(new Health(hp, hp));
         } else if (type === 'eraser') {
-            const radius = 25 + Math.random() * 5; // 25-30
+            const eraseRadius = 25 + Math.random() * 5; // Preserve the existing paint-erasure area.
+            const radius = 35; // 70px, larger than the player's 52px presentation.
+            const behavior = new EnemyBehavior('eraser');
+            behavior.eraseRadius = eraseRadius;
+            enemy.addComponent(behavior);
             enemy.addComponent(new Velocity(0, 0, 1.0)); // Speed 1.0 (Reduced from 2)
             enemy.addComponent(new Renderable('#ffffff', radius, radius * 2, radius * 2, 'rect', 10)); // White square
             enemy.addComponent(new Health(50, 50));
         } else if (type === 'shield') {
-            const radius = 22;
+            const radius = 35;
             enemy.addComponent(new Velocity(0, 0, 1.1)); // Speed 1.1 (Reduced from 2.2)
             enemy.addComponent(new Renderable('#66ccff', radius, 0, 0, 'circle', 20));
             enemy.addComponent(new Health(90, 90));
             enemy.addComponent(new EnemyBehavior('shield', 80, 80, 0, 0, 0, 0));
         } else if (type === 'shooter') {
-            const radius = 18;
+            const radius = 25;
             enemy.addComponent(new Velocity(0, 0, 0.8)); // Speed 0.8 (Reduced from 1.2)
             enemy.addComponent(new Renderable('#ff66aa', radius, 0, 0, 'circle', 20));
             enemy.addComponent(new Health(40, 40));
             enemy.addComponent(new EnemyBehavior('shooter', 0, 0, 0, 0, 0, 0));
         } else if (type === 'summoner') {
-            const radius = 20;
+            const radius = 35;
             enemy.addComponent(new Velocity(0, 0, 0.9)); // Speed 0.9 (Reduced from 1.8)
             enemy.addComponent(new Renderable('#bb88ff', radius, 0, 0, 'circle', 20));
             enemy.addComponent(new Health(50, 50));
             enemy.addComponent(new EnemyBehavior('summoner', 0, 0, 0, 0, 0, 0));
         } else if (type === 'paper_plane') {
-            const radius = 10;
+            const radius = 21; // 42px approved presentation; collision follows the visible scale.
             enemy.addComponent(new Velocity(0, 0, 3.5)); // 移速极快
             enemy.addComponent(new Renderable('#ccffff', radius, 0, 0, 'triangle', 10));
             enemy.addComponent(new Health(10, 10)); // 血量极低

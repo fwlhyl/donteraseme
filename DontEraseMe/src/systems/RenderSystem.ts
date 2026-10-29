@@ -727,7 +727,7 @@ export class RenderSystem extends System {
 
                     const eb = entity.getComponent(EnemyBehavior);
                     const drawn = entity.tags.has('enemy') && drawDoodleEnemy(this.ctx, eb?.type, renderable.radius, rotation, doodlePose, eb?.bossTimer);
-                    if (eb && eb.type === 'paper_plane') {
+                    if (!drawn && eb && eb.type === 'paper_plane') {
                         // 纸飞机高对比度描边 (红白交替闪烁)
                         this.ctx.shadowBlur = 10;
                         this.ctx.shadowColor = '#ff0000';
@@ -744,7 +744,7 @@ export class RenderSystem extends System {
                     this.ctx.closePath();
                     if (!drawn) this.ctx.fill();
 
-                    if (eb && eb.type === 'paper_plane') {
+                    if (!drawn && eb && eb.type === 'paper_plane') {
                         this.ctx.stroke();
                     }
 

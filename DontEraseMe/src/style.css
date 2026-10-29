@@ -58,7 +58,8 @@ kbd { font: 10px/1.2 var(--ui); color: var(--text); padding: 3px 5px; border: 1p
    artwork's coordinates, including when the stage is letterboxed. */
 #main-menu { padding:0; overflow:hidden; background:#f7f6f1 !important; }
 #main-menu::before, #main-menu::after { content:none; }
-.menu-stage { position:absolute; top:50%; left:50%; width:min(100vw, 177.6833vh); aspect-ratio:1672/941; transform:translate(-50%,-50%); background:url('./assets/menu/main-menu.png') center/100% 100% no-repeat; }
+.menu-stage { position:absolute; top:50%; left:50%; width:min(100vw, 177.6833vh); aspect-ratio:1672/941; transform:translate(-50%,-50%); background:url('./assets/menu/main-menu-clean.png') center/100% 100% no-repeat; }
+#menu-artwork { width:100%; height:100%; pointer-events:none; }
 .menu-paths { position:absolute; left:71.11%; top:21.36%; width:23.03%; height:54.10%; display:flex; flex-direction:column; justify-content:space-between; }
 #main-menu .mode-entry, #main-menu .menu-settings { appearance:none; padding:0; margin:0; border:0; border-radius:0; background:transparent; box-shadow:none; cursor:pointer; color:#282824; }
 #main-menu .mode-entry { position:relative; width:100%; height:20%; flex:none; }

@@ -23,6 +23,8 @@ export class EnemyBehavior extends Component {
     public defenseTargetY: number | null = null;
     public defenseRetargetFrames: number = 0;
     public defenseEraseCooldown: number = 0;
+    /** Original eraser paint radius, independent of its visual/hit size. */
+    public eraseRadius: number | null = null;
 
     // 存活倒计时（如果是召唤物、临时粒子或替身，大于0时会倒计时并死亡）
     public lifeTimer: number = 0;

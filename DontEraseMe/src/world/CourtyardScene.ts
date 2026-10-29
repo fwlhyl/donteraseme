@@ -1,18 +1,24 @@
 import { COURTYARD_OUTLINE } from './CourtyardGeometry';
 import type { CourtyardTheme } from './SceneLayout';
+import { comicAtelierBounds } from './ComicAtelierLayout';
+import creationRuinsUrl from '../assets/scenes/creation-ruins-v1.png';
 
-/** Temporary neutral stage after retiring the illustrated scenery.
- * Uses the existing playable boundary; decoration never changes collisions or ink. */
+/** Background is kept below the painting and actors; scenery is not saved as ink. */
 export class CourtyardScene {
     private canvas = document.createElement('canvas');
     private ctx: CanvasRenderingContext2D;
     private lastFrame = '';
+    private creationArt = new Image();
 
     constructor(_enable3d = false) {
         this.canvas.id = 'courtyardCanvas';
         this.canvas.style.cssText = 'position:absolute;inset:0;z-index:0;pointer-events:none;display:none';
         document.body.insertBefore(this.canvas, document.getElementById('paintingCanvas'));
         this.ctx = this.canvas.getContext('2d')!;
+        // Invalidate the camera cache when the image finishes loading so a
+        // stationary player still sees the completed scene immediately.
+        this.creationArt.onload = () => { this.lastFrame = ''; };
+        this.creationArt.src = creationRuinsUrl;
     }
 
     /** No obsolete foreground plate is painted over the combat layer. */
@@ -31,7 +37,7 @@ export class CourtyardScene {
         const ownsCanvas = this.canvas.dataset.scene === theme;
         this.canvas.style.display = 'block';
         this.canvas.dataset.scene = theme;
-        this.canvas.dataset.renderer = 'neutral-line';
+        this.canvas.dataset.renderer = theme === 'atelier' ? 'paper-ruins' : 'neutral-line';
         const key = [camera.x, camera.y, width, height, dpr, worldWidth, worldHeight, theme].join(':');
         if (key === this.lastFrame && ownsCanvas) return;
         this.lastFrame = key;
@@ -43,10 +49,18 @@ export class CourtyardScene {
         }
         const ctx = this.ctx;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.fillStyle = '#deddd5';
+        ctx.fillStyle = theme === 'atelier' ? '#f6f5ef' : '#deddd5';
         ctx.fillRect(0, 0, width, height);
         ctx.save();
         ctx.translate(-camera.x, -camera.y);
+        if (theme === 'atelier' && this.creationArt.complete && this.creationArt.naturalWidth > 0) {
+            // Share the existing aspect-preserving world mapping with collision
+            // geometry: scrolling moves the image and scenery together.
+            const bounds = comicAtelierBounds(worldWidth, worldHeight);
+            ctx.drawImage(this.creationArt, bounds.x, bounds.y, bounds.width, bounds.height);
+            ctx.restore();
+            return;
+        }
         ctx.beginPath();
         if (theme === 'ruins') ctx.rect(0, 0, worldWidth, worldHeight);
         else COURTYARD_OUTLINE.forEach(([x, y], index) => {

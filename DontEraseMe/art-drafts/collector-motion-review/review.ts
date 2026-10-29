@@ -1,11 +1,15 @@
 import { drawPaperCollector, getPaperCollector } from '../../src/art/PaperCollectorArt';
 import { DoodleMotion, type DoodlePose } from '../../src/art/DoodleMotion';
-import { Weapon } from '../../src/components/Weapon';
+import { Weapon, WEAPONS } from '../../src/components/Weapon';
 import { CHARACTERS } from '../../src/config/EndlessConfig';
 import { PLAYER_PRESENTATION } from '../../src/config/PlayerPresentation';
 
 const source = getPaperCollector();
 const weapon = new Weapon(0);
+const weaponSelect = document.getElementById('weapon') as HTMLSelectElement;
+const weaponLabels = ['\u753b\u7b14\u67aa', '\u55b7\u7f50\u6563\u5f39\u67aa', '\u8c03\u8272\u5200', '\u58a8\u94fe\u67aa', '\u5c3a\u89c4\u67aa', '\u8272\u5e26', '\u8c03\u8272\u6405\u62cc\u5668', '\u989c\u6599\u6876\u53d1\u5c04\u5668', '\u72d9\u51fb\u7b14', '\u55b7\u67aa', '\u5706\u89c4', '\u6ef4\u7ba1'];
+for (const item of WEAPONS) { const option = document.createElement('option'); option.value = String(item.id); option.textContent = weaponLabels[item.id] ?? item.name; weaponSelect.append(option); }
+weaponSelect.onchange = () => { weapon.currentWeaponIndex = Number(weaponSelect.value); weapon.reloading = false; reloadTime = -1; };
 const character = document.getElementById('character') as HTMLSelectElement;
 for (const item of CHARACTERS) { const option = document.createElement('option'); option.value = item.id; option.textContent = item.name; character.append(option); }
 const direction = document.getElementById('direction') as HTMLSelectElement;
@@ -53,7 +57,7 @@ function loop(now: number) {
         const reloadDuration = (weapon.config?.reloadTime ?? 60) / 60;
         if (reloadTime >= 0) { reloadTime += dt; if (reloadTime >= reloadDuration) reloadTime = -1; }
         weapon.reloading = reloadTime >= 0;
-        pose = motion.update({x, y: 0, hp, attackSerial, kind: 'player', aim, reloading: weapon.reloading, reloadProgress: weapon.reloading ? reloadTime / reloadDuration : 0}, dt);
+        pose = motion.update({x, y: 0, hp, attackSerial, kind: 'player', aim, weaponType: weapon.config?.type, reloading: weapon.reloading, reloadProgress: weapon.reloading ? reloadTime / reloadDuration : 0}, dt);
     }
     draw(document.getElementById('large') as HTMLCanvasElement, 4, aim, pose);
     draw(document.getElementById('native') as HTMLCanvasElement, 1, aim, pose);

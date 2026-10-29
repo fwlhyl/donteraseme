@@ -97,6 +97,19 @@
   clip-path:polygon(0 1%,8% 0,12% 1%,24% 0,39% 1%,45% 0,60% 1%,76% 0,90% 1%,100% 0,99% 15%,100% 30%,99% 48%,100% 67%,99% 86%,100% 99%,90% 100%,77% 99%,66% 100%,51% 99%,35% 100%,21% 99%,8% 100%,0 99%,1% 83%,0 65%,1% 48%,0 33%,1% 17%);
 }
 #combat-field-notes { display:none !important; }
+/* The creation arena is pale paper, so use dark ink for its instruments. */
+#ui[data-mode="endless"] { --text:#252923; --muted:#5e6259; --line:#888b80; }
+#ui[data-mode="endless"] .hud-paper,
+#ui[data-mode="endless"] .hud-score,
+#ui[data-mode="endless"] .hud-eye,
+#ui[data-mode="endless"] .hud-magic { text-shadow:none !important; }
+#ui[data-mode="endless"] .weapon-stamp,
+#ui[data-mode="endless"] .hud-magic-stamp { background:rgba(247,246,240,.8); }
+#ui[data-mode="endless"] .weapon-stamp::after,
+#ui[data-mode="endless"] .hud-magic-stamp::after { border-color:rgba(37,41,35,.35); }
+#ui[data-mode="endless"] .health-card[data-state="critical"] .hud-health-row>span,
+#ui[data-mode="endless"] .weapon-card[data-state="empty"] .hud-card-heading small,
+#ui[data-mode="endless"] .hud-magic[data-ready="true"] .hud-magic-status { color:#a32f20; }
 #defense-hud.guard-card {
   position:absolute; left:50%; top:22px; bottom:auto; z-index:120; pointer-events:none;
   display:flex; gap:8px; width:280px; padding:0; text-align:left;

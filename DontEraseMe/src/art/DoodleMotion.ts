@@ -2,7 +2,7 @@ import type { Entity } from '../core/Entity';
 import { Transform } from '../components/Transform';
 import { Health } from '../components/Health';
 import { EnemyBehavior } from '../components/EnemyBehavior';
-import { Weapon } from '../components/Weapon';
+import { Weapon, type WeaponType } from '../components/Weapon';
 import { PlayerStats } from '../components/PlayerStats';
 import { getEnemyGait } from './DoodleEnemyGait';
 
@@ -32,6 +32,7 @@ export interface DoodleSample {
     reloadProgress?: number;
     reloading?: boolean;
     aim?: number;
+    weaponType?: WeaponType;
 }
 const TAU = Math.PI * 2;
 const neutral = (): DoodlePose => ({x:0,y:0,angle:0,scaleX:1,scaleY:1,attack:0,hit:0,shadowScale:1,step:0,moving:0});
@@ -61,7 +62,9 @@ export class DoodleMotion {
         const distance = prev ? Math.hypot(sample.x-prev.x,sample.y-prev.y) : 0;
         // Ignore spawn and teleport displacement; walls use actual movement, not held input.
         const speed = sample.frozen || distance > 80 ? 0 : Math.min(1, distance / dt / 190);
-        const attack = Math.max(0,1-this.attackAge/.16);
+        // The scraper completes a readable visual arc without changing gameplay cadence.
+        const attackDuration = sample.kind === 'player' && sample.weaponType === 'melee' ? .30 : .16;
+        const attack = Math.max(0,1-this.attackAge/attackDuration);
         const hit = Math.max(0,1-this.hitAge/.2);
         if (sample.kind === 'player') {
             // Keep the body's direction tied to aim; a brief squash softens a flip.
@@ -130,6 +133,7 @@ export class DoodleMotion {
                 y: -bounce+breathing-hit*.12,
                 angle: 0, scaleX: 1, scaleY: 1,
                 attack, hit, shadowScale: 1-bounce*.035, step, moving: this.moving,
+                gaitPhase: this.gait + this.seed, time: this.time,
             };
             this.previous = {...sample};
             return this.pose;
@@ -150,6 +154,7 @@ export class DoodleMotion {
             scaleX: 1-breathing + this.moving*Math.abs(step)*.025 + attack*.075 - hit*.055,
             scaleY: 1+breathing - this.moving*Math.abs(step)*.025 - attack*.065 + hit*.07,
             attack, hit, shadowScale: 1-bounce*.035, step: step*this.moving, moving: this.moving,
+            time: this.time,
         };
         this.previous = {...sample};
         return this.pose;
@@ -170,7 +175,7 @@ export function sampleDoodleMotion(entity: Entity, dt: number, cache: WeakMap<En
     const reloadFrames = config && weapon
         ? Math.max(1, Math.floor(config.reloadTime * weapon.reloadTimeMul / (stats?.totalReloadMultiplier ?? 1))) : 1;
     const reloadProgress = weapon?.reloading ? Math.max(0, Math.min(1, 1-weapon.reloadTimer/reloadFrames)) : 0;
-    const sample={x:t?.x??0,y:t?.y??0,hp:h?.current??0,attackSerial:attackSerials.get(entity)??0,frozen:(e?.frozenFrames??0)>0,kind:player?'player':e?.type,reloadProgress,reloading:weapon?.reloading??false,aim:player?t?.rotation:undefined};
+    const sample={x:t?.x??0,y:t?.y??0,hp:h?.current??0,attackSerial:attackSerials.get(entity)??0,frozen:(e?.frozenFrames??0)>0,kind:player?'player':e?.type,reloadProgress,reloading:weapon?.reloading??false,aim:player?t?.rotation:undefined,weaponType:config?.type};
     let motion = cache.get(entity);
     if (!motion) {
         let hash=0; for (const ch of entity.id) hash=(hash*31+ch.charCodeAt(0))>>>0;
