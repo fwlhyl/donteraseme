@@ -1,4 +1,5 @@
 import { System } from '../core/System';
+import { drawInkSplash } from '../art/InkSplash';
 import { Entity } from '../core/Entity';
 import { Transform } from '../components/Transform';
 import { Weapon } from '../components/Weapon';
@@ -133,16 +134,7 @@ export class WeaponSystem extends System {
     }
 
     private paintDrawingSplash(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
-        ctx.beginPath();
-        ctx.arc(x, y, radius * 0.66, 0, Math.PI * 2);
-        ctx.fill();
-        for (let i = 0; i < 7; i++) {
-            const angle = i * Math.PI * 2 / 7;
-            const offset = radius * (0.65 + (i % 3) * 0.12);
-            ctx.beginPath();
-            ctx.arc(x + Math.cos(angle) * offset, y + Math.sin(angle) * offset, radius * (0.11 + (i % 2) * 0.05), 0, Math.PI * 2);
-            ctx.fill();
-        }
+        drawInkSplash(ctx, x, y, radius, String(ctx.fillStyle));
     }
 
     public update(dt: number): void {
@@ -390,7 +382,7 @@ export class WeaponSystem extends System {
                         
                         // Create a dummy transform for the turret using the turret's FIXED coordinates
                         const penTransform = new Transform(turret.x, turret.y, targetAngle);
-                        this.fireDigitalPenAttack(player, weapon, turret.config, penTransform, '#00ffff', stats);
+                        this.fireDigitalPenAttack(player, weapon, turret.config, penTransform, renderable.color, stats);
                     }
                 }
             }
@@ -480,7 +472,7 @@ export class WeaponSystem extends System {
                         }
                         
                         const penTransform = new Transform(penX, penY, targetAngle);
-                        this.fireDigitalPenAttack(player, weapon, stats.lastAttackConfig, penTransform, '#00ffff', stats);
+                        this.fireDigitalPenAttack(player, weapon, stats.lastAttackConfig, penTransform, renderable.color, stats);
                     }
                 }
             }
@@ -758,7 +750,7 @@ export class WeaponSystem extends System {
                     const spread = (Math.random() - 0.5) * config.spread * weapon.spreadMul;
                     const angle = transform.rotation + spread;
                     const bullet = BulletFactory.create(
-                        config,
+                        { ...config, color: bulletColor },
                         transform.x,
                         transform.y,
                         angle,
@@ -1001,7 +993,7 @@ export class WeaponSystem extends System {
         // Determine bullet color
         let bulletColor = config.color;
         // All weapons except Pistol (0) should use player color
-        if (config.id !== 0 || owner.tags.has('drawing_mode')) {
+        if (config.id !== 0 || owner.tags.has('drawing_mode') || stats?.hasDigitalPassive) {
             bulletColor = ownerColor;
         }
 
@@ -1330,7 +1322,7 @@ export class WeaponSystem extends System {
 
             // Create bullet entity
             const bullet = BulletFactory.create(
-                config,
+                stats?.hasDigitalPassive ? { ...config, color: bulletColor } : config,
                 spawnX,
                 spawnY,
                 angle,

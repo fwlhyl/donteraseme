@@ -373,12 +373,12 @@ export class EnemySystem extends System {
                         const bx = transform.x + Math.cos(angle) * spawnOffset;
                         const by = transform.y + Math.sin(angle) * spawnOffset;
                         bullet.addComponent(new Transform(bx, by, angle));
-                        const speed = 1.5; // 大幅降低子弹速度 (原来是3)
-                        bullet.addComponent(new Renderable('#ffffff', 5, 0, 0, 'circle', 10));
+                        const speed = 0.8; // Slow, readable shots
+                        bullet.addComponent(new Renderable('#ffffff', 10, 0, 0, 'circle', 10));
                         bullet.addComponent(new Projectile('standard', 50, entity.id, Math.ceil(800 / speed)));
                         bullet.addComponent(new Velocity(Math.cos(angle) * speed, Math.sin(angle) * speed, speed));
                         this.addEntityCallback(bullet);
-                        enemy.shootCooldown = 150; // 大幅降低射速 (原来是75)
+                        enemy.shootCooldown = 360; // Six seconds at 60 FPS
                         signalDoodleAttack(entity);
                     }
                 } else if (enemy.type === 'summoner') {

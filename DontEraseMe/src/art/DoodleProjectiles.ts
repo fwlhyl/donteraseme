@@ -48,10 +48,13 @@ function pigment(color:string, base?:{r:number;g:number;b:number}):string {
     pigments.set(key,nearest);
     return nearest;
 }
-function polygon(c:CanvasRenderingContext2D, points:readonly number[], fill:string):void {
+function polygon(c:CanvasRenderingContext2D, points:readonly number[], fill:string, visibleEdge=false):void {
     c.beginPath();c.moveTo(points[0],points[1]);
     for(let i=2;i<points.length;i+=2)c.lineTo(points[i],points[i+1]);
-    c.closePath();c.fillStyle=fill;c.fill();c.stroke();
+    c.closePath();c.fillStyle=fill;c.fill();
+    if(visibleEdge) { c.strokeStyle=PAPER;c.lineWidth=8.5;c.stroke();c.strokeStyle=INK;c.lineWidth=4.5; }
+    c.stroke();
+    if(visibleEdge) c.lineWidth=2.4;
 }
 function line(c:CanvasRenderingContext2D, points:readonly number[], color:string, width:number):void {
     c.beginPath();c.moveTo(points[0],points[1]);
@@ -73,17 +76,17 @@ function paintStamp(c:CanvasRenderingContext2D, kind:StampKind, color:string, aw
             line(c,[-7,-7,-10,0,-9,5],PAPER,3);dot(c,12,19,2.5,color);
             break;
         case 'standard':
-            polygon(c,[-29,-4,-14,-9,7,-10,26,-4,30,2,18,10,-3,9,-18,5,-28,7],color);
-            line(c,[-12,-4,7,-5,19,-2],PAPER,3);break;
+            polygon(c,[-29,-6,-14,-15,7,-16,26,-8,30,2,18,16,-3,15,-18,9,-28,11],color,true);
+            line(c,[-12,-7,7,-8,19,-3],PAPER,3.5);break;
         case 'shotgun':
-            polygon(c,[-17,-10,-4,-18,12,-13,20,0,9,15,-9,13,-20,2],color);
+            polygon(c,[-17,-10,-4,-18,12,-13,20,0,9,15,-9,13,-20,2],color,true);
             dot(c,-26,17,3.7,color);dot(c,24,-17,3,color);line(c,[-7,-9,4,-10],PAPER,3);break;
         case 'chain':
-            polygon(c,[-31,-3,-13,-12,2,-8,16,-12,29,-3,22,10,7,12,-8,7,-22,11],color);
+            polygon(c,[-31,-3,-13,-12,2,-8,16,-12,29,-3,22,10,7,12,-8,7,-22,11],color,true);
             c.beginPath();c.ellipse(-9,0,10,5,-.23,0,Math.PI*2);c.ellipse(10,0,10,5,.18,0,Math.PI*2);
             c.strokeStyle=INK;c.lineWidth=3;c.stroke();line(c,[-4,-7,12,-8],PAPER,2);break;
         case 'ribbon':
-            polygon(c,[-31,-13,-12,-7,4,-14,26,-7,31,1,12,1,2,13,-17,15,-7,4,-28,1],color);
+            polygon(c,[-31,-13,-12,-7,4,-14,26,-7,31,1,12,1,2,13,-17,15,-7,4,-28,1],color,true);
             line(c,[-24,-7,-10,-1,4,-8,20,-3],PAPER,2.4);line(c,[-7,4,3,8,11,1],INK,2);break;
         case 'rocket':
             polygon(c,[-29,-12,-13,-8,-14,9,-29,15,-23,1],color);
@@ -95,7 +98,7 @@ function paintStamp(c:CanvasRenderingContext2D, kind:StampKind, color:string, aw
             line(c,[17,-10,6,-17,-10,-12,-18,0,-10,13,5,16,16,5,8,-3,-2,-2,-4,5],INK,5);
             line(c,[-16,-17,-5,-22,7,-21],PAPER,2.8);break;
         case 'flamethrower':
-            polygon(c,[-29,-4,-18,-14,-5,-9,4,-20,17,-13,30,0,16,14,1,9,-11,20,-17,7],color);
+            polygon(c,[-29,-4,-18,-14,-5,-9,4,-20,17,-13,30,0,16,14,1,9,-11,20,-17,7],color,true);
             polygon(c,[-12,-1,-1,-6,7,-3,19,0,4,7,-5,4],PAPER);break;
         case 'compass':
             polygon(c,[-14,-27,-4,-25,5,3,28,20,23,27,-3,12,-14,-17],color);
@@ -157,6 +160,13 @@ export function drawDoodleProjectile(ctx:CanvasRenderingContext2D,entity:Entity,
     else if(p.type==='compass')width=height=radius*2.8;
     else if(p.type==='gravity')width=height=radius*2.5;
     else if(p.type==='rocket')width=radius*3.4;
+    // Small projectile stamps need enough screen pixels to remain legible;
+    // this changes presentation only, never collision radii or painted paths.
+    if(p.type==='shotgun') {width=Math.max(width,25);height=Math.max(height,22);}
+    else if(p.type==='standard') {width=Math.max(width,32);height=Math.max(height,26);}
+    else if(p.type==='chain'||p.type==='ribbon') {
+        width=Math.max(width,23);height=Math.max(height,20);
+    } else if(p.type==='flamethrower') {width=Math.max(width,18);height=Math.max(height,17);}
     ctx.save();
     if(p.type==='melee') {ctx.translate(Math.cos(angle)*r.width*.55,Math.sin(angle)*r.width*.55);ctx.globalAlpha*=Math.min(1,Math.max(.3,p.life/5));}
     // Flame fade already lives in Renderable.color; preserve its existing life opacity.

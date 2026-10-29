@@ -46,12 +46,15 @@ import { DefensePainting } from './DefensePainting';
 import { ArtReplayRecording } from './ArtReplayRecording';
 import { ArtReplayPlayer } from './ArtReplayPlayer';
 import { DefenseArtworkPicker } from './DefenseArtworkPicker';
+import { convertToStrokes } from './ImageToStrokes';
+import { prepareArtwork } from './DefenseArtwork';
 import { DefenseIntro } from './DefenseIntro';
 import { ArtworkStore } from './ArtworkStore';
 import type { DefenseArtwork } from './DefenseArtwork';
 import { CREATE_WORLD, DEFENSE_WORLD } from '../config/WorldConfig';
 import { emitGameSound } from '../audio/AudioEvents';
 import { DrawingHud } from '../ui/DrawingHud';
+import { AimCursor } from '../ui/AimCursor';
 import { OutcomePortrait } from '../ui/OutcomePortrait';
 import { GalleryStore } from './GalleryStore';
 import type { ArtGallery } from '../gallery/ArtGallery';
@@ -86,6 +89,7 @@ export class Game {
     public lastTime: number = 0;
     public isRunning: boolean = false;
     public state: GameState = GameState.MENU; // Default state
+    private readonly aimCursor = new AimCursor(() => this.state === GameState.PLAYING && this.isRunning);
     
     public gameCanvas: HTMLCanvasElement;
     public gameCtx: CanvasRenderingContext2D;
@@ -132,6 +136,7 @@ export class Game {
     private animationFrame = 0;
     private readonly defenseIntro = new DefenseIntro();
     private readonly artworkPicker: DefenseArtworkPicker;
+    private guardUnlocked = false;
     private runGeneration = 0;
     private frameUrls = new Map<number, string>();
     private frameLoadGeneration = 0;
@@ -148,12 +153,6 @@ export class Game {
     public inputManager: InputManager;
     public currentMode: PlayMode = 'endless';
     private studioTimeLeft: number = 0;
-    private lastRatingTick: number = 0;
-    private lastBuffTime: number = 0;
-    private lastEliteTime: number = 0;
-    private ratingCanvas: HTMLCanvasElement;
-    private ratingCtx: CanvasRenderingContext2D;
-    private ratingInterval: number = 1;
 
     constructor() {
         // Setup canvases
@@ -192,10 +191,6 @@ export class Game {
         this.gameCtx.imageSmoothingEnabled = false;
         this.trailCtx.imageSmoothingEnabled = false;
         
-        this.ratingCanvas = document.createElement('canvas');
-        this.ratingCanvas.width = 64;
-        this.ratingCanvas.height = 64;
-        this.ratingCtx = this.ratingCanvas.getContext('2d')!;
 
         // Debug: Log canvas sizes and z-indexes
         console.log('GameCanvas:', this.gameCanvas.width, this.gameCanvas.height, this.gameCanvas.style.zIndex);
@@ -225,7 +220,20 @@ export class Game {
         if (createModeBtn) createModeBtn.addEventListener('click', () => this.showSelectionScreen('endless'));
 
         const defenseModeBtn = document.getElementById('defense-mode-btn');
-        if (defenseModeBtn) defenseModeBtn.addEventListener('click', () => this.showSelectionScreen('defense'));
+        if (defenseModeBtn) defenseModeBtn.addEventListener('click', () => {
+            if (this.guardUnlocked) this.showSelectionScreen('defense');
+        });
+        const refreshGuardUnlock = async () => {
+            this.guardUnlocked = !!await ArtworkStore.getDrawingArtworkId().catch(() => null);
+            if (defenseModeBtn) {
+                defenseModeBtn.classList.toggle('guard-locked', !this.guardUnlocked);
+                defenseModeBtn.setAttribute('aria-disabled', String(!this.guardUnlocked));
+                defenseModeBtn.title = this.guardUnlocked ? '守卫模式' : '完成画画模式并保存画作后解锁';
+            }
+        };
+        defenseModeBtn?.classList.add('guard-locked');
+        window.addEventListener('guard-unlock-changed', () => { void refreshGuardUnlock(); });
+        void refreshGuardUnlock();
         document.getElementById('drawing-mode-btn')?.addEventListener('click', () => this.startGame('drawing'));
         document.getElementById('gallery-btn')?.addEventListener('click', () => { void this.openGallery(); });
         document.getElementById('gallery-save-confirm')?.addEventListener('click', () => { void this.saveToGallery(); });
@@ -1145,6 +1153,7 @@ export class Game {
 
     public startGame(mode: PlayMode = 'endless'): void {
         if (this.state === GameState.DEFENSE_INTRO || this.state === GameState.GALLERY) return;
+        if (mode === 'defense' && !this.guardUnlocked) return;
         this.currentMode = mode;
         this.gameUI.dataset.mode = mode;
         // 暂时屏蔽皮肤绘制提示，直接使用默认皮肤进入无尽模式
@@ -1164,9 +1173,18 @@ export class Game {
         if (mode === 'defense') {
             this.state = GameState.DEFENSE_INTRO;
             const generation = this.runGeneration;
-            void this.artworkPicker.ready.then(() => {
+            void this.artworkPicker.ready.then(async () => {
                 if (generation !== this.runGeneration || this.state !== GameState.DEFENSE_INTRO) return;
-                const artwork = structuredClone(this.artworkPicker.selected);
+                const selected = this.artworkPicker.selected;
+                if (!selected) { this.state = GameState.MENU; this.showSelectionScreen('defense'); return; }
+                const artwork = structuredClone(selected);
+                try { await prepareArtwork(artwork); } catch {
+                    this.state = GameState.MENU;
+                    this.mainMenu.style.display = 'flex';
+                    window.dispatchEvent(new CustomEvent('announce', { detail: { text: '画作读取失败，请重新保存画作。' } }));
+                    return;
+                }
+                if (generation !== this.runGeneration || this.state !== GameState.DEFENSE_INTRO) return;
                 this.defenseIntro.play(artwork, () => {
                     if (generation !== this.runGeneration) return;
                     this.inputManager.keys.clear();
@@ -1226,7 +1244,7 @@ export class Game {
 
         // Night courtyard needs visible pigment; this display opacity does not
         // alter recorded strokes, exported artwork or guard-mode readability.
-        if (this.trailCanvas) this.trailCanvas.style.opacity = this.currentMode === 'drawing' ? '1' : this.currentMode === 'defense' ? '0.16' : this.currentMode === 'endless' ? '0.65' : '0.1';
+        if (this.trailCanvas) this.trailCanvas.style.opacity = this.currentMode === 'drawing' ? '1' : this.currentMode === 'defense' ? '0.16' : this.currentMode === 'endless' ? '0.25' : '0.1';
         
         // Show Pause Button
         const pauseBtn = document.getElementById('pause-btn');
@@ -1526,12 +1544,14 @@ export class Game {
     public start(): void {
         if (this.isRunning) return;
         this.isRunning = true;
+        this.aimCursor.sync();
         this.lastTime = performance.now();
         this.animationFrame = requestAnimationFrame((time) => this.loop(time));
     }
 
     public stop(): void {
         this.isRunning = false;
+        this.aimCursor.sync();
         cancelAnimationFrame(this.animationFrame);
         this.animationFrame = 0;
         // Legacy stop, now handled by gameOver()
@@ -1689,18 +1709,6 @@ export class Game {
             if (this.drawingElapsed >= this.drawingDuration) this.finishDrawing();
             return;
         }
-        this.lastRatingTick += dt;
-        const activeEnemies = (() => {
-            let c = 0;
-            for (const [, e] of this.entities) if (e.tags.has('enemy')) c++;
-            return c;
-        })();
-        this.ratingInterval = (activeEnemies > 40 || dt > 0.02) ? 3 : 1;
-        if (this.lastRatingTick >= this.ratingInterval) {
-            this.lastRatingTick = 0;
-            this.evaluateRating();
-        }
-
         if (this.currentMode === 'defense' && this.updateDefenseMode(dt)) {
             return;
         }
@@ -1814,70 +1822,6 @@ export class Game {
         this.trailCanvas.style.transform = `translate(${-this.camera.x + shakeX}px, ${-this.camera.y + shakeY}px)`;
         
         // Render logic will be handled by RenderSystem
-    }
-    
-    private evaluateRating(): void {
-        const x = Math.max(0, Math.min(this.worldWidth - this.width, this.camera.x));
-        const y = Math.max(0, Math.min(this.worldHeight - this.height, this.camera.y));
-        const w = Math.min(this.width, this.worldWidth - x);
-        const h = Math.min(this.height, this.worldHeight - y);
-        this.ratingCtx.clearRect(0, 0, 64, 64);
-        this.ratingCtx.drawImage(this.trailCanvas, x, y, w, h, 0, 0, 64, 64);
-        let density = 0;
-        let contrast = 0;
-        let edges = 0;
-        const img = this.ratingCtx.getImageData(0, 0, 64, 64);
-        const data = img.data;
-        let prev = 0;
-        for (let i = 0; i < data.length; i += 4) {
-            const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-            if (a > 10) density++;
-            const lum = (r * 0.2126 + g * 0.7152 + b * 0.0722);
-            contrast += Math.abs(lum - 128);
-            const diff = Math.abs(lum - prev);
-            if (diff > 25) edges++;
-            prev = lum;
-        }
-        const totalPixels = (data.length / 4) || 1;
-        const dScore = Math.min(100, (density / totalPixels) * 120);
-        const cScore = Math.min(100, (contrast / totalPixels) * 0.8);
-        const eScore = Math.min(100, (edges / totalPixels) * 1.2);
-        const rating = Math.floor((dScore * 0.4) + (cScore * 0.3) + (eScore * 0.3));
-        for (const [, e] of this.entities) {
-            if (!e.tags.has('player')) continue;
-            const sc = e.getComponent(Score);
-            if (sc) sc.rating = rating;
-        }
-        if (rating >= 70 && (performance.now() - this.lastBuffTime > 10000)) {
-            this.lastBuffTime = performance.now();
-            for (const [, e] of this.entities) {
-                if (!e.tags.has('player')) continue;
-                const wpn = e.getComponent(Weapon);
-                if (wpn) {
-                    wpn.critChance = Math.min(0.8, wpn.critChance + 0.15);
-                    setTimeout(() => {
-                        wpn.critChance = Math.max(0, wpn.critChance - 0.15);
-                    }, 8000);
-                }
-            }
-            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `评分加成：暴击提升` } }));
-        }
-        if (rating >= 85 && (performance.now() - this.lastEliteTime > 15000)) {
-            this.lastEliteTime = performance.now();
-            let px = 0, py = 0;
-            for (const [, e] of this.entities) {
-                if (!e.tags.has('player')) continue;
-                const t = e.getComponent(Transform);
-                if (t) { px = t.x; py = t.y; }
-            }
-            const elite = EnemyFactory.create('shield', px + 120, py);
-            const hp = elite.getComponent(Health);
-            const vel = elite.getComponent(Velocity);
-            if (hp) { hp.max = Math.floor(hp.max * 1.5); hp.current = hp.max; }
-            if (vel) { vel.speed *= 1.3; }
-            this.addEntity(elite);
-            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `精英出现` } }));
-        }
     }
     
     private buyStudioTime(sec: number): void {
@@ -2036,6 +1980,23 @@ export class Game {
         try {
             const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('图片编码失败')), 'image/png'));
             const artwork = await GalleryStore.save({ id, name, mode, width, height, blob });
+            if (mode === 'drawing' && this.state === GameState.GAMEOVER && generation === this.runGeneration) {
+                try {
+                    const drawing = await convertToStrokes(canvas, { name, preserveColor: true, autoCrop: false });
+                    drawing.id = `drawing-${artwork.id}`;
+                    drawing.rasterDataUrl = canvas.toDataURL('image/png');
+                    await prepareArtwork(drawing);
+                    await ArtworkStore.saveDrawingArtwork(drawing);
+                    await this.artworkPicker.loadLibrary();
+                    window.dispatchEvent(new Event('guard-unlock-changed'));
+                } catch (error) {
+                    if (generation === this.runGeneration) {
+                        this.savedGalleryId = artwork.id;
+                        status.textContent = `画作已保存，但无法用于守卫模式：${error instanceof Error ? error.message : '请重试'}`;
+                    }
+                    return;
+                }
+            }
             if (generation === this.runGeneration) {
                 this.savedGalleryId = artwork.id;
                 status.textContent = '已保存到我的画廊 ✓（返回主菜单即可参观）';

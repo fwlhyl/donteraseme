@@ -1,6 +1,6 @@
 import { Component } from '../core/Component';
 
-export type QuestStepType = 'kills' | 'rating' | 'announce' | 'defend' | 'survive' | 'escape';
+export type QuestStepType = 'kills' | 'announce' | 'defend' | 'survive' | 'escape';
 
 export interface QuestStep {
     type: QuestStepType;

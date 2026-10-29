@@ -21,6 +21,7 @@ import { DoodleMotion, sampleDoodleMotion } from '../art/DoodleMotion';
 import { drawDoodleSkillEntity, drawDoodleSkillSprite, drawDoodleTurret, getDoodleUprightFacing, DOODLE_VEHICLE_SCALE } from '../art/DoodleSkillArt';
 import { drawDoodlePlayerEffects, drawDoodleStatus } from '../art/DoodleSkillEffects';
 import { drawDoodleProjectile, drawDoodleProjectileLine, drawDoodleRulerShot } from '../art/DoodleProjectiles';
+import { drawVortexField } from '../art/VortexField';
 import { Stunned } from '../components/Stunned';
 import { Particle } from '../components/Particle';
 import { ExperienceOrb } from '../components/ExperienceOrb';
@@ -200,7 +201,15 @@ export class RenderSystem extends System {
             this.ctx.clip(paper);
         }
 
-        // const player = Array.from(this.entities).find(e => e.tags.has('player')); // Already defined at the top of update()
+        // Fields draw behind bodies, even when their center is just off screen.
+        for (const entity of this.entities) {
+            const projectile = entity.getComponent(Projectile);
+            const pos = entity.getComponent(Transform);
+            if (projectile?.type !== 'gravity' || projectile.ownerId !== player?.id || !pos) continue;
+            const radius = (projectile as Projectile & { isAwakened?: boolean }).isAwakened ? 300 : 250;
+            if (pos.x + radius < left || pos.x - radius > left + viewport.width || pos.y + radius < top || pos.y - radius > top + viewport.height) continue;
+            drawVortexField(this.ctx, entity, player?.id, this.artTime);
+        }
 
         for (const entity of renderList) {
             const transform = entity.getComponent(Transform);
@@ -344,16 +353,21 @@ export class RenderSystem extends System {
                         const currentRadius = 10 + progress * maxRadius;
                         
                         this.ctx.save();
-                        this.ctx.beginPath();
-                        this.ctx.arc(0, 0, currentRadius, 0, Math.PI * 2);
                         this.ctx.shadowBlur = 0;
-                        this.ctx.globalAlpha *= Math.max(0,1-progress);
-                        this.ctx.strokeStyle = '#1b2028';
-                        this.ctx.lineWidth = 5;
-                        this.ctx.stroke();
-                        this.ctx.strokeStyle = '#e7bc59';
-                        this.ctx.lineWidth = 2.5;
-                        this.ctx.stroke();
+                        this.ctx.globalAlpha *= Math.max(0, 1 - progress);
+                        this.ctx.lineCap = 'round';
+                        // Irregular outward flecks suggest a burst of ink without a circular ring.
+                        const angles = [0.12, 0.74, 1.29, 1.94, 2.66, 3.12, 3.78, 4.57, 5.1, 5.78];
+                        for (let i = 0; i < angles.length; i++) {
+                            const angle = angles[i], directionX = Math.cos(angle), directionY = Math.sin(angle);
+                            const end = currentRadius * (0.66 + (i % 4) * 0.09);
+                            const start = end * (0.68 + (i % 3) * 0.06);
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(directionX * start, directionY * start);
+                            this.ctx.lineTo(directionX * end, directionY * end);
+                            this.ctx.strokeStyle = '#1b2028'; this.ctx.lineWidth = 5; this.ctx.stroke();
+                            this.ctx.strokeStyle = '#e7bc59'; this.ctx.lineWidth = 2.5; this.ctx.stroke();
+                        }
                         this.ctx.restore();
                     }
                 } else if (renderable.shape === 'wall_line') {

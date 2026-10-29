@@ -6,6 +6,7 @@ import { Summon } from '../components/Summon';
 import { Transform } from '../components/Transform';
 import { Renderable } from '../components/Renderable';
 import { SkillVisual } from '../components/SkillVisual';
+import { Projectile } from '../components/Projectile';
 import { Velocity } from '../components/Velocity';
 import { MagicManifestation } from '../components/MagicManifestation';
 import { drawMagicTank } from './MagicTankArt';
@@ -132,9 +133,41 @@ export function drawDoodleSkillEntity(ctx: CanvasRenderingContext2D, entity: Ent
         const v=entity.getComponent(Velocity);
         drawPencilShard(ctx,r.radius,v?Math.atan2(v.y,v.x):t.rotation);
     } else if (kind === 'desperate_burst') {
-        ctx.save(); ctx.globalAlpha *= .35; ctx.strokeStyle = '#f28774'; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(0,0,r.radius,0,Math.PI*2); ctx.stroke(); ctx.restore();
-        ctx.fillStyle = 'rgba(239,116,92,.08)'; ctx.beginPath(); ctx.arc(0,0,r.radius,0,Math.PI*2); ctx.fill();
+        // A brief irregular paint burst, rather than a circular range marker.
+        // Fixed shapes avoid flicker; the existing projectile lifetime drives the expansion.
+        const life = entity.getComponent(Projectile)?.life ?? 10;
+        const remaining = Math.max(0, Math.min(1, life / 10));
+        ctx.save(); ctx.scale(r.radius, r.radius); ctx.globalAlpha *= .28 * remaining;
+        ctx.fillStyle = '#f28774'; ctx.strokeStyle = '#f28774';
+        ctx.beginPath();
+        ctx.moveTo(-.31,-.18); ctx.quadraticCurveTo(-.38,-.39,-.13,-.35);
+        ctx.quadraticCurveTo(-.04,-.51,.12,-.32); ctx.quadraticCurveTo(.33,-.38,.31,-.17);
+        ctx.quadraticCurveTo(.48,-.05,.32,.11); ctx.quadraticCurveTo(.38,.32,.16,.29);
+        ctx.quadraticCurveTo(.01,.46,-.12,.29); ctx.quadraticCurveTo(-.35,.35,-.33,.13);
+        ctx.quadraticCurveTo(-.46,-.02,-.31,-.18); ctx.closePath(); ctx.fill();
+        const streaks = [
+            [-.2,-.22,-.5,-.47,-.79,-.56,.065], [.08,-.3,.16,-.54,.11,-.84,.045],
+            [.25,-.17,.48,-.39,.75,-.42,.055], [.31,.03,.54,.04,.85,.18,.06],
+            [.18,.24,.35,.46,.49,.73,.05], [-.05,.3,-.16,.54,-.11,.75,.06],
+            [-.27,.17,-.48,.29,-.76,.32,.048], [-.31,-.02,-.54,-.11,-.7,-.17,.038],
+        ];
+        const expansion = .65 + .35 * (1 - remaining);
+        ctx.scale(expansion, expansion);
+        for (const [x,y,cx,cy,endX,endY,width] of streaks) {
+            // Each streak tapers into an uneven pointed tongue of paint.
+            const length = Math.hypot(endX-x, endY-y) || 1;
+            const nx = -(endY-y) / length * width, ny = (endX-x) / length * width;
+            ctx.beginPath(); ctx.moveTo(x+nx,y+ny);
+            ctx.quadraticCurveTo(cx+nx*.55,cy+ny*.55,endX,endY);
+            ctx.quadraticCurveTo(cx-nx*.25,cy-ny*.25,x-nx*.7,y-ny*.7);
+            ctx.closePath(); ctx.fill();
+        }
+        for (const [x,y,rx,ry,angle] of [[-.85,-.61,.037,.022,-.4],[.16,-.91,.027,.039,.2],
+            [.83,-.48,.035,.023,-.6],[.92,.21,.035,.022,.3],[.56,.81,.03,.043,-.5],
+            [-.15,.86,.035,.025,.4],[-.84,.39,.028,.042,.9]]) {
+            ctx.beginPath(); ctx.ellipse(x,y,rx,ry,angle,0,Math.PI*2); ctx.fill();
+        }
+        ctx.restore();
     } else if (vehicle) {
         const size = Math.max(r.width,r.height) * DOODLE_VEHICLE_SCALE;
         shadow(ctx,size*.34,size*.35);

@@ -1,4 +1,5 @@
 import { System } from '../core/System';
+import { drawInkSplash } from '../art/InkSplash';
 import { Entity } from '../core/Entity';
 import { Transform } from '../components/Transform';
 import { Renderable } from '../components/Renderable';
@@ -197,39 +198,9 @@ export class CollisionSystem extends System {
     // retain dead enemies or carry cooldowns into a later run.
     private vehicleRamCooldown = new WeakMap<Entity, number>();
 
-    // Helper: Draw Blood / Splash
-    private drawSplash(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, radius: number) {
-        // Only draw splash for explosions (Rocket or Skill) or if explicitly called for death?
-        // User Requirement 1: "Only explosion effect (Weapon 4 and Explosion Skill) leaves traces on enemies."
-        // Wait, "Weapon damage causes enemies to leave traces" -> User says "Actually should be ONLY explosion".
-        // So regular bullets should NOT cause `drawSplash` on death?
-        // Or maybe regular death doesn't leave a huge splash, just particles?
-        // Re-reading: "Weapon damage causes enemies to leave traces, actually should only be explosion effect (Weapon 4 and Skill) that causes enemy to leave traces."
-        // This implies:
-        // 1. Regular bullet hit -> No trace (already true, drawSplash is on death).
-        // 2. Regular bullet kill -> User says "Only explosion effect... causes enemy to leave traces".
-        // So if I kill with pistol, NO splash on canvas?
-        // If so, I should wrap `drawSplash` call in a check for weapon type.
-        
-        // But the code below calls `drawSplash` inside `if (eHealth.current <= 0)`.
-        // I need to check `pData.type` there.
-        
-        const drops = 5 + Math.random() * 5;
-        ctx.fillStyle = color;
-        ctx.globalAlpha = 0.6;
-        
-        for(let i=0; i<drops; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * radius;
-            const r = 2 + Math.random() * (radius / 2);
-            
-            ctx.beginPath();
-            ctx.arc(x + Math.cos(angle)*dist, y + Math.sin(angle)*dist, r, 0, Math.PI*2);
-            ctx.fill();
-        }
-        ctx.globalAlpha = 1.0;
+    private drawSplash(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, radius: number): void {
+        drawInkSplash(ctx, x, y, radius, color, 0.6);
     }
-
 
     private handleEnemyDeath(enemy: Entity, player: Entity | null, x: number, y: number, color: string): void {
         DeathHandler.handleEnemyDeath(enemy, player, x, y, color, this.entities, this.addEntityCallback);
@@ -833,7 +804,7 @@ export class CollisionSystem extends System {
                             if (eHealth.current <= 0) {
                                 this.handleEnemyDeath(enemy, player, eTransform.x, eTransform.y, eRender.color);
                                 if (this.trailCtx) {
-                                    this.drawSplash(this.trailCtx, eTransform.x, eTransform.y, eRender.color, (eRender.radius || 15) * 2);
+                                    this.drawSplash(this.trailCtx, eTransform.x, eTransform.y, '#000000', (eRender.radius || 15) * 2);
                                 }
                             }
                             
@@ -953,7 +924,7 @@ export class CollisionSystem extends System {
                                     if (otherEnemy.active) { // Check again to avoid double kill logic
                                         this.handleEnemyDeath(otherEnemy, player, t.x, t.y, otherEnemy.getComponent(Renderable)!.color);
                                         if (this.trailCtx) {
-                                            this.drawSplash(this.trailCtx, t.x, t.y, otherEnemy.getComponent(Renderable)!.color, otherEnemy.getComponent(Renderable)!.radius * 2);
+                                            this.drawSplash(this.trailCtx, t.x, t.y, '#000000', otherEnemy.getComponent(Renderable)!.radius * 2);
                                         }
                                     }
                                 }
@@ -1274,7 +1245,7 @@ export class CollisionSystem extends System {
                                                     if (other.active) {
                                                         this.handleEnemyDeath(other, player, tt.x, tt.y, tr?.color || '#ffffff');
                                                         if (this.trailCtx) {
-                                                            this.drawSplash(this.trailCtx, tt.x, tt.y, tr?.color || '#ffffff', (tr?.radius || 15) * 2);
+                                                            this.drawSplash(this.trailCtx, tt.x, tt.y, '#000000', (tr?.radius || 15) * 2);
                                                         }
                                                     }
                                                 }
@@ -1487,7 +1458,7 @@ export class CollisionSystem extends System {
                             // Only Gravity(Blackhole?) causes splash on death here
                             if (pData.type === 'gravity') {
                                 // Draw Enemy Splash
-                                this.drawSplash(this.trailCtx, eTransform.x, eTransform.y, eRender.color, eRender.radius * 2);
+                                this.drawSplash(this.trailCtx, eTransform.x, eTransform.y, '#000000', eRender.radius * 2);
                             }
                         }
                     }

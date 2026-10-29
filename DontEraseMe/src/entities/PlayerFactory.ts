@@ -82,7 +82,6 @@ export class PlayerFactory {
 
         const steps: QuestStep[] = [
             { type: 'announce', text: '序章开始' },
-            { type: 'rating', target: 60 },
             { type: 'kills', target: 10 },
             { type: 'announce', text: '进入擦除之夜' }
         ];

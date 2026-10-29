@@ -1,4 +1,4 @@
-import { BUILT_IN_ARTWORK, drawArtwork } from './DefenseArtwork';
+import { drawArtwork, prepareArtwork } from './DefenseArtwork';
 import type { DefenseArtwork } from './DefenseArtwork';
 import { ArtworkStore } from './ArtworkStore';
 import { convertToStrokes, decodeImage } from './ImageToStrokes';
@@ -8,7 +8,7 @@ type Crop = { x: number; y: number; width: number; height: number };
 
 /** Offline artwork library. The live game only consumes a validated stroke document. */
 export class DefenseArtworkPicker {
-    public selected: DefenseArtwork = BUILT_IN_ARTWORK;
+    public selected: DefenseArtwork | null = null;
     public readonly ready: Promise<void>;
     private readonly host: HTMLElement;
     private readonly cards: HTMLDivElement;
@@ -32,7 +32,7 @@ export class DefenseArtworkPicker {
         this.host.classList.add('defense-artwork-picker');
         this.host.innerHTML = `
             <div class="defense-art-library-heading">
-                <div><h3>选择要守卫的画作</h3><p>可以守护内置画作，也可以把自己的图片转成彩色线稿。全程离线。</p></div>
+                <div><h3>选择要守卫的画作</h3><p>守护保存的画作，也可以将自己的图片转成彩色线稿。全程离线。</p></div>
                 <button id="defense-art-import" type="button">＋ 导入自己的图片</button>
             </div>
             <div class="defense-art-cards" role="group" aria-label="守卫画作"></div>
@@ -49,29 +49,30 @@ export class DefenseArtworkPicker {
         if (!visible) this.closeImport(true);
     }
 
-    private async loadLibrary(): Promise<void> {
+    public async loadLibrary(): Promise<void> {
         const version = this.selectionVersion;
         try {
-            const [artworks, selectedId] = await Promise.all([
-                ArtworkStore.listArtworks(), ArtworkStore.getSelectedArtworkId(),
+            const [artworks, selectedId, drawingId] = await Promise.all([
+                ArtworkStore.listArtworks(), ArtworkStore.getSelectedArtworkId(), ArtworkStore.getDrawingArtworkId(),
             ]);
+            await Promise.all(artworks.map(artwork => prepareArtwork(artwork).catch(() => undefined)));
             this.artworks = artworks;
             // A slow disk read must not undo a selection made while the menu was opening.
             if (version === this.selectionVersion) {
-                this.selected = artworks.find(artwork => artwork.id === selectedId) ?? BUILT_IN_ARTWORK;
+                this.selected = artworks.find(artwork => artwork.id === selectedId) ?? artworks.find(artwork => artwork.id === drawingId) ?? null;
             }
             this.renderCards();
         } catch (error) {
-            this.setStatus(`无法读取本地画作：${this.errorMessage(error)}。仍可使用内置画作。`, true);
+            this.setStatus(`无法读取本地画作：${this.errorMessage(error)}。`, true);
         }
     }
 
     private renderCards(): void {
         this.cards.replaceChildren();
-        for (const artwork of [BUILT_IN_ARTWORK, ...this.artworks]) {
+        for (const artwork of this.artworks) {
             const card = document.createElement('div');
             card.className = 'defense-art-card';
-            const selected = this.selected.id === artwork.id;
+            const selected = this.selected?.id === artwork.id;
             card.classList.toggle('is-selected', selected);
             const select = document.createElement('button');
             select.type = 'button';
@@ -89,11 +90,11 @@ export class DefenseArtworkPicker {
             name.textContent = artwork.name;
             const caption = document.createElement('span');
             caption.className = 'defense-art-caption';
-            caption.textContent = selected ? '本局守卫这幅画' : artwork.id === BUILT_IN_ARTWORK.id ? '内置画作 · 免费' : '已保存在本机';
+            caption.textContent = selected ? '本局守卫这幅画' : '已保存在本机';
             select.append(thumbnail, name, caption);
             select.addEventListener('click', () => this.selectArtwork(artwork));
             card.append(select);
-            if (artwork.id !== BUILT_IN_ARTWORK.id) {
+            {
                 const remove = document.createElement('button');
                 remove.type = 'button';
                 remove.className = 'defense-art-delete';
@@ -114,7 +115,7 @@ export class DefenseArtworkPicker {
         // Serialize persistence so rapidly selecting two cards cannot reverse the saved choice.
         this.selectionWrite = this.selectionWrite.then(async () => {
             if (version !== this.selectionVersion) return;
-            await ArtworkStore.setSelectedArtworkId(artwork.id === BUILT_IN_ARTWORK.id ? null : artwork.id);
+            await ArtworkStore.setSelectedArtworkId(artwork.id);
         }).catch(error => {
             if (version === this.selectionVersion) this.setStatus(`本局已选中，但未能记住下次选择：${this.errorMessage(error)}`, true);
         });
@@ -126,8 +127,9 @@ export class DefenseArtworkPicker {
         try {
             await ArtworkStore.deleteArtwork(artwork.id);
             this.artworks = this.artworks.filter(item => item.id !== artwork.id);
-            if (this.selected.id === artwork.id) this.selectArtwork(BUILT_IN_ARTWORK);
-            else this.renderCards();
+            if (this.selected?.id === artwork.id) this.selected = null;
+            await this.loadLibrary();
+            window.dispatchEvent(new Event('guard-unlock-changed'));
             this.setStatus(`已删除本机线稿「${artwork.name}」；原始图片文件未改动。`);
         } catch (error) {
             button.disabled = false;

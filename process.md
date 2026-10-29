@@ -7,7 +7,7 @@
 - 仓库根目录：`E:\xingkong\donteraseme`；游戏项目目录：`DontEraseMe/`。其他电脑上的根目录可能不同。
 - 游戏使用 TypeScript、Vite 和 Canvas；支持 Electron。进入 `DontEraseMe` 后执行 `npm install`、`npm run dev`，浏览器打开 Vite 输出的本地地址；生产构建执行 `npm run build`。
 - 仓库曾在 Windows 使用 `main` 和 GitHub 远端。不要把本文中记录的本地或远程提交状态当成实时状态，以 `git status -sb`、`git remote -v` 为准。
-- 本次检查前的最近提交是 `c24605e Update game art, enemies and creation scene`。本次更新和提交是否完成、推送是否成功，以 Git 实际状态为准。
+- 近期更新以前的远程 `main` 为 `7e1bd03 Add Brush to Life vehicles and progress handoff`；提交和推送后的状态以 Git 实际状态为准。
 
 ## 用户确认的美术方向
 
@@ -26,9 +26,19 @@
 - **碰撞规则**：驾驶坦克或机器人接触敌人造成伤害和击退，对单敌有 30 帧冷却；玩家仍受原接触伤害。普通人物不获得载具撞击伤害。轰炸机视觉明显离地，不造成撞击伤害，免受敌人身体接触伤害，但仍可受敌方弹体等伤害。现有敌人盾牌和终极 Boss 无敌阶段有相应处理。
 - 重要文件：`src/systems/MagicPenSystem.ts`、`src/components/MagicManifestation.ts`、`src/config/EndlessConfig.ts`、`src/systems/CollisionSystem.ts`、`src/systems/InputSystem.ts`、`src/art/MagicTankArt.ts`、`MagicRobotArt.ts`、`MagicBomberArt.ts`、`src/art/DoodleSkillArt.ts`、`src/ui/CombatHud.ts`。HUD/画板、旧回放的可见名称也已同步为“画笔成真”。
 
+## 2026-10-29 对局体验更新
+
+- **暂停与笔迹**：Esc 和暂停按钮打开同一面板，包含颜色、自动攻击和伤害数字设置。移除笔迹浓度滑杆；创造模式的痕迹仅在对局显示时调淡，原始画布与结算导出仍保留较高浓度。对局评级、关联的定时奖励和评级任务已移除。
+- **守卫解锁**：新玩家不能直接进入守卫模式，入口提示完成画画模式并保存画作解锁；成功保存有效画作后，该画作成为默认守卫作品，解锁状态跨刷新保留。空白或无法转换为可守卫笔迹的画作可以保存到画廊，但不会解锁守卫。原内置画作不再作为默认选项；守卫用画作去除白纸背景以免整页都被判为笔迹。相关实现：`src/core/ArtworkStore.ts`、`DefenseArtwork.ts`、`DefenseArtworkPicker.ts` 和 `Game.ts`。
+- **对局视觉与手感**：怪物本体绘制浓度调整为 95%，预警和子弹不受影响；火柴人助手固定跟随玩家并保持射击；远程射手发射频率和弹速降低、弹体加大；数字绘板师子弹使用玩家颜色。鼠标准星为红色 FPS 风格十字，暂停、离开窗口及指向交互控件时隐藏。守卫锁图标改为黑色。
+- **子弹与爆炸**：强化霰弹枪、初始手枪及其他较小弹体的绘制尺寸和明暗描边，不改变碰撞或作画轨迹。爆炸画痕改为不规则墨团、甩痕和散落液滴，敌人死亡留下的痕迹为黑色；冲击波和绝境爆炸也使用喷溅形态。路径录制支持作品回放。相关实现：`src/art/DoodleProjectiles.ts`、`InkSplash.ts`、`DoodleSkillArt.ts`、`src/systems/CollisionSystem.ts`、`SkillSystem.ts`、`WeaponSystem.ts`、`RenderSystem.ts`。
+- **Vortex**：玩家黑洞弹体的飞行和停留阶段增加中心较浓、向外围渐淡的紫色吸引场与向心粒子，绘制于角色下层，不写入作品或修改伤害。现有觉醒吸引判定被 ±300 的碰撞筛选限制，且落地生成的新黑洞不会继承觉醒状态；特效按当前实际范围显示，玩法暂未调整。实现：`src/art/VortexField.ts`。
+
 ## 已验证与仍需注意
 
 - 最近一次相关修改的 `npm run build` 通过。隔离浏览器测试覆盖载具瞄准限位与弹道一致、自动攻击设置下鼠标控制、碰撞伤害/击退/冷却/盾牌/Boss、轰炸机接触免疫与弹体伤害、随机载具取消重开与新局、动作与弹体逻辑。测试为 `scripts/test-magic-vehicle-aim.mjs`、`test-magic-vehicle-collision.mjs`、`test-magic-random-choice.mjs`、`test-magic-vehicle-motion.mjs`；这些脚本需要 Vite 运行与 Playwright/Edge，环境不一定已安装依赖。`scripts/test-combat-hud.mjs` 验证技能 HUD 显隐与进度。
+- 本轮构建、`test-projectile-art.mjs`、`test-combat-clarity.mjs`、`test-vortex-field.mjs` 和画画模式 12 种武器的作品回放验证通过；隔离浏览器验证了统一暂停设置、准星交互和画画保存解锁守卫。弹体在深浅背景下检查过，但密集动态战场尚未全面实机验收。`test-enemy-art-integration.mjs` 仍假设守卫模式默认解锁，需适配新流程；`test-doodle-motion.mjs` 引用了当前不存在的 `PAPER_COLLECTOR_PARTS` 导出，现有版本下未通过。
+- 守卫画作存储待优化：`ArtworkStore.saveDrawingArtwork` 目前绕过自定义画作的 12 幅上限，连续保存不同画作可能持续占用存储空间；`DefenseArtwork` 的解码图片缓存也没有淘汰上限，可能随画作数量增长而占用内存。后续处理时需兼顾已保存画作、默认作品及解锁状态，避免破坏用户数据或改变现有解锁行为。
 - 创造场景的边界/投影/寻路与 Boss 路径曾用 `node scripts/test-courtyard.mjs` 验证；场景和其他模式做过隔离短程检查。完整 20 分钟、高密度战斗、所有真实鼠标绘画操作、所有设备与打包后的兼容性尚未全面实机验收，不能以单元或短程测试替代。
 - 已知守卫模式规则：20 分钟直接结束，而终极橡皮擦延迟生成，可能无法正常交战。尚未擅自改胜利规则；是否调整需结合用户后续决定。
 - `scripts/test-defense-layout.mjs` 曾有旧的创造地图尺寸断言（期待 2700×1800，当前实际 1800×1200）；如再次遇到失败，先核对现状，不要当作这次美术改动自动修复或忽略。

@@ -29,8 +29,6 @@ export class UISystem extends System {
     private pauseMenu: HTMLElement;
     private resumeBtn: HTMLElement;
     private colorPalette: HTMLElement;
-    private settingAlpha: HTMLInputElement;
-    private alphaVal: HTMLElement;
 
     private isPaused: boolean = false;
     private toolWheel: HTMLElement | null = null;
@@ -67,8 +65,6 @@ export class UISystem extends System {
         this.pauseMenu = document.getElementById('pause-menu')!;
         this.resumeBtn = document.getElementById('resume-btn')!;
         this.colorPalette = document.getElementById('color-palette')!;
-        this.settingAlpha = document.getElementById('setting-alpha') as HTMLInputElement;
-        this.alphaVal = document.getElementById('alpha-val')!;
 
         this.setupPauseMenu();
         this.setupPerkModal();
@@ -80,11 +76,12 @@ export class UISystem extends System {
     private setupPauseMenu() {
         // Toggle Pause
         this.pauseBtn.addEventListener('click', () => {
-            this.togglePause();
+            window.dispatchEvent(new CustomEvent('open-esc'));
         });
 
         this.resumeBtn.addEventListener('click', () => {
-            this.togglePause();
+            this.dismissPause();
+            window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));
         });
 
         // Colors
@@ -109,13 +106,6 @@ export class UISystem extends System {
                 swatch.setAttribute('aria-pressed', 'true');
             });
             this.colorPalette.appendChild(swatch);
-        });
-
-        // Alpha
-        this.settingAlpha.addEventListener('input', (e: any) => {
-            const val = parseInt(e.target.value);
-            this.alphaVal.innerText = val + '%';
-            this.updatePlayerSettings('alpha', val / 100);
         });
 
         // Damage Numbers Toggle
@@ -211,6 +201,8 @@ export class UISystem extends System {
         copy.className = 'dialog-copy';
         copy.textContent = getLang() === 'zh' ? '暂留此刻。保存笔迹，或继续抵抗抹除。' : 'Hold this moment. Preserve your marks, or resist erasure.';
         panel.append(heading, copy);
+        // The pause button and Escape share one panel and one set of controls.
+        for (const group of Array.from(this.pauseMenu.querySelectorAll('.setting-group'))) panel.appendChild(group);
         const btnSaveFrame = document.createElement('button');
         btnSaveFrame.className = 'btn';
         btnSaveFrame.textContent = '保存当前作品到画廊';
@@ -294,17 +286,6 @@ export class UISystem extends System {
         // choose-perk logic removed per user request
     }
 
-    private togglePause() {
-        this.isPaused = !this.isPaused;
-        if (this.isPaused) {
-            this.pauseMenu.style.display = 'flex';
-            window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: true } }));
-        } else {
-            this.pauseMenu.style.display = 'none';
-            window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));
-        }
-    }
-
     public dismissPause(): void {
         this.isPaused = false;
         this.pauseMenu.style.display = 'none';
@@ -319,9 +300,6 @@ export class UISystem extends System {
                     if (renderable) renderable.color = value;
                     const trail = entity.getComponent(Trail);
                     if (trail) trail.color = value;
-                } else if (key === 'alpha') {
-                    const trail = entity.getComponent(Trail);
-                    if (trail) trail.alpha = value;
                 }
             }
         }
@@ -356,7 +334,7 @@ export class UISystem extends System {
                 const score = entity.getComponent(Score);
                 
                 if (score) {
-                    const label = getLang() === 'zh' ? `得分 ${score.value} · 金币 ${score.coins} · 评级 ${score.rating}` : `SCORE ${score.value} · COINS ${score.coins} · RATING ${score.rating}`;
+                    const label = getLang() === 'zh' ? `得分 ${score.value} · 金币 ${score.coins}` : `SCORE ${score.value} · COINS ${score.coins}`;
                     if (this.scoreDisplay.textContent !== label) this.scoreDisplay.textContent = label;
                 }
 

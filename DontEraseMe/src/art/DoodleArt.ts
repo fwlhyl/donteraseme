@@ -24,7 +24,11 @@ export function hasDoodleEnemyArtwork(type: EnemyType | undefined): boolean { re
 export function drawDoodleEnemy(ctx: CanvasRenderingContext2D, type: EnemyType | undefined, radius: number,
     rotation: number, pose?: DoodlePose, bossTimer?: number): boolean {
     if (!hasDoodleEnemyArtwork(type)) return false;
-    if (drawBossArtwork(ctx, type, radius, rotation, pose)) {
+    ctx.save();
+    ctx.globalAlpha *= .95;
+    const bossDrawn = drawBossArtwork(ctx, type, radius, rotation, pose);
+    ctx.restore();
+    if (bossDrawn) {
         drawDoodleAccent(ctx, pose, radius * 2.5, rotation);
         if (bossTimer !== undefined) drawDoodleWarning(ctx, type, radius, rotation, bossTimer);
         return true;
@@ -32,6 +36,7 @@ export function drawDoodleEnemy(ctx: CanvasRenderingContext2D, type: EnemyType |
     if (type === 'chaser' || type === 'shield' || type === 'shooter' || type === 'summoner') {
         const draw = type === 'chaser' ? drawChaserDraft : type === 'shield' ? drawShieldDraft : type === 'shooter' ? drawShooterDraft : drawSummonerDraft;
         ctx.save();
+        ctx.globalAlpha *= .95;
         ctx.translate(pose?.x ?? 0, pose?.y ?? 0);
         ctx.scale(Math.cos(rotation) < -.12 ? -1 : 1, 1);
         // The hovering ink bottle's exhaust remains active when it is stationary.
@@ -42,7 +47,7 @@ export function drawDoodleEnemy(ctx: CanvasRenderingContext2D, type: EnemyType |
         return true;
     }
     if (type === 'paper_plane') {
-        ctx.save(); ctx.rotate(rotation);
+        ctx.save(); ctx.globalAlpha *= .95; ctx.rotate(rotation);
         const time = pose?.time ?? 0;
         drawPlane(ctx, radius * 2, time * 7, pose?.moving ?? 0, time);
         ctx.restore();
@@ -50,7 +55,7 @@ export function drawDoodleEnemy(ctx: CanvasRenderingContext2D, type: EnemyType |
         return true;
     }
     if (type === 'eraser') {
-        ctx.save(); ctx.translate(pose?.x ?? 0, pose?.y ?? 0);
+        ctx.save(); ctx.globalAlpha *= .95; ctx.translate(pose?.x ?? 0, pose?.y ?? 0);
         ctx.scale(Math.cos(rotation) < -.12 ? -1 : 1, 1);
         drawEraser(ctx, radius * 2, pose?.gaitPhase ?? 0, pose?.moving ?? 0);
         ctx.restore();
@@ -58,7 +63,7 @@ export function drawDoodleEnemy(ctx: CanvasRenderingContext2D, type: EnemyType |
         return true;
     }
     const size=radius*2.5, ratio=size/64, step=pose?.step??0;
-    ctx.save();ctx.shadowBlur=0;ctx.setLineDash([]);ctx.scale(ratio,ratio);
+    ctx.save();ctx.globalAlpha*=.95;ctx.shadowBlur=0;ctx.setLineDash([]);ctx.scale(ratio,ratio);
     ctx.strokeStyle='#30332e';ctx.fillStyle='#d9dbd1';ctx.lineWidth=1.6;ctx.lineJoin='miter';
     const facing=Math.cos(rotation)<-.12?-1:1;
     if (type==='blackhole'||type==='boss_slime') {

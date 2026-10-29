@@ -13,6 +13,8 @@ export interface DefenseArtwork {
     height: number;
     strokes: ArtworkStroke[];
     createdAt: number;
+    /** Original pixels retained for player drawings; strokes support the introduction. */
+    rasterDataUrl?: string;
 }
 
 export const MAX_ARTWORK_STROKES = 2400;
@@ -27,6 +29,7 @@ export function validateArtwork(value: unknown): value is DefenseArtwork {
         || !Number.isFinite(art.width) || !Number.isFinite(art.height)
         || art.width! < 1 || art.width! > 2048 || art.height! < 1 || art.height! > 2048
         || !Number.isFinite(art.createdAt) || art.createdAt! < 0
+        || (art.rasterDataUrl !== undefined && (typeof art.rasterDataUrl !== 'string' || !art.rasterDataUrl.startsWith('data:image/png;base64,') || art.rasterDataUrl.length > 45000000))
         || !Array.isArray(art.strokes) || art.strokes.length < 1 || art.strokes.length > MAX_ARTWORK_STROKES) return false;
 
     let pointCount = 0;
@@ -49,10 +52,38 @@ export function validateArtwork(value: unknown): value is DefenseArtwork {
 
 const lengths = new WeakMap<DefenseArtwork, { strokes: number[]; total: number }>();
 
+const rasterImages = new Map<string, HTMLCanvasElement>();
+
+/** Decode before the guard introduction so the original pixels are ready to render. */
+export async function prepareArtwork(art: DefenseArtwork): Promise<void> {
+    if (!art.rasterDataUrl || rasterImages.has(art.rasterDataUrl)) return;
+    const image = new Image();
+    image.src = art.rasterDataUrl;
+    await image.decode();
+    // Drawing mode paints on white paper. Make that paper transparent so
+    // erasers target actual marks rather than treating the whole page as ink.
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) throw new Error('无法读取画作。');
+    ctx.drawImage(image, 0, 0);
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < pixels.data.length; i += 4) {
+        const white = Math.min(pixels.data[i], pixels.data[i + 1], pixels.data[i + 2]);
+        const ink = 255 - white;
+        pixels.data[i + 3] = Math.round(pixels.data[i + 3] * ink / 255);
+        if (ink) for (let c = 0; c < 3; c++) pixels.data[i + c] = Math.round((pixels.data[i + c] - white) * 255 / ink);
+    }
+    ctx.putImageData(pixels, 0, 0);
+    rasterImages.set(art.rasterDataUrl, canvas);
+}
+
 /** Draw in artwork coordinates. The caller owns clearing, translation and scale. */
 export function drawArtwork(ctx: CanvasRenderingContext2D, art: DefenseArtwork, progress = 1): void {
     const fraction = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
     if (fraction === 0) return;
+    const raster = art.rasterDataUrl && rasterImages.get(art.rasterDataUrl);
+    if (fraction >= 1 && raster) { ctx.drawImage(raster, 0, 0, art.width, art.height); return; }
     let measured = lengths.get(art);
     if (!measured) {
         const strokes = art.strokes.map(stroke => stroke.points.reduce((total, point, index, points) =>

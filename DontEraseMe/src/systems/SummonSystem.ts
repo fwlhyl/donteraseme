@@ -220,7 +220,13 @@ export class SummonSystem extends System {
                 const dx = targetX - sTransform.x;
                 const dy = targetY - sTransform.y;
                 
-                if (sVel) {
+                if (summon.type === 'stickman') {
+                    // Keep assistants at a fixed offset; spring acceleration caused endless oscillation.
+                    sTransform.x = targetX;
+                    sTransform.y = targetY;
+                    sTransform.rotation = pTransform.rotation + Math.PI / 2;
+                    if (sVel) { sVel.x = 0; sVel.y = 0; }
+                } else if (sVel) {
                     sVel.x += dx * 0.05;
                     sVel.y += dy * 0.05;
                     

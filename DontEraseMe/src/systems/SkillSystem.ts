@@ -1,4 +1,5 @@
 import { System } from '../core/System';
+import { drawInkSplash } from '../art/InkSplash';
 import { Entity } from '../core/Entity';
 import { InputManager } from '../core/InputManager';
 import { Transform } from '../components/Transform';
@@ -574,17 +575,8 @@ export class SkillSystem extends System {
                             );
                             particles.forEach(p => this.addEntityCallback(p));
                             
-                            // Draw Blood on Trail Canvas (Enemy Color)
-                            // User: "Explosion skill... enemy leaves explosion ink marks"
-                            // User: "Enemies traces are red, should be enemy color".
-                            // I used '#ff0000' hardcoded.
-                            const enemyRender = target.getComponent(Renderable);
-                            const enemyColor = enemyRender ? enemyRender.color : '#ff0000';
-                            
-                            this.drawBlood(targetTransform.x, targetTransform.y, enemyColor);
-                            
-                            // Draw Splatter for enemy death by skill
-                            // this.drawSplatter(targetTransform.x, targetTransform.y, '#ff0000'); // Redundant if drawBlood does it?
+                            // Enemy death marks are black, independent of the enemy's color.
+                            this.drawBlood(targetTransform.x, targetTransform.y);
                         }
                     }
                 }
@@ -598,50 +590,10 @@ export class SkillSystem extends System {
     // dash removed
 
     private drawSplatter(x: number, y: number, color: string): void {
-        const count = 20 + Math.random() * 10;
-        
-        this.trailCtx.save();
-        this.trailCtx.fillStyle = color;
-        this.trailCtx.globalAlpha = 0.8;
-        
-        for (let i = 0; i < count; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * 150; // explosion radius
-            const size = 5 + Math.random() * 20;
-            
-            const sx = x + Math.cos(angle) * dist;
-            const sy = y + Math.sin(angle) * dist;
-
-            this.trailCtx.beginPath();
-            this.trailCtx.arc(sx, sy, size, 0, Math.PI * 2);
-            this.trailCtx.fill();
-            
-            // Draw connecting lines
-            this.trailCtx.beginPath();
-            this.trailCtx.moveTo(x, y);
-            this.trailCtx.lineTo(sx, sy);
-            this.trailCtx.strokeStyle = color;
-            this.trailCtx.lineWidth = size / 2;
-            this.trailCtx.stroke();
-        }
-        this.trailCtx.restore();
+        drawInkSplash(this.trailCtx, x, y, 150, color, 0.8);
     }
 
-    private drawBlood(x: number, y: number, color: string): void {
-        const drops = 5 + Math.random() * 5;
-        this.trailCtx.save();
-        this.trailCtx.fillStyle = color;
-        this.trailCtx.globalAlpha = 0.6;
-        
-        for(let i=0; i<drops; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * 25; 
-            const radius = 5 + Math.random() * 12; 
-            
-            this.trailCtx.beginPath();
-            this.trailCtx.arc(x + Math.cos(angle)*dist, y + Math.sin(angle)*dist, radius, 0, Math.PI*2);
-            this.trailCtx.fill();
-        }
-        this.trailCtx.restore();
+    private drawBlood(x: number, y: number): void {
+        drawInkSplash(this.trailCtx, x, y, 45, '#000000', 0.6);
     }
 }

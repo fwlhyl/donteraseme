@@ -22,6 +22,14 @@
 * { box-sizing: border-box; }
 body { margin: 0; overflow: hidden; background: var(--bg); color: var(--text); font: 14px/1.5 var(--ui); user-select: none; touch-action: none; }
 button, input, select { font: inherit; }
+/* The aiming crosshair stays above the game but never intercepts input. */
+body.aiming-cursor, body.aiming-cursor * { cursor: none !important; }
+.aim-cursor { position: fixed; left: 0; top: 0; z-index: 190; width: 0; height: 0; pointer-events: none; display: none; }
+.aim-cursor.is-visible { display: block; }
+.aim-cursor span { position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; filter: drop-shadow(0 0 1px #1a1715) drop-shadow(0 0 1px #1a1715); }
+.aim-cursor span::before, .aim-cursor span::after { content: ''; position: absolute; }
+.aim-cursor span::before { left: 0; top: 10px; width: 22px; height: 2px; background: linear-gradient(to right, #ff3447 0 8px, transparent 8px 14px, #ff3447 14px 22px); }
+.aim-cursor span::after { left: 10px; top: 0; width: 2px; height: 22px; background: linear-gradient(to bottom, #ff3447 0 8px, transparent 8px 14px, #ff3447 14px 22px); }
 /* Keep native button chrome from changing the hand-drawn frame on any platform. */
 button { appearance:none; -webkit-appearance:none; color: inherit; }
 button, a, [tabindex], input, select { -webkit-tap-highlight-color: transparent; }
@@ -219,3 +227,7 @@ kbd { font: 10px/1.2 var(--ui); color: var(--text); padding: 3px 5px; border: 1p
 @media (prefers-reduced-motion: reduce) {
   .overlay *, .sketch-dialog *, .sketch-board-panel * { animation: none !important; transition: none !important; }
 }
+
+/* Guard mode unlock is shown directly on the menu entry. */
+#main-menu #defense-mode-btn.guard-locked { cursor: not-allowed; background: #f6f1e8b8; }
+#main-menu #defense-mode-btn.guard-locked::after { content: '完成画画模式并保存画作解锁'; position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: max-content; max-width: 100%; font: 400 clamp(5px, .72vw, 12px)/1.2 var(--ui); text-align: center; color: #4d4032; background: #fff8e8e8 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23282824' d='M6 10V7a6 6 0 0 1 12 0v3h1a2 2 0 0 1 2 2v9H3v-9a2 2 0 0 1 2-2h1zm3 0h6V7a3 3 0 0 0-6 0v3z'/%3E%3C/svg%3E") no-repeat 4px center / 1em 1em; padding: 2px 4px 2px 1.6em; border-radius: 4px; }

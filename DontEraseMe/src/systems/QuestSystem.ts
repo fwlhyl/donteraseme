@@ -30,16 +30,6 @@ export class QuestSystem extends System {
                 quest.index += 1;
                 continue;
             }
-            if (step.type === 'rating') {
-                const r = score.rating || 0;
-                const target = step.target || 0;
-                if (r >= target) {
-                    window.dispatchEvent(new CustomEvent('announce', { detail: { text: `评分达标 ${target}` } }));
-                    step.done = true;
-                    quest.index += 1;
-                    continue;
-                }
-            }
             if (step.type === 'kills') {
                 const kills = Math.floor((score.value || 0) / 10);
                 const target = step.target || 0;

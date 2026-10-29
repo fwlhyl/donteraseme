@@ -6,6 +6,7 @@ const DATABASE_VERSION = 1;
 const MAX_ARTWORKS = 12;
 const MAX_FRAME_BYTES = 32 * 1024 * 1024;
 const SELECTED_ARTWORK_KEY = 'selectedArtworkId';
+const DRAWING_ARTWORK_KEY = 'drawingArtworkId';
 
 function storageError(error: unknown, fallback = '本地画作存储失败，请重试。'): Error {
     if (error instanceof DOMException) {
@@ -194,10 +195,36 @@ export class ArtworkStore {
         });
     }
 
+    /** A completed drawing becomes both the unlock and the default guard artwork. */
+    public static async saveDrawingArtwork(artwork: DefenseArtwork): Promise<void> {
+        if (!validateArtwork(artwork)) throw new Error('画作没有可守卫的笔迹。');
+        const snapshot = structuredClone(artwork);
+        return this.transaction(['artworks', 'meta'], 'readwrite', (transaction, setResult) => {
+            transaction.objectStore('artworks').put(snapshot);
+            const meta = transaction.objectStore('meta');
+            meta.put(snapshot.id, DRAWING_ARTWORK_KEY);
+            meta.put(snapshot.id, SELECTED_ARTWORK_KEY);
+            setResult(undefined);
+        });
+    }
+
+    public static async getDrawingArtworkId(): Promise<string | null> {
+        return this.transaction(['artworks', 'meta'], 'readonly', (transaction, setResult) => {
+            const request = transaction.objectStore('meta').get(DRAWING_ARTWORK_KEY);
+            request.onsuccess = () => {
+                if (typeof request.result !== 'string') { setResult(null); return; }
+                const artwork = transaction.objectStore('artworks').get(request.result);
+                artwork.onsuccess = () => setResult(validateArtwork(artwork.result) ? artwork.result.id : null);
+            };
+        });
+    }
+
     public static async deleteArtwork(id: string): Promise<void> {
         return this.transaction(['artworks', 'meta'], 'readwrite', (transaction, setResult) => {
             transaction.objectStore('artworks').delete(id);
             const meta = transaction.objectStore('meta');
+            const drawing = meta.get(DRAWING_ARTWORK_KEY);
+            drawing.onsuccess = () => { if (drawing.result === id) meta.delete(DRAWING_ARTWORK_KEY); };
             const selected = meta.get(SELECTED_ARTWORK_KEY);
             selected.onsuccess = () => {
                 if (selected.result === id) meta.delete(SELECTED_ARTWORK_KEY);

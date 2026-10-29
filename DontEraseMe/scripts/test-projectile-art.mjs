@@ -24,7 +24,7 @@ globalThis.window={addEventListener(){},innerWidth:1280,innerHeight:720,devicePi
 let canvasCount=0;
 function context(){
  const calls=[],stack=[],target={calls,stack,globalAlpha:.6,shadowBlur:0,fillStyle:'',strokeStyle:'',canvas:{clientWidth:1280,clientHeight:720}};
- return new Proxy(target,{get(o,k){if(k in o)return o[k];if(k==='save')return()=>stack.push({globalAlpha:o.globalAlpha,shadowBlur:o.shadowBlur});if(k==='restore')return()=>{assert(stack.length);Object.assign(o,stack.pop());};return(...args)=>{calls.push({name:k,args,alpha:o.globalAlpha});for(const a of args)if(typeof a==='number')assert(Number.isFinite(a));};}});
+ return new Proxy(target,{get(o,k){if(k in o)return o[k];if(k==='save')return()=>stack.push({globalAlpha:o.globalAlpha,shadowBlur:o.shadowBlur});if(k==='restore')return()=>{assert(stack.length);Object.assign(o,stack.pop());};if(k==='createRadialGradient')return()=>({addColorStop(){}});return(...args)=>{calls.push({name:k,args,alpha:o.globalAlpha});for(const a of args)if(typeof a==='number')assert(Number.isFinite(a));};}});
 }
 globalThis.document={body:{insertBefore(){}},getElementById:()=>null,createElement:()=>{canvasCount++;const ctx=context();return {width:0,height:0,style:{},dataset:{},getContext:()=>ctx};}};
 const m=await import(pathToFileURL(out));
@@ -37,6 +37,11 @@ for(const config of WEAPONS){
  const e=actor(config),before=snapshot(e),c=context();
  assert(drawDoodleProjectile(c,e,'player'),config.type);assert.equal(snapshot(e),before);
  assert.equal(c.calls.filter(x=>x.name==='drawImage').length,1,'one cached blit per projectile');
+ const minimum = { shotgun: [25,22], standard: [32,26], chain: [23,20], ribbon: [23,20], flamethrower: [18,17] }[config.type];
+ if (minimum) {
+  const args = c.calls.find(x=>x.name==='drawImage').args;
+  assert(args[3] >= minimum[0] * 1.112 && args[4] >= minimum[1] * 1.112, `${config.type}: small projectiles remain visible`);
+ }
  assert(!c.calls.some(x=>['beginPath','stroke','fill'].includes(x.name)),'runtime body does not retessellate art');
  assert.equal(c.globalAlpha,.6);assert.equal(c.stack.length,0);
  const made=canvasCount;for(let frame=0;frame<120;frame++)drawDoodleProjectile(context(),e,'player');
