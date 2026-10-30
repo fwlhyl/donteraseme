@@ -1,3 +1,6 @@
+import { Velocity } from '../components/Velocity';
+import { PlayerControl } from '../components/PlayerControl';
+import { skillVfx } from '../art/SkillVfx';
 import { System } from '../core/System';
 import { drawInkSplash } from '../art/InkSplash';
 import { Entity } from '../core/Entity';
@@ -39,12 +42,10 @@ export class SkillSystem extends System {
                 const lvl = ex ? ex.level : 0;
                 const conf = this.getToolSettings(id);
                 if (lvl < conf.unlock) {
-                    window.dispatchEvent(new CustomEvent('announce', { detail: { text: `未解锁：${this.getToolName(id)} Lv${conf.unlock}` } }));
                     continue;
                 }
                 if (sk) {
                     sk.activeTool = id;
-                    window.dispatchEvent(new CustomEvent('announce', { detail: { text: `已选择：${this.getToolName(id)}（F触发）` } }));
                 }
             }
         });
@@ -102,9 +103,7 @@ export class SkillSystem extends System {
                                     stats.hasClassicalShield = false; // 只有在满层或有层数时才是 true，这里我们用层数逻辑
                                 }
                             }
-                            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `厚涂护盾 +1！(当前 ${stats.classicalShieldStacks} 层)` } }));
                         } else {
-                            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `厚涂护盾已就绪！` } }));
                         }
                     }
                 }
@@ -116,7 +115,6 @@ export class SkillSystem extends System {
                         stats.shieldCooldownFrames--;
                     } else {
                         stats.classicalShieldStacks++;
-                        window.dispatchEvent(new CustomEvent('announce', { detail: { text: `厚涂护盾 +1！(当前 ${stats.classicalShieldStacks} 层)` } }));
                         if (stats.classicalShieldStacks < stats.maxClassicalShieldStacks) {
                             stats.shieldCooldownFrames = stats.maxShieldCooldownFrames;
                         }
@@ -154,7 +152,6 @@ export class SkillSystem extends System {
                         stats.origamiShieldCooldownFrames--;
                     } else {
                         stats.hasOrigamiShield = true;
-                        window.dispatchEvent(new CustomEvent('announce', { detail: { text: `折纸盾牌已生成！` } }));
                     }
                 }
 
@@ -196,7 +193,6 @@ export class SkillSystem extends System {
                     const conf = this.getToolSettings('curve');
                     if (level < conf.unlock) {
                         if (skill.toolCooldown <= 0) {
-                            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `未解锁：画圆 Lv${conf.unlock}` } }));
                             skill.toolCooldown = 45;
                         }
                     } else if (skill.toolCooldown <= 0) {
@@ -240,13 +236,11 @@ export class SkillSystem extends System {
                         skill.curveStage = 0;
                         skill.toolCooldown = conf.cd;
                         emitGameSound('skill', { x: transform.x, y: transform.y });
-                        window.dispatchEvent(new CustomEvent('announce', { detail: { text: `画圆（命中伤害）` } }));
                     }
                 } else if (skill.activeTool === 'symmetry') {
                     const conf = this.getToolSettings('symmetry');
                     if (level < conf.unlock) {
                         if (skill.toolCooldown <= 0) {
-                            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `未解锁：对称镜像 Lv${conf.unlock}` } }));
                             skill.toolCooldown = 45;
                         }
                     } else if (skill.toolCooldown <= 0) {
@@ -254,26 +248,22 @@ export class SkillSystem extends System {
                         skill.symmetryAxisX = transform.x;
                         skill.toolCooldown = conf.cd;
                         emitGameSound('skill', { x: transform.x, y: transform.y });
-                        window.dispatchEvent(new CustomEvent('announce', { detail: { text: `对称镜像启动` } }));
                     }
                 } else if (skill.activeTool === 'eraser') {
                     const conf = this.getToolSettings('eraser');
                     if (level < conf.unlock) {
                         if (skill.toolCooldown <= 0) {
-                            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `未解锁：橡皮盾 Lv${conf.unlock}` } }));
                             skill.toolCooldown = 45;
                         }
                     } else if (skill.toolCooldown <= 0) {
                         skill.eraserShieldFrames = 240;
                         skill.toolCooldown = conf.cd;
                         emitGameSound('shield', { x: transform.x, y: transform.y });
-                        window.dispatchEvent(new CustomEvent('announce', { detail: { text: `橡皮盾开启` } }));
                     }
                 } else if (skill.activeTool === 'pin') {
                     const conf = this.getToolSettings('pin');
                     if (level < conf.unlock) {
                         if (skill.toolCooldown <= 0) {
-                            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `未解锁：定点钉住 Lv${conf.unlock}` } }));
                             skill.toolCooldown = 45;
                         }
                     } else if (skill.toolCooldown <= 0) {
@@ -289,14 +279,12 @@ export class SkillSystem extends System {
                             }
                         }
                         skill.toolCooldown = conf.cd;
-                        window.dispatchEvent(new CustomEvent('announce', { detail: { text: `定点钉住` } }));
                         emitGameSound('skill', { x: transform.x, y: transform.y });
                     }
                 } else if (skill.activeTool === 'explosion') {
                     const conf = this.getToolSettings('explosion');
                     if (level < conf.unlock) {
                         if (skill.toolCooldown <= 0) {
-                            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `未解锁：爆炸 Lv${conf.unlock}` } }));
                             skill.toolCooldown = 45;
                         }
                     } else if (skill.toolCooldown <= 0) {
@@ -304,7 +292,6 @@ export class SkillSystem extends System {
                         this.activateSkill(entity, skill, transform, renderable ? renderable.color : '#ffffff');
                         skill.cooldown = prev; // keep Space cooldown unaffected; use tools' shared cooldown
                         skill.toolCooldown = conf.cd;
-                        window.dispatchEvent(new CustomEvent('announce', { detail: { text: `爆炸` } }));
                     }
                 }
             }
@@ -329,7 +316,6 @@ export class SkillSystem extends System {
                     transform.x = skill.symmetryLastX;
                     transform.y = skill.symmetryLastY;
                     emitGameSound('dash', { x: transform.x, y: transform.y });
-                    window.dispatchEvent(new CustomEvent('announce', { detail: { text: `镜像位移` } }));
                 }
             }
             if (skill.eraserShieldFrames > 0) {
@@ -368,28 +354,27 @@ export class SkillSystem extends System {
 
         // 传送距离
         // 向后反穿（回马枪）：因为是在风筝身后的敌人，所以位移方向改为与当前移动方向相反 (-dirX, -dirY)
-        const distance = 400;
+        const distance = 200;
         let endX = startX - dirX * distance;
         let endY = startY - dirY * distance;
 
-        // 边界检测 - 改为“镜像”反弹，完美契合“镜像位移”的主题！
-        // 如果玩家在地图边缘触发，向外传送的部分会折射回地图内
-        if (endX < 0) {
-            endX = -endX;
-        } else if (endX > this.worldWidth) {
-            endX = this.worldWidth - (endX - this.worldWidth);
-        }
-
-        if (endY < 0) {
-            endY = -endY;
-        } else if (endY > this.worldHeight) {
-            endY = this.worldHeight - (endY - this.worldHeight);
-        }
+        // Stop at world boundaries instead of reflecting back into the movement direction.
+        endX = Math.max(0, Math.min(this.worldWidth, endX));
+        endY = Math.max(0, Math.min(this.worldHeight, endY));
 
         // 执行传送
         // 直接修改 player 实体的 Transform 组件坐标，它会自动同步给渲染系统
+        this.addEntityCallback(skillVfx(startX,startY,'mirror_cut',Math.hypot(endX-startX,endY-startY),'#e5a1ff',30,Math.atan2(endY-startY,endX-startX)));
         transform.x = endX;
         transform.y = endY;
+        stats.mirrorLandingFrames = 2;
+        stats.mirrorMovementLocked = true;
+        stats.moveSameDirFrames = 0;
+        stats.currentSpeed = 0;
+        const landingVelocity = player.getComponent(Velocity);
+        if (landingVelocity) { landingVelocity.x = 0; landingVelocity.y = 0; }
+        const landingControl = player.getComponent(PlayerControl);
+        if (landingControl) { landingControl.dashFrames = 0; landingControl.recoilFrames = 0; }
         emitGameSound('dash', { x: transform.x, y: transform.y });
         
         // 由于我们在处理事件时可能已经离开了主循环更新，
@@ -464,7 +449,6 @@ export class SkillSystem extends System {
             }
         }
 
-        window.dispatchEvent(new CustomEvent('announce', { detail: { text: `镜像反穿！切割了 ${hitCount} 个敌人` } }));
         
         // 留下一道视觉特效线 (加粗，并且使用不同颜色或复合特效让玩家清楚是向后穿了)
         if (this.trailCtx) {

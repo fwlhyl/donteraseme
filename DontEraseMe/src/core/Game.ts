@@ -1,3 +1,5 @@
+import { skillIconMarkup } from '../art/SkillIcons';
+import { isSkillUsefulForWeapon } from '../config/WeaponSkillCompatibility';
 import { Entity } from './Entity';
 import { System } from './System';
 import { InputManager } from './InputManager';
@@ -56,6 +58,8 @@ import { emitGameSound } from '../audio/AudioEvents';
 import { DrawingHud } from '../ui/DrawingHud';
 import { AimCursor } from '../ui/AimCursor';
 import { OutcomePortrait } from '../ui/OutcomePortrait';
+import { createCharacterPortrait } from '../ui/CharacterPortrait';
+import { createWeaponPortrait } from '../ui/WeaponPortrait';
 import { GalleryStore } from './GalleryStore';
 import type { ArtGallery } from '../gallery/ArtGallery';
 import { Skill } from '../components/Skill';
@@ -810,7 +814,10 @@ export class Game {
         });
 
         // Select 4 random skills that can be upgraded or learned
+        const equippedWeapon = player.getComponent(Weapon);
+        const equippedType = WEAPONS[equippedWeapon?.currentWeaponIndex ?? -1]?.type;
         const availableSkills = SKILLS.filter(skill => {
+            if (!isSkillUsefulForWeapon(skill, equippedType)) return false;
             const currentLevel = stats.getSkillLevel(skill.id);
             if (currentLevel >= skill.maxLevel) return false;
             
@@ -861,7 +868,7 @@ export class Game {
                 card.setAttribute('aria-pressed', 'false');
 
                 card.innerHTML = `
-                    <span class="upgrade-portrait" aria-hidden="true"></span>
+                    <span class="upgrade-portrait" aria-hidden="true">${skillIconMarkup(skill.id)}</span>
                     <span class="upgrade-card-info">
                     <span class="upgrade-category">${t(skill.category)}</span>
                     <span class="upgrade-title">${t(skill.name)}</span>
@@ -1039,7 +1046,7 @@ export class Game {
             card.setAttribute('aria-pressed', 'false');
 
             card.innerHTML = `
-                <span class="upgrade-portrait" aria-hidden="true"></span>
+                <span class="upgrade-portrait" aria-hidden="true">${skillIconMarkup(skill.id)}</span>
                 <span class="upgrade-card-info">
                 <span class="upgrade-category">${t(skill.category)}</span>
                 <span class="upgrade-title">${t(skill.name)}</span>
@@ -1101,7 +1108,10 @@ export class Game {
                 el.className = `selection-orb char-card ${this.selectedCharacterId === char.id ? 'active' : ''} ${unlocked ? '' : 'locked'}`;
                 el.setAttribute('aria-pressed', String(this.selectedCharacterId === char.id));
                 el.setAttribute('aria-label', `${t(char.name)} · ${unlocked ? this.profileText('unlocked') : this.profileText('locked', char.unlockPrice)}`);
-                el.innerHTML = unlocked ? '' : '<svg class="selection-lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v10H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+                const portrait = createCharacterPortrait(char.id);
+                portrait.classList.add('selection-portrait');
+                el.appendChild(portrait);
+                if (!unlocked) el.insertAdjacentHTML('beforeend', '<svg class="selection-lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v10H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>');
                 el.onclick = () => {
                     this.selectedCharacterId = char.id;
                     if (unlocked) PlayerProfile.selectCharacter(char.id);
@@ -1123,7 +1133,8 @@ export class Game {
                 el.className = `selection-orb weap-card ${this.selectedWeaponId === weap.id ? 'active' : ''} ${unlocked ? '' : 'locked'}`;
                 el.setAttribute('aria-pressed', String(this.selectedWeaponId === weap.id));
                 el.setAttribute('aria-label', `${t(weap.name)} · ${unlocked ? this.profileText('unlocked') : this.profileText('locked', price)}`);
-                el.innerHTML = unlocked ? '' : '<svg class="selection-lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v10H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+                el.appendChild(createWeaponPortrait(weap.type));
+                if (!unlocked) el.insertAdjacentHTML('beforeend', '<svg class="selection-lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v10H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>');
                 el.onclick = () => {
                     this.selectedWeaponId = weap.id;
                     this.updateSelectionUI();

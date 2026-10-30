@@ -1,3 +1,4 @@
+import { skillVfx } from '../art/SkillVfx';
 import { Entity } from '../core/Entity';
 import { Transform } from '../components/Transform';
 import { Renderable } from '../components/Renderable';
@@ -36,7 +37,6 @@ export class DeathHandler {
             const pStats = player.getComponent(PlayerStats);
             if (eBeh && eBeh.damageFactor >= 3 && pStats && addEntityCallback) {
                 emitGameSound('explosion', { x, y });
-                window.dispatchEvent(new CustomEvent('announce', { detail: { text: `替身爆炸！` } }));
                 const explosion = new Entity();
                 explosion.addComponent(new Transform(x, y));
                 explosion.addComponent(new Renderable('rgba(100, 100, 100, 0.6)', 150, 0, 0, 'circle'));
@@ -65,6 +65,7 @@ export class DeathHandler {
                     const bloomRadius = bloomLevel === 1 ? 60 : (bloomLevel === 2 ? 80 : 100);
                     
                     if (addEntityCallback) {
+                        addEntityCallback(skillVfx(x,y,'paint_bloom',bloomRadius,'#ed78bc',28));
                         const explosion = ParticleFactory.createExplosion(x, y, color, 15);
                         for (const p of explosion) addEntityCallback(p);
                     }
@@ -102,7 +103,6 @@ export class DeathHandler {
                     if (stats.killReaperCount >= requiredKills) {
                         stats.killReaperReady = true;
                         stats.killReaperCount = 0;
-                        window.dispatchEvent(new CustomEvent('announce', { detail: { text: `死神收割就绪！` } }));
                     }
                 }
             }

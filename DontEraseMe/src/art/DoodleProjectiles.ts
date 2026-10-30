@@ -14,9 +14,9 @@ export const DOODLE_PROJECTILE_TYPES: readonly WeaponType[] = [
     'sniper', 'flamethrower', 'compass', 'mine',
 ];
 type StampKind = WeaponType | 'slash';
-const INK = '#171d29', PAPER = '#fff0cb';
-const PALETTE = ['#f3d754','#ef9151','#e85564','#ac78dc','#647beb','#55b8e1',
-    '#66d3cc','#60b975','#dfdfcc','#303c58','#de7fc3','#ba9970'];
+const INK = '#171d29', PAPER = '#c8c1aa';
+const PALETTE = ['#b9a75e','#bc8c60','#b56c76','#927ba6','#73839e','#739eae',
+    '#79a69e','#7c9878','#c0bca9','#424958','#ae819d','#a38b75'];
 const paletteRGB = PALETTE.map(p=>[1,3,5].map(i=>parseInt(p.slice(i,i+2),16)));
 const pigments = new Map<string,string>();
 const named: Record<string,string> = {yellow:'#ffff00',orange:'#ffa500',red:'#ff0000',
@@ -115,7 +115,7 @@ function paintStamp(c:CanvasRenderingContext2D, kind:StampKind, color:string, aw
             if(kind==='ruler') for(let x=-24;x<=24;x+=8)line(c,[x,2,x,6+(x%16===0?2:0)],INK,1.2);
             break;
     }
-    if(awakened && kind!=='mine' && kind!=='ruler' && kind!=='sniper') {
+    if(false && awakened && kind!=='mine' && kind!=='ruler' && kind!=='sniper') {
         line(c,[-29,-24,-25,-28],PAPER,2);line(c,[23,25,29,22],PAPER,2);
     }
 }
@@ -129,7 +129,7 @@ function stamp(kind:StampKind,color:string,awakened:boolean):HTMLCanvasElement|n
     if(cache.size>=192)cache.delete(cache.keys().next().value!);
     cache.set(key,canvas);builds++;return canvas;
 }
-function drawStamp(ctx:CanvasRenderingContext2D,kind:StampKind,color:string,width:number,height:number,angle:number,awakened=false):boolean {
+export function drawStamp(ctx:CanvasRenderingContext2D,kind:StampKind,color:string,width:number,height:number,angle:number,awakened=false):boolean {
     if(![width,height,angle].every(Number.isFinite)||width<=0||height<=0)return false;
     const image=stamp(kind,color,awakened);if(!image)return false;
     ctx.save();ctx.shadowBlur=0;ctx.imageSmoothingEnabled=true;ctx.rotate(angle);
@@ -163,7 +163,7 @@ export function drawDoodleProjectile(ctx:CanvasRenderingContext2D,entity:Entity,
     // Small projectile stamps need enough screen pixels to remain legible;
     // this changes presentation only, never collision radii or painted paths.
     if(p.type==='shotgun') {width=Math.max(width,25);height=Math.max(height,22);}
-    else if(p.type==='standard') {width=Math.max(width,32);height=Math.max(height,26);}
+    else if(p.type==='standard') {width=Math.max(width,25);height=Math.max(height,19);}
     else if(p.type==='chain'||p.type==='ribbon') {
         width=Math.max(width,23);height=Math.max(height,20);
     } else if(p.type==='flamethrower') {width=Math.max(width,18);height=Math.max(height,17);}

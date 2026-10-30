@@ -51,6 +51,12 @@ export function drawMagicRobot(ctx: CanvasRenderingContext2D, size: number,
     px(ink, 14, -7, Math.max(6, fistX - 10), 8);
     px(dark, 15, -6, Math.max(4, fistX - 11), 5);
     px(ink, fistX, -10, 11, 13); px(steel, fistX + 2, -8, 7, 8);
+    if (hit > .35) {
+        ctx.strokeStyle='#91afbf';ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(fistX+12,-11);ctx.lineTo(fistX+18,-6);ctx.lineTo(fistX+14,1);ctx.stroke();
+        ctx.strokeStyle=paper;ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(fistX+14,-5);ctx.lineTo(fistX+23,-5);ctx.stroke();
+    }
     px(light, fistX + 3, -7, 5, 2); px(dark, fistX + 7, -4, 2, 4);
     ctx.restore();
     ctx.restore();

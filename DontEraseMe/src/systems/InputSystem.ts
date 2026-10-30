@@ -44,25 +44,32 @@ export class InputSystem extends System {
                 let skateboardSpeedBonus = 0;
                 const skateboardLevel = stats.getSkillLevel('move_skateboard');
                 if (skateboardLevel > 0) {
-                    const maxSpeedBonus = skateboardLevel === 1 ? 1.5 : (skateboardLevel === 2 ? 2.0 : 2.5);
-                    const maxFrames = 180; // 3秒蓄满
+                    const maxSpeedBonus = skateboardLevel === 1 ? .30 : (skateboardLevel === 2 ? .50 : 1.0);
+                    const maxFrames = 180; // Ramp for 3 seconds after the initial 3-second wait.
+                    stats.skateboardActive = false;
                     if (!entity.attacking) {
-                        stats.skateboardFrames = Math.min(maxFrames, stats.skateboardFrames + 1);
-                        const currentBonus = (stats.skateboardFrames / maxFrames) * maxSpeedBonus;
-                        skateboardSpeedBonus = currentBonus;
+                        stats.skateboardIdleFrames++;
                         stats.skateboardDamageBonus = 0;
+                        if (stats.skateboardIdleFrames > 180) {
+                            stats.skateboardFrames = Math.min(maxFrames, stats.skateboardFrames + 1);
+                            skateboardSpeedBonus = stats.skateboardFrames / maxFrames * maxSpeedBonus;
+                            stats.skateboardActive = true;
+                        } else {
+                            stats.skateboardFrames = 0;
+                        }
                     } else {
-                        // 开火转化为伤害倍率，并逐渐消耗蓄能
-                        const currentBonus = (stats.skateboardFrames / maxFrames) * maxSpeedBonus;
+                        stats.skateboardIdleFrames = 0;
+                        const currentBonus = stats.skateboardFrames / maxFrames * maxSpeedBonus;
                         stats.skateboardDamageBonus = skateboardLevel === 3 ? currentBonus * 2 : currentBonus;
-                        stats.skateboardFrames = Math.max(0, stats.skateboardFrames - 2); // 消耗速度
-                        skateboardSpeedBonus = 0;
+                        stats.skateboardFrames = Math.max(0, stats.skateboardFrames - 2);
                     }
                 } else {
+                    stats.skateboardIdleFrames = 0;
+                    stats.skateboardActive = false;
                     stats.skateboardFrames = 0;
                     stats.skateboardDamageBonus = 0;
                 }
-                
+
                 // 应用速度加成
                 const totalSpeedWithFrenzy = calculatedSpeed * (1 + frenzySpeedBonus + skateboardSpeedBonus);
 
@@ -111,6 +118,14 @@ export class InputSystem extends System {
                 }
             }
             
+            if (stats?.mirrorMovementLocked) {
+                velocity.x = 0;
+                velocity.y = 0;
+                control.dashFrames = 0;
+                control.recoilFrames = 0;
+                const directionHeld = ['w','a','s','d'].some(key => this.input.isKeyDown(key));
+                if (!directionHeld) stats.mirrorMovementLocked = false;
+            }
             const isMoving = velocity.x !== 0 || velocity.y !== 0;
             const currentActualSpeed = Math.hypot(velocity.x, velocity.y);
             if (stats) {
@@ -165,20 +180,8 @@ export class InputSystem extends System {
                         const dirX = velocity.x / mag;
                         const dirY = velocity.y / mag;
                         
-                        if (stats.lastMoveDir.x === 0 && stats.lastMoveDir.y === 0) {
-                            stats.lastMoveDir = { x: dirX, y: dirY };
-                            stats.moveSameDirFrames = 1;
-                        } else {
-                            // 计算点积判断是否同向 (阈值例如 0.9)
-                            const dot = dirX * stats.lastMoveDir.x + dirY * stats.lastMoveDir.y;
-                            if (dot > 0.9) {
-                                stats.moveSameDirFrames++;
-                                stats.lastMoveDir = { x: dirX, y: dirY }; // 平滑更新方向
-                            } else {
-                                stats.moveSameDirFrames = 1;
-                                stats.lastMoveDir = { x: dirX, y: dirY };
-                            }
-                        }
+                        stats.moveSameDirFrames++;
+                        stats.lastMoveDir = { x: dirX, y: dirY };
 
                         const targetFrames = mirrorLevel === 1 ? 600 : (mirrorLevel === 2 ? 480 : 300); // 10s, 8s, 5s
                         if (stats.moveSameDirFrames >= targetFrames) {

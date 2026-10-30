@@ -48,7 +48,12 @@ export function drawMagicTank(ctx: CanvasRenderingContext2D, size: number, time:
     rect(ink,11,-13,17,6); rect(steel,13,-12,14,3);
     rect(ink,26,-15,4,10); rect(pale,27,-13,2,5);
     // A tiny single-frame spark reinforces the shot, kept close to the muzzle.
-    if (fire > .65) { rect(paper,30,-12,4,4); rect(light,34,-11,3,2); }
+    if (fire > .45) {
+        ctx.fillStyle=light;ctx.strokeStyle=ink;ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(30,-12);ctx.lineTo(38,-17);ctx.lineTo(36,-11);
+        ctx.lineTo(44,-10);ctx.lineTo(36,-8);ctx.lineTo(38,-3);ctx.lineTo(30,-8);ctx.closePath();ctx.fill();ctx.stroke();
+        rect(paper,31,-11,6,2);
+    }
     ctx.restore();
     ctx.restore();
     ctx.restore();

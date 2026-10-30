@@ -1,3 +1,6 @@
+import { skillVfx } from '../art/SkillVfx';
+import { SkillVisual } from '../components/SkillVisual';
+import { Particle } from '../components/Particle';
 import { System } from '../core/System';
 import { drawInkSplash } from '../art/InkSplash';
 import { Entity } from '../core/Entity';
@@ -670,6 +673,14 @@ export class WeaponSystem extends System {
                 pData.life = 5; // Very short life, just enough for CollisionSystem to process
             }
             this.addEntityCallback(sweepProj);
+            // A separate visual lifetime keeps the damage window unchanged.
+            const sweepArt = new Entity();
+            sweepArt.addComponent(new Transform(transform.x, transform.y, base));
+            sweepArt.addComponent(new Renderable(bulletColor, reach * 1.18, 0, 0, 'circle'));
+            sweepArt.addComponent(new SkillVisual('scraper_sweep'));
+            sweepArt.addComponent(new Particle(18, 18));
+            this.addEntityCallback(sweepArt);
+
 
             if (this.trailCtx) {
                 this.trailCtx.save();
@@ -728,23 +739,7 @@ export class WeaponSystem extends System {
             this.queueAttack(owner, () => {
                 if (!owner.active || owner.tags.has('magic_piloting')) return;
                 
-                if (config.type === 'shotgun' && burstCount > 1) {
-                    const pCtrl = owner.getComponent(PlayerControl);
-                    if (pCtrl) {
-                        // 强制触发 5 帧的极速后坐力 (位移量较大)
-                        pCtrl.recoilFrames = 5;
-                        pCtrl.recoilSpeed = 12; // 极大的后坐力速度
-                        pCtrl.recoilDirX = -Math.cos(transform.rotation);
-                        pCtrl.recoilDirY = -Math.sin(transform.rotation);
-                    } else {
-                        // 兜底方案
-                        const pT = owner.getComponent(Transform);
-                        if (pT) {
-                            pT.x -= Math.cos(transform.rotation) * 20;
-                            pT.y -= Math.sin(transform.rotation) * 20;
-                        }
-                    }
-                }
+                // Floating digital pens fire independently without pushing their owner.
 
                 for (let i = 0; i < count; i++) {
                     const spread = (Math.random() - 0.5) * config.spread * weapon.spreadMul;
@@ -874,12 +869,14 @@ export class WeaponSystem extends System {
         if ((weapon as any).inspirationLevel && (weapon as any).inspirationLevel > 0) {
             inspLevel = (weapon as any).inspirationLevel;
             (weapon as any).inspirationLevel = 0; // 消耗掉
+            this.addEntityCallback?.(skillVfx(transform.x,transform.y,'paint_bloom',40,'#ffe294',16,transform.rotation));
         }
 
         let isReaperStrike = false;
         if (stats && stats.killReaperReady) {
             isReaperStrike = true;
             stats.killReaperReady = false; // 消耗掉
+            this.addEntityCallback?.(skillVfx(transform.x,transform.y,'scraper_sweep',85,'#9b78bd',20,transform.rotation));
         }
 
         const getDamage = (baseDamage: number, weaponBonus: number): { damage: number, isCrit: boolean, bonusPierce: number, isSuperCrit: boolean } => {
@@ -1217,6 +1214,14 @@ export class WeaponSystem extends System {
                 pData.life = 5; // Very short life, just enough for CollisionSystem to process
             }
             this.addEntityCallback(sweepProj);
+            // A separate visual lifetime keeps the damage window unchanged.
+            const sweepArt = new Entity();
+            sweepArt.addComponent(new Transform(transform.x, transform.y, base));
+            sweepArt.addComponent(new Renderable(bulletColor, reach * 1.18, 0, 0, 'circle'));
+            sweepArt.addComponent(new SkillVisual('scraper_sweep'));
+            sweepArt.addComponent(new Particle(18, 18));
+            this.addEntityCallback(sweepArt);
+
 
             // 视觉：在轨迹层画出短暂的弧线
             if (this.trailCtx) {
@@ -1291,15 +1296,15 @@ export class WeaponSystem extends System {
                 if (config.type === 'shotgun' && burstCount > 1) {
                     const pCtrl = owner.getComponent(PlayerControl);
                     if (pCtrl) {
-                        pCtrl.recoilFrames = 5;
-                        pCtrl.recoilSpeed = 12; 
+                        pCtrl.recoilFrames = 3;
+                        pCtrl.recoilSpeed = 4;
                         pCtrl.recoilDirX = -Math.cos(transform.rotation);
                         pCtrl.recoilDirY = -Math.sin(transform.rotation);
                     } else {
                         const pT = owner.getComponent(Transform);
                         if (pT) {
-                            pT.x -= Math.cos(transform.rotation) * 20;
-                            pT.y -= Math.sin(transform.rotation) * 20;
+                            pT.x -= Math.cos(transform.rotation) * 4;
+                            pT.y -= Math.sin(transform.rotation) * 4;
                         }
                     }
                 }
@@ -1438,7 +1443,7 @@ export class WeaponSystem extends System {
                         const dist = Math.hypot(et.x - transform.x, et.y - transform.y);
                         if (dist <= radius) {
                             const eb = e.getComponent(EnemyBehavior);
-                            if (eb) eb.frozenFrames = duration;
+                            if (eb) { eb.frozenFrames = duration; this.addEntityCallback?.(skillVfx(et.x,et.y,'thumbtack',22,'#d6b07a',duration)); }
                         }
                     }
                 }

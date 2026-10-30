@@ -6,7 +6,7 @@ import { Particle } from '../components/Particle';
 
 export class ParticleFactory {
     public static totalParticles: number = 0; // 记录当前存在的粒子数量
-    public static maxParticles: number = 200; // 同屏最大粒子限制
+    public static maxParticles: number = 100; // 同屏最大粒子限制
 
     public static createExplosion(x: number, y: number, color: string, count: number = 10): Entity[] {
         // 如果同屏粒子数量已经太多，直接限制生成或减半
@@ -16,6 +16,7 @@ export class ParticleFactory {
             count = Math.floor(count / 2);
         }
 
+        count = Math.ceil(count * .55);
         const particles: Entity[] = [];
         
         for (let i = 0; i < count; i++) {
@@ -23,7 +24,7 @@ export class ParticleFactory {
             
             // Random direction and speed
             const angle = Math.random() * Math.PI * 2;
-            const speed = Math.random() * 5 + 2;
+            const speed = Math.random() * 3 + 1;
             
             particle.addComponent(new Transform(x, y));
             particle.addComponent(new Velocity(
@@ -38,7 +39,7 @@ export class ParticleFactory {
             particle.addComponent(new Renderable(color, size, 0, 0, 'circle', 5));
             
             // Random life
-            const life = Math.floor(Math.random() * 30 + 30);
+            const life = Math.floor(Math.random() * 18 + 18);
             particle.addComponent(new Particle(life, life, 0.95));
             
             particles.push(particle);

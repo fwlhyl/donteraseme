@@ -26,6 +26,8 @@ export function drawDoodleEnemy(ctx: CanvasRenderingContext2D, type: EnemyType |
     if (!hasDoodleEnemyArtwork(type)) return false;
     ctx.save();
     ctx.globalAlpha *= .95;
+    const impact=Math.max(0,pose?.hit ?? 0);
+    ctx.scale(1+impact*.035,1-impact*.025);
     const bossDrawn = drawBossArtwork(ctx, type, radius, rotation, pose);
     ctx.restore();
     if (bossDrawn) {
@@ -38,6 +40,7 @@ export function drawDoodleEnemy(ctx: CanvasRenderingContext2D, type: EnemyType |
         ctx.save();
         ctx.globalAlpha *= .95;
         ctx.translate(pose?.x ?? 0, pose?.y ?? 0);
+        ctx.scale(1+impact*.12,1-impact*.10);
         ctx.scale(Math.cos(rotation) < -.12 ? -1 : 1, 1);
         // The hovering ink bottle's exhaust remains active when it is stationary.
         const phase = type === 'summoner' ? (pose?.time ?? 0) * 5 : (pose?.gaitPhase ?? 0);
@@ -55,7 +58,7 @@ export function drawDoodleEnemy(ctx: CanvasRenderingContext2D, type: EnemyType |
         return true;
     }
     if (type === 'eraser') {
-        ctx.save(); ctx.globalAlpha *= .95; ctx.translate(pose?.x ?? 0, pose?.y ?? 0);
+        ctx.save(); ctx.globalAlpha *= .95; ctx.translate(pose?.x ?? 0, pose?.y ?? 0); ctx.scale(1+impact*.10,1-impact*.08);
         ctx.scale(Math.cos(rotation) < -.12 ? -1 : 1, 1);
         drawEraser(ctx, radius * 2, pose?.gaitPhase ?? 0, pose?.moving ?? 0);
         ctx.restore();

@@ -1,3 +1,5 @@
+import { combatImpact } from '../art/CombatImpact';
+import { skillVfx } from '../art/SkillVfx';
 import { System } from '../core/System';
 import { drawInkSplash } from '../art/InkSplash';
 import { Entity } from '../core/Entity';
@@ -219,7 +221,6 @@ export class CollisionSystem extends System {
             ink.addComponent(new Renderable('rgba(0, 0, 0, 0.8)', inkRadius, 0, 0, 'circle'));
             ink.addComponent(new InkCloud(inkRadius, 180, 'rgba(0, 0, 0, 0.8)'));
             this.addEntityCallback(ink);
-            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `墨染致盲！` } }));
         }
 
         // 防御/受击触发系：刺猬装甲 (defense_hedgehog)
@@ -238,7 +239,7 @@ export class CollisionSystem extends System {
                     const angle = (Math.PI * 2 / projCount) * i;
                     const proj = new Entity();
                     proj.addComponent(new Transform(pTransform.x, pTransform.y));
-                    proj.addComponent(new Renderable('#555555', 4, 0, 0, 'circle'));
+                    proj.addComponent(new Renderable('#b9b5ce', 8, 0, 0, 'circle'));
                     proj.addComponent(new SkillVisual('pencil_shard'));
                     proj.addComponent(new Velocity(Math.cos(angle) * 10, Math.sin(angle) * 10));
                     proj.addComponent(new Projectile('standard', projDamage, player.id, 60, isPiercing ? 999 : 1));
@@ -321,7 +322,6 @@ export class CollisionSystem extends System {
             
             DamageTextSystem.addDamageText(pTransform.x, pTransform.y - 20, 0, '#00ffff', true, "免疫!");
             emitGameSound('shield', { x: pTransform.x, y: pTransform.y });
-            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `厚涂护盾破裂！(剩余 ${pStats.classicalShieldStacks} 层)` } }));
             pHealth.invincibleFrames = 60; // Give some i-frames anyway to prevent instant multi-hit
             this.handlePlayerHit(player, pTransform, sourceTransform);
             return;
@@ -335,7 +335,6 @@ export class CollisionSystem extends System {
             pStats.origamiShieldCooldownFrames = cooldowns[shieldLevel - 1] || 3600;
             DamageTextSystem.addDamageText(pTransform.x, pTransform.y - 20, 0, '#ffffff', true, "折纸盾!");
             emitGameSound('shield', { x: pTransform.x, y: pTransform.y });
-            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `折纸盾牌破裂！` } }));
             pHealth.invincibleFrames = 60;
             
             if (shieldLevel >= 3 && this.addEntityCallback) {
@@ -379,7 +378,6 @@ export class CollisionSystem extends System {
             pHealth.invincibleFrames = 180; // 3 seconds invincible
             pStats.speedMultiplier += 0.5; // temporary speed up
             pStats.dummySpeedBuffFrames = 180; // 3 seconds speed up buff
-            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `墨水替身触发！隐身加速3秒！` } }));
             DamageTextSystem.addDamageText(pTransform.x, pTransform.y - 30, 0, '#888888', true, "替身!");
             
             if (this.addEntityCallback) {
@@ -411,7 +409,6 @@ export class CollisionSystem extends System {
                 DamageTextSystem.addDamageText(pTransform.x, pTransform.y - 30, heal, '#00ff00', false, "+HP");
             }
             
-            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `绝境爆炸触发！` } }));
             if (this.addEntityCallback) {
                 const explosion = new Entity();
                 explosion.addComponent(new Transform(pTransform.x, pTransform.y));
@@ -462,7 +459,6 @@ export class CollisionSystem extends System {
                 pHealth.current = 1; // 锁血
                 pHealth.invincibleFrames = 180; // 3秒无敌
                 
-                window.dispatchEvent(new CustomEvent('announce', { detail: { text: `【散财消灾】花费 ${cost} 金币抵挡致命伤！剩余：${3 - pStats.collectorAwaken2Triggers}次` } }));
                 DamageTextSystem.addDamageText(pTransform.x, pTransform.y - 40, cost, '#ffd700', true, "-$$$");
                 
                 // 全屏击退 (修正位移算法)
@@ -528,6 +524,8 @@ export class CollisionSystem extends System {
                 xpOrbs.push(entity);
             } else if (entity.tags.has('player')) {
                 player = entity;
+                const landingStats = player.getComponent(PlayerStats);
+                if (landingStats && landingStats.mirrorLandingFrames > 0) landingStats.mirrorLandingFrames--;
                 const pHealth = player.getComponent(Health);
                 if (pHealth && pHealth.invincibleFrames > 0) {
                     pHealth.invincibleFrames -= 1;
@@ -876,6 +874,11 @@ export class CollisionSystem extends System {
                         emitGameSound('explosion', { x: eTransform.x, y: eTransform.y });
                         // Explosion radius
                         let explosionRadius = Math.floor(100 * (pData.explosionRadiusScale || 1));
+                        if (projectile.tags.has('magic-tank-shell') || projectile.tags.has('magic-bomber-shell')) {
+                            const bomber = projectile.tags.has('magic-bomber-shell');
+                            this.addEntityCallback?.(skillVfx(eTransform.x,eTransform.y,bomber?'bomber_wave':'tank_wave',explosionRadius,bomber?'#968578':'#8b9274',bomber?28:22));
+                        }
+
                         
                         if (pData.type === 'mine' && (pData as any).isAwakened) {
                             explosionRadius *= 3; // 爆炸范围扩大3倍
@@ -1120,6 +1123,7 @@ export class CollisionSystem extends System {
                                         const elecDamage = finalDamage * jumpDmgScale;
                                         th.current -= elecDamage;
                                         DamageTextSystem.addDamageText(tt.x, tt.y - 15, elecDamage, '#ffff00', false);
+                                        this.addEntityCallback?.(skillVfx(eTransform.x,eTransform.y,'electric_arc',Math.hypot(tt.x-eTransform.x,tt.y-eTransform.y),'#ffe66b',16,Math.atan2(tt.y-eTransform.y,tt.x-eTransform.x)));
                                         // 绘制闪电连线
                                         if (this.trailCtx) {
                                             this.trailCtx.save();
@@ -1163,6 +1167,7 @@ export class CollisionSystem extends System {
                                     // 解除冰冻
                                     eBeh.frozenFrames = 0;
                                     
+                                    this.addEntityCallback?.(skillVfx(eTransform.x,eTransform.y,'ice_steam',explodeRadius,'#bceaf3',32));
                                     // 冰火爆破特效
                                     if (this.addEntityCallback) {
                                         const p1 = ParticleFactory.createExplosion(eTransform.x, eTransform.y, '#ff4444', 20);
@@ -1184,6 +1189,13 @@ export class CollisionSystem extends System {
                     // Apply damage (for non-AOE or direct hit)
                     if (eBeh || pData.ownerId === (player ? player.id : '')) {
                          eHealth.current -= finalDamage;
+                         if (finalDamage > 0 && pData.ownerId === player?.id) {
+                             combatImpact(enemy, projectile);
+                             enemyIndex?.update(enemy, eTransform);
+                             if (projectile.tags.has('magic-robot-pulse')) {
+                                 this.addEntityCallback?.(skillVfx(eTransform.x,eTransform.y,'robot_wave',62,'#7d9ca9',18));
+                             }
+                         }
                          if (finalDamage > 0) emitGameSound(pData.isCrit || pData.isSuperCrit ? 'hit-heavy' : 'hit', { x: eTransform.x, y: eTransform.y });
                          const textColor = pData.isSuperCrit ? '#ff0000' : (pData.isCrit ? '#ff4444' : '#ffffff');
                          DamageTextSystem.addDamageText(eTransform.x, eTransform.y - 15, finalDamage, textColor, pData.isCrit || pData.isSuperCrit);
@@ -1230,7 +1242,8 @@ export class CollisionSystem extends System {
                                 if (explosionLevel > 0) {
                                     const radius = explosionLevel >= 2 ? 120 : 80;
                                     const damageMultiplier = explosionLevel >= 3 ? 2 : 1;
-                                    const explodeDamage = Math.floor(finalDamage * damageMultiplier * 0.5); 
+                                    const explodeDamage = Math.floor(finalDamage * damageMultiplier * 0.5);
+                                    this.addEntityCallback?.(skillVfx(eTransform.x,eTransform.y,'paint_bloom',radius,'#f5a64d',24));
                                     
                                     for (const other of enemies) {
                                         if (!other.active || other === enemy) continue;
@@ -1741,6 +1754,16 @@ export class CollisionSystem extends System {
                 const minDist = (pRender.radius || 20) + (eRender.radius || 15);
 
                 if (dist < minDist) {
+                    const landing = player.getComponent(PlayerStats);
+                    if (landing && landing.mirrorLandingFrames > 0) {
+                        const nx = dist > .001 ? -dx / dist : Math.cos(pTransform.rotation);
+                        const ny = dist > .001 ? -dy / dist : Math.sin(pTransform.rotation);
+                        const push = minDist - dist + 24;
+                        eTransform.x += nx * push;
+                        eTransform.y += ny * push;
+                        enemyIndex?.update(enemy, eTransform);
+                        continue;
+                    }
                     // Flying avoids body contact only; hostile projectiles and
                     // other damage sources still run in their normal branches.
                     if (player.tags.has('magic_piloting_bomber')) continue;

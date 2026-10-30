@@ -54,10 +54,11 @@ export function drawMagicBomber(ctx: CanvasRenderingContext2D, size: number,
     // A brief opening bomb bay and falling cartridge make the attack readable.
     // This is visual feedback only; combat projectiles are owned by the system.
     if (a > .04) {
-        const fall = Math.round((1 - a) * 9);
-        px(ink,-4,8,12,3); px(mid,-2,9,7,1);
+        const fall = Math.round((1 - a) * 17);
+        px(ink,-7,8,17,4); px(mid,-6,8,3,6); px(mid,6,8,3,6);
         px(ink,0,11 + fall,6,7); px(dark,1,12 + fall,4,5);
         px(light,2,12 + fall,2,2); px(ink,2,18 + fall,2,2);
+        px(ink,-2,12 + fall,2,3); px(ink,6,12 + fall,2,3);
     }
     ctx.restore();
 }

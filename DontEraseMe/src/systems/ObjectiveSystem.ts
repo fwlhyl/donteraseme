@@ -62,11 +62,9 @@ export class ObjectiveSystem extends System {
         const rand = Math.random();
         const pStats = player.getComponent(PlayerStats);
         const pHealth = player.getComponent(Health);
-        let announcement = "";
 
         if (rand < 0.33) {
             // 奖励 1：全屏炸弹
-            announcement = "获得奖励：全屏炸弹！小怪已被清空！";
             for (const e of this.entities) {
                 if (!e.active) continue;
                 const eb = e.getComponent(EnemyBehavior);
@@ -86,7 +84,6 @@ export class ObjectiveSystem extends System {
             }
         } else if (rand < 0.66) {
             // 奖励 2：额外宝箱（这里触发一次升级技能抽取，并回满血）
-            announcement = "获得奖励：医疗宝箱！生命已回满！";
             if (pHealth) {
                 pHealth.current = pHealth.max;
             }
@@ -94,12 +91,10 @@ export class ObjectiveSystem extends System {
         } else {
             // 奖励 3：短时Buff (10秒无敌或无限子弹)
             if (Math.random() < 0.5) {
-                announcement = "获得奖励：短时Buff！10秒内无敌！";
                 if (pStats) {
                     pStats.invincibleUntil = Date.now() + 10000;
                 }
             } else {
-                announcement = "获得奖励：短时Buff！10秒内无限子弹！";
                 if (pStats) {
                     pStats.infiniteAmmoUntil = Date.now() + 10000;
                 }
@@ -107,7 +102,6 @@ export class ObjectiveSystem extends System {
         }
 
         // 发送提示
-        window.dispatchEvent(new CustomEvent('announce', { detail: { text: announcement } }));
     }
     
     private spawnNext() {

@@ -1,3 +1,4 @@
+import { SkillVisual } from '../components/SkillVisual';
 import { System } from '../core/System';
 import { Transform } from '../components/Transform';
 import { Velocity } from '../components/Velocity';
@@ -17,6 +18,11 @@ export class ParticleSystem extends System {
             const velocity = entity.getComponent(Velocity);
             const renderable = entity.getComponent(Renderable);
 
+            if (particle && entity.hasComponent(SkillVisual)) {
+                particle.life--;
+                if (particle.life <= 0) entitiesToRemove.push(entity);
+                continue;
+            }
             if (particle && transform && velocity && renderable) {
                 count++;
                 // Life decay

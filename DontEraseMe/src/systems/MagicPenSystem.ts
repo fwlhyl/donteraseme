@@ -282,7 +282,6 @@ export class MagicPenSystem extends System {
         this.progressByPlayer.set(playerId, next);
         if (previous < MAX_INSPIRATION && next >= MAX_INSPIRATION) {
             this.readyAnnouncedFor.add(playerId);
-            window.dispatchEvent(new CustomEvent('announce', { detail: { text: '画笔成真已充能！按 G 键描绘具现。' } }));
         }
     }
 
@@ -291,11 +290,9 @@ export class MagicPenSystem extends System {
         if (!player || !player.getComponent(PlayerStats)?.hasSkill('magic_pen')) return;
         const progress = this.progressByPlayer.get(player.id) || 0;
         if (progress < MAX_INSPIRATION) {
-            window.dispatchEvent(new CustomEvent('announce', { detail: { text: `画笔成真充能不足：${progress}/${MAX_INSPIRATION}` } }));
             return;
         }
         if (this.hasActiveManifestation(player.id)) {
-            window.dispatchEvent(new CustomEvent('announce', { detail: { text: '正在驾驶画笔成真载具，等它消散后再召唤。' } }));
             return;
         }
 
@@ -436,7 +433,6 @@ export class MagicPenSystem extends System {
                 strokes: this.strokes.map(stroke => stroke.map(point => ({ ...point })))
             }
         }));
-        window.dispatchEvent(new CustomEvent('announce', { detail: { text: `画笔成真：${TARGETS[this.selectedType].label} · ${grade} 级（持续 10 秒）` } }));
         this.closeBoard(true);
         emitGameSound('magic', { x: transform.x, y: transform.y });
     }
@@ -563,7 +559,6 @@ export class MagicPenSystem extends System {
             if (manifestation.remainingFrames <= 0) {
                 entity.active = false;
                 this.stopPiloting(player);
-                window.dispatchEvent(new CustomEvent('announce', { detail: { text: '画笔成真载具消散了，主武器已恢复。' } }));
                 continue;
             }
 
@@ -673,6 +668,7 @@ export class MagicPenSystem extends System {
             projectile.explosionRadiusScale = 1.05 * multiplier;
         }
         rocket.tags.add('magic-pen-projectile');
+        rocket.tags.add(aim === undefined ? 'magic-bomber-shell' : 'magic-tank-shell');
         this.addEntityCallback(rocket);
         emitGameSound('shot-bucket', { x: origin.x, y: origin.y, gain: 0.85 });
     }

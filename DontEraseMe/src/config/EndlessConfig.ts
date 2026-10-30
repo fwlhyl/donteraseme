@@ -237,32 +237,32 @@ export const SKILLS: SkillConfig[] = [
         id: 'element_ice', name: '冰霜颜料', category: SkillCategory.ELEMENT, maxLevel: 3,
         levels: [
             { level: 1, description: '子弹有 20% 概率冻结敌人 1 秒', value: 0.2 },
-            { level: 2, description: '冰冻概率提升至 30%', value: 0.3 },
-            { level: 3, description: '冰冻概率提升至 40%，且冻结时间变为 1.5 秒', value: 0.4 }
+            { level: 2, description: '子弹冰冻概率提升至 30%', value: 0.3 },
+            { level: 3, description: '子弹冰冻概率提升至 40%，且冻结时间变为 1.5 秒', value: 0.4 }
         ]
     },
     {
         id: 'element_corrosive', name: '腐蚀墨水', category: SkillCategory.ELEMENT, maxLevel: 3,
         levels: [
             { level: 1, description: '子弹命中使敌人受到伤害增加 10%，最多叠加 3 层', value: 0.1 },
-            { level: 2, description: '每层伤害增加提升至 15%', value: 0.15 },
-            { level: 3, description: '每层伤害增加提升至 20%', value: 0.2 }
+            { level: 2, description: '子弹命中每层伤害增加提升至 15%', value: 0.15 },
+            { level: 3, description: '子弹命中每层伤害增加提升至 20%', value: 0.2 }
         ]
     },
     {
         id: 'element_fire', name: '焦油燃烧', category: SkillCategory.ELEMENT, maxLevel: 3,
         levels: [
             { level: 1, description: '子弹附加燃烧，每秒造成 20% 攻击力的持续伤害，持续 3 秒', value: 0.2 },
-            { level: 2, description: '燃烧伤害提升至 35% 攻击力', value: 0.35 },
-            { level: 3, description: '燃烧伤害提升至 50% 攻击力，且引燃周围敌人', value: 0.5 }
+            { level: 2, description: '子弹燃烧伤害提升至 35% 攻击力', value: 0.35 },
+            { level: 3, description: '子弹燃烧伤害提升至 50% 攻击力，且引燃周围敌人', value: 0.5 }
         ]
     },
     {
         id: 'element_electric', name: '静电导电', category: SkillCategory.ELEMENT, maxLevel: 3,
         levels: [
             { level: 1, description: '子弹命中时弹射 1 个附近敌人，造成 50% 伤害', value: 1 },
-            { level: 2, description: '弹射 2 个附近敌人，造成 50% 伤害', value: 2 },
-            { level: 3, description: '弹射 3 个附近敌人，造成 75% 伤害', value: 3 }
+            { level: 2, description: '子弹命中弹射 2 个附近敌人，造成 50% 伤害', value: 2 },
+            { level: 3, description: '子弹命中弹射 3 个附近敌人，造成 75% 伤害', value: 3 }
         ]
     },
 
@@ -271,15 +271,15 @@ export const SKILLS: SkillConfig[] = [
         id: 'reload_thumbtack', name: '图钉禁锢', category: SkillCategory.RELOAD, maxLevel: 3,
         levels: [
             { level: 1, description: '每次换弹时，将自身周围小范围内的所有敌人钉住 2 秒' },
-            { level: 2, description: '范围中等，持续 3 秒' },
-            { level: 3, description: '范围大，持续 4 秒' }
+            { level: 2, description: '钉住敌人范围中等，持续 3 秒' },
+            { level: 3, description: '钉住敌人范围大，持续 4 秒' }
         ]
     },
     {
         id: 'reload_pigment_dump', name: '颜料倾倒', category: SkillCategory.RELOAD, maxLevel: 3,
         levels: [
             { level: 1, description: '每次换弹时在脚下留下一摊毒水，持续 5 秒，造成基础伤害' },
-            { level: 2, description: '范围扩大，伤害 +50%' },
+            { level: 2, description: '毒水范围扩大，伤害 +50%' },
             { level: 3, description: '毒水内的敌人移速降低 50%' }
         ]
     },
@@ -295,8 +295,8 @@ export const SKILLS: SkillConfig[] = [
         id: 'reload_inspiration', name: '灵感爆发', category: SkillCategory.RELOAD, maxLevel: 3,
         levels: [
             { level: 1, description: '换弹后的第一发子弹必定暴击，且伤害 +100%' },
-            { level: 2, description: '第一发子弹伤害 +200%' },
-            { level: 3, description: '第一发子弹伤害 +300% 且附带穿透' }
+            { level: 2, description: '换弹后第一发子弹伤害 +200%' },
+            { level: 3, description: '换弹后第一发子弹伤害 +300% 且附带穿透' }
         ]
     },
 
@@ -305,15 +305,15 @@ export const SKILLS: SkillConfig[] = [
         id: 'hit_sketch_clone', name: '素描分身', category: SkillCategory.HIT, maxLevel: 3,
         levels: [
             { level: 1, description: '击中敌人后，30% 概率分裂 2 发额外子弹弹射其他敌人' },
-            { level: 2, description: '概率提升至 40%，分裂 2 发' },
-            { level: 3, description: '概率提升至 50%，分裂 4 发' }
+            { level: 2, description: '额外子弹弹射其他敌人概率提升至 40%，分裂 2 发' },
+            { level: 3, description: '额外子弹弹射其他敌人概率提升至 50%，分裂 4 发' }
         ]
     },
     {
         id: 'hit_explosion', name: '色彩爆炸', category: SkillCategory.HIT, maxLevel: 3,
         levels: [
             { level: 1, description: '触发暴击时，必定产生一次小范围爆炸（爆炸伤害受暴击伤害倍率加成）' },
-            { level: 2, description: '爆炸范围扩大' },
+            { level: 2, description: '产生爆炸的范围扩大' },
             { level: 3, description: '爆炸伤害额外翻倍' }
         ]
     },
@@ -321,24 +321,24 @@ export const SKILLS: SkillConfig[] = [
         id: 'crit_pierce', name: '致命穿透', category: SkillCategory.HIT, maxLevel: 3,
         levels: [
             { level: 1, description: '暴击时 30% 概率穿透敌人（穿透类武器则转化为 +30% 暴击伤害）' },
-            { level: 2, description: '穿透概率或暴伤加成提升至 60%' },
-            { level: 3, description: '穿透概率或暴伤加成提升至 100%' }
+            { level: 2, description: '暴击时穿透概率或暴伤加成提升至 60%' },
+            { level: 3, description: '暴击时穿透概率或暴伤加成提升至 100%' }
         ]
     },
     {
         id: 'crit_vampire', name: '吸血鬼之触', category: SkillCategory.HIT, maxLevel: 3,
         levels: [
             { level: 1, description: '触发暴击时，有 30% 概率恢复 1 点生命值' },
-            { level: 2, description: '概率提升至 40%' },
-            { level: 3, description: '概率提升至 50%，且恢复量变为 2 点' }
+            { level: 2, description: '恢复生命值概率提升至 40%' },
+            { level: 3, description: '恢复生命值概率提升至 50%，且恢复量变为 2 点' }
         ]
     },
     {
         id: 'hit_last_strike', name: '收笔一击', category: SkillCategory.HIT, maxLevel: 3,
         levels: [
             { level: 1, description: '弹匣内的最后一发子弹必定暴击' },
-            { level: 2, description: '该发子弹额外获得 50% 暴击伤害加成' },
-            { level: 3, description: '额外获得 100% 暴击伤害加成且附带穿透' }
+            { level: 2, description: '弹匣内的最后一发子弹额外获得 50% 暴击伤害加成' },
+            { level: 3, description: '弹匣内的最后一发子弹额外获得 100% 暴击伤害加成且附带穿透' }
         ]
     },
 
@@ -351,32 +351,32 @@ export const SKILLS: SkillConfig[] = [
         id: 'kill_bloom', name: '颜料绽放', category: SkillCategory.KILL, maxLevel: 3,
         levels: [
             { level: 1, description: '击杀敌人后尸体炸开，造成相当于其最大生命值 5% 的真实伤害' },
-            { level: 2, description: '真实伤害提升至 10%' },
-            { level: 3, description: '真实伤害提升至 15%' }
+            { level: 2, description: '击杀敌人后尸体炸开，造成真实伤害提升至 10%' },
+            { level: 3, description: '击杀敌人后尸体炸开，造成真实伤害提升至 15%' }
         ]
     },
     {
         id: 'kill_frenzy', name: '墨滴狂热', category: SkillCategory.KILL, maxLevel: 3,
         levels: [
             { level: 1, description: '击杀敌人后，移速和射速临时提升 10%，持续 2 秒（可叠加）' },
-            { level: 2, description: '加成提升至 15%' },
-            { level: 3, description: '加成提升至 20%，持续时间增至 3 秒' }
+            { level: 2, description: '击杀敌人后，移速和射速临时加成提升至 15%' },
+            { level: 3, description: '击杀敌人后，移速和射速临时加成提升至 20%，持续时间增至 3 秒' }
         ]
     },
     {
         id: 'kill_magnet', name: '经验磁铁', category: SkillCategory.KILL, maxLevel: 3,
         levels: [
             { level: 1, description: '击杀敌人时，10% 概率直接吸收当前击败敌人掉落的经验' },
-            { level: 2, description: '概率提升至 20%' },
-            { level: 3, description: '概率提升至 40%，且拾取时恢复极少量生命' }
+            { level: 2, description: '击杀敌人时，直接吸收当前击败敌人掉落的经验概率提升至 20%' },
+            { level: 3, description: '击杀敌人时，直接吸收当前击败敌人掉落的经验概率提升至 40%，且拾取时恢复极少量生命' }
         ]
     },
     {
         id: 'kill_reaper', name: '死神收割', category: SkillCategory.KILL, maxLevel: 3,
         levels: [
-            { level: 1, description: '连续击杀 15 个敌人后，下一次攻击必定触发所有“命中触发系”效果' },
-            { level: 2, description: '需连杀 10 个' },
-            { level: 3, description: '需连杀 5 个' }
+            { level: 1, description: '连续击杀 15 个敌人后，下一次攻击必定触发所有已拥有的“击杀触发系”效果' },
+            { level: 2, description: '需连杀 10 个敌人后，下一次攻击必定触发所有已拥有的“击杀触发系”效果' },
+            { level: 3, description: '需连杀 5 个敌人后，下一次攻击必定触发所有已拥有的“击杀触发系”效果' }
         ]
     },
 
@@ -392,24 +392,24 @@ export const SKILLS: SkillConfig[] = [
     {
         id: 'summon_palette', name: '调色盘卫星', category: SkillCategory.SUMMON, maxLevel: 3,
         levels: [
-            { level: 1, description: '召唤 2 个发光的色块像卫星一样围绕玩家旋转切割敌人' },
-            { level: 2, description: '增加至 3 个色块' },
-            { level: 3, description: '增加至 4 个色块，且旋转速度提升' }
+            { level: 1, description: '召唤 2 个色块像卫星一样围绕玩家旋转切割敌人' },
+            { level: 2, description: '增加至 3 个色块像卫星一样围绕玩家旋转切割敌人' },
+            { level: 3, description: '增加至 4 个色块像卫星一样围绕玩家旋转切割敌人，且旋转速度提升' }
         ]
     },
     {
         id: 'summon_scythe', name: '吸血镰刀', category: SkillCategory.SUMMON, maxLevel: 3,
         levels: [
             { level: 1, description: '召唤 1 把镰刀围绕玩家做圆周运动，割到敌人恢复 1 点生命值' },
-            { level: 2, description: '收割半径扩大 50%' },
-            { level: 3, description: '恢复量提升至 2 点并附带重伤效果' }
+            { level: 2, description: '镰刀收割半径扩大 50%' },
+            { level: 3, description: '镰刀收割敌人恢复生命值提升至 2 点并附带重伤效果' }
         ]
     },
     {
         id: 'summon_drone', name: '无人机（橡皮擦猎手）', category: SkillCategory.SUMMON, maxLevel: 3,
         levels: [
-            { level: 1, description: '召唤 1 架小飞船专门消灭“橡皮擦”敌人' },
-            { level: 2, description: '召唤 2 架无人机' },
+            { level: 1, description: '召唤 1 架无人机专门消灭“橡皮擦”敌人' },
+            { level: 2, description: '召唤 2 架无人机专门消灭“橡皮擦”敌人' },
             { level: 3, description: '无人机附带发射激光制导，伤害大幅提升' }
         ]
     },
@@ -419,8 +419,8 @@ export const SKILLS: SkillConfig[] = [
         id: 'defense_shield', name: '折纸盾牌', category: SkillCategory.DEFENSE, maxLevel: 3,
         levels: [
             { level: 1, description: '定期生成环绕自身的纸盾抵挡一次伤害，60 秒冷却' },
-            { level: 2, description: '冷却时间降低至 45 秒' },
-            { level: 3, description: '冷却时间降低至 30 秒，且破碎时发射纸屑打击敌人' }
+            { level: 2, description: '定期生成环绕自身的纸盾抵挡一次伤害，冷却时间降低至 45 秒' },
+            { level: 3, description: '定期生成环绕自身的纸盾抵挡一次伤害，冷却时间降低至 30 秒，且破碎时发射纸屑打击敌人' }
         ]
     },
     {
@@ -435,16 +435,16 @@ export const SKILLS: SkillConfig[] = [
         id: 'defense_desperate_explosion', name: '绝境爆炸', category: SkillCategory.DEFENSE, maxLevel: 3,
         levels: [
             { level: 1, description: '血量低于 20% 且受击时，瞬间触发大范围颜料爆炸，60 秒冷却' },
-            { level: 2, description: '冷却时间降低至 45 秒' },
-            { level: 3, description: '冷却时间降低至 30 秒，且爆炸后恢复 10% 生命值' }
+            { level: 2, description: '颜料爆炸冷却时间降低至 45 秒' },
+            { level: 3, description: '颜料爆炸冷却时间降低至 30 秒，且爆炸后恢复 10% 生命值' }
         ]
     },
     {
         id: 'defense_hedgehog', name: '刺猬装甲', category: SkillCategory.DEFENSE, maxLevel: 3,
         levels: [
             { level: 1, description: '受击时，向四周发射 8 根尖锐的铅笔芯' },
-            { level: 2, description: '发射 16 根' },
-            { level: 3, description: '发射 24 根且带穿透' }
+            { level: 2, description: '受击时，向四周发射 16 根' },
+            { level: 3, description: '受击时，向四周发射 24 根且带穿透' }
         ]
     },
 
@@ -452,41 +452,41 @@ export const SKILLS: SkillConfig[] = [
     {
         id: 'move_mirror', name: '镜像位移', category: SkillCategory.MOVEMENT, maxLevel: 3,
         levels: [
-            { level: 1, description: '朝同向移动 10 秒后，向后方反穿 400 距离，切割沿途敌人' },
-            { level: 2, description: '朝同向移动 8 秒后，向后方反穿 400 距离，切割沿途敌人' },
-            { level: 3, description: '朝同向移动 5 秒后，向后方反穿 400 距离，切割范围变宽且伤害翻倍' }
+            { level: 1, description: '持续移动 10 秒后，向后方反穿 200 距离，切割沿途敌人' },
+            { level: 2, description: '持续移动 8 秒后，向后方反穿 200 距离，切割沿途敌人' },
+            { level: 3, description: '持续移动 5 秒后，向后方反穿 200 距离，切割范围变宽且伤害翻倍' }
         ]
     },
     {
         id: 'move_skateboard', name: '颜料滑板', category: SkillCategory.MOVEMENT, maxLevel: 3,
         levels: [
-            { level: 1, description: '未开火状态下移速逐渐提升最高 150%，开火时转化为伤害倍率' },
-            { level: 2, description: '最高提升至 200% 移速' },
-            { level: 3, description: '最高提升至 250% 移速，且开火伤害倍率翻倍' }
+            { level: 1, description: '连续 3 秒未开火后，移速逐渐提升至 130%，开火时将加速转为伤害加成' },
+            { level: 2, description: '连续 3 秒未开火后，移速逐渐提升至 150%，开火时将加速转为伤害加成' },
+            { level: 3, description: '连续 3 秒未开火后，移速逐渐提升至 200%，开火时转化的伤害加成翻倍' }
         ]
     },
     {
         id: 'move_static_charge', name: '静止蓄能', category: SkillCategory.MOVEMENT, maxLevel: 3,
         levels: [
             { level: 1, description: '静止 2 秒后，每秒增加攻击力，最高 50%' },
-            { level: 2, description: '需静止 1.5 秒，最高 100%' },
-            { level: 3, description: '需静止 1 秒，最高 150%' }
+            { level: 2, description: '需静止 1.5 秒，每秒增加攻击力，最高 100%' },
+            { level: 3, description: '需静止 1 秒，每秒增加攻击力，最高 150%' }
         ]
     },
     {
         id: 'move_parkour', name: '跑酷大师', category: SkillCategory.MOVEMENT, maxLevel: 3,
         levels: [
             { level: 1, description: '移动速度越快闪避率越高，最高 15%' },
-            { level: 2, description: '最高 25% 闪避' },
-            { level: 3, description: '最高 40% 闪避' }
+            { level: 2, description: '移动速度越快闪避率越高，最高 25% 闪避' },
+            { level: 3, description: '移动速度越快闪避率越高，最高 40% 闪避' }
         ]
     },
     {
         id: 'move_rabbit', name: '动如脱兔', category: SkillCategory.MOVEMENT, maxLevel: 3,
         levels: [
             { level: 1, description: '移动速度越高，暴击率越高（最高提升 15% 暴击率）' },
-            { level: 2, description: '最高提升 30% 暴击率' },
-            { level: 3, description: '最高提升 45% 暴击率' }
+            { level: 2, description: '移动速度越高，暴击率越高，最高提升 30% 暴击率' },
+            { level: 3, description: '移动速度越高，暴击率越高，最高提升 45% 暴击率' }
         ]
     },
 
@@ -495,8 +495,8 @@ export const SKILLS: SkillConfig[] = [
         id: 'gadget_paperclip', name: '磁力曲别针', category: SkillCategory.SYNERGY, maxLevel: 3,
         levels: [
             { level: 1, description: '每 10 秒掉落曲别针，两针之间连起高压电线，伤害敌人后消失' },
-            { level: 2, description: '每 8 秒掉落 1 个' },
-            { level: 3, description: '每 5 秒掉落 1 个，且电线伤害翻倍' }
+            { level: 2, description: '每 8 秒掉落 1 个曲别针' },
+            { level: 3, description: '每 5 秒掉落 1 个曲别针，且电线伤害翻倍' }
         ]
     },
     {
@@ -533,7 +533,7 @@ export const SKILLS: SkillConfig[] = [
         id: 'mastery_shotgun', name: '【超广角喷头】', category: SkillCategory.WEAPON_MASTERY, maxLevel: 1,
         requiredWeapon: 'shotgun',
         levels: [
-            { level: 1, description: '散布喷枪觉醒：每次开火连续喷射 3 次，弹丸数量翻倍，后坐力极大。' }
+            { level: 1, description: '散布喷枪觉醒：每次开火连续喷射 3 次，弹丸数量翻倍，后坐力变大。' }
         ]
     },
     {
@@ -582,7 +582,7 @@ export const SKILLS: SkillConfig[] = [
         id: 'mastery_sniper', name: '【达摩克利斯之笔】', category: SkillCategory.WEAPON_MASTERY, maxLevel: 1,
         requiredWeapon: 'sniper',
         levels: [
-            { level: 1, description: '钢笔狙击枪觉醒：同时发射三发子弹，类似于三发豌豆射手的攻击模式。' }
+            { level: 1, description: '钢笔狙击枪觉醒：同时发射三发子弹的攻击模式。' }
         ]
     },
     {

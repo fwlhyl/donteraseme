@@ -88,11 +88,13 @@ kbd { font: 10px/1.2 var(--ui); color: var(--text); padding: 3px 5px; border: 1p
 #character-list, #weapon-list { display: grid; grid-template-rows: repeat(4, minmax(52px, 1fr)); gap: clamp(8px, 1.4vh, 14px) 12px; justify-items: center; align-items: center; margin-bottom: 18px; }
 #character-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 #weapon-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-#selection-screen .selection-orb { display: grid; place-items: center; width: clamp(52px, 7vh, 68px); height: clamp(52px, 7vh, 68px); padding: 0; border: 2px solid #75756b; border-radius: 50%; background: #faf9f3; color: #66675e; cursor: pointer; }
-#selection-screen .selection-orb:hover { border-color: #292a25; background: #efede4; }
-#selection-screen .selection-orb.active { border: 3px solid #b74736; box-shadow: 0 0 0 2px #f4f2e9, 0 0 0 3px #b74736; }
+#selection-screen .selection-orb { position:relative; display:grid; place-items:center; width:clamp(52px,7vh,68px); height:clamp(52px,7vh,68px); padding:0; border:2px solid transparent; border-radius:4px; background:transparent; color:#292a25; cursor:pointer; }
+#selection-screen .selection-orb.active { border-color:#b74736; }
+#selection-screen .selection-portrait { position:static; width:100%; height:100%; object-fit:contain; image-rendering:pixelated; pointer-events:none; transform:scale(1.18); transition:transform .15s ease; }
+#selection-screen .selection-orb:not(.locked):hover .selection-portrait { transform:scale(1.42); }
+#selection-screen .selection-orb.locked .selection-portrait { opacity:.32; filter:grayscale(1); }
+#selection-screen .selection-orb .selection-lock { position:absolute; z-index:1; right:0; bottom:0; width:20px; height:20px; padding:2px; background:#f4f2e9; color:#292a25; pointer-events:none; }
 #selection-screen .selection-orb:focus-visible { outline: 2px solid #b74736; outline-offset: 4px; }
-#selection-screen .selection-orb svg { width: 24px; height: 24px; }
 .selection-detail { flex: 1; min-height: 154px; border: 1px solid #838379; background: #faf9f3; color: #292a25; padding: 14px 18px; overflow-wrap: anywhere; }
 #selection-screen .detail-title, #selection-screen .selection-detail h4 { color: #292a25 !important; font: 600 18px/1.4 var(--display); margin: 0 0 8px; }
 #selection-screen .detail-description, #selection-screen .selection-detail p, #selection-screen .detail-stat, #selection-screen .detail-skill { color: #51534a !important; font: 13px/1.55 var(--ui) !important; margin: 5px 0; }
@@ -231,7 +233,7 @@ kbd { font: 10px/1.2 var(--ui); color: var(--text); padding: 3px 5px; border: 1p
   .selection-column { padding: 0 8px; }
   #character-list, #weapon-list { gap: 9px 2px; }
   #selection-screen .selection-orb { width: clamp(38px, 10vw, 52px); height: clamp(38px, 10vw, 52px); }
-  #selection-screen .selection-orb svg { width: 19px; height: 19px; }
+  #selection-screen .selection-orb .selection-lock { width: 17px; height: 17px; }
   .selection-detail { padding: 10px; min-height: 175px; }
   .selection-actions { padding: 0 8px; }
   #level-up-screen { justify-content: center !important; }
@@ -244,3 +246,5 @@ kbd { font: 10px/1.2 var(--ui); color: var(--text); padding: 3px 5px; border: 1p
 /* Guard mode unlock is shown directly on the menu entry. */
 #main-menu #defense-mode-btn.guard-locked { cursor: not-allowed; background: #f6f1e8b8; }
 #main-menu #defense-mode-btn.guard-locked::after { content: '完成画画模式并保存画作解锁'; position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: max-content; max-width: 100%; font: 400 clamp(5px, .72vw, 12px)/1.2 var(--ui); text-align: center; color: #4d4032; background: #fff8e8e8 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23282824' d='M6 10V7a6 6 0 0 1 12 0v3h1a2 2 0 0 1 2 2v9H3v-9a2 2 0 0 1 2-2h1zm3 0h6V7a3 3 0 0 0-6 0v3z'/%3E%3C/svg%3E") no-repeat 4px center / 1em 1em; padding: 2px 4px 2px 1.6em; border-radius: 4px; }
+
+.upgrade-portrait .skill-icon { display: block; width: 100%; height: 100%; padding: 6px; box-sizing: border-box; }

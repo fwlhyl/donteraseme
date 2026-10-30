@@ -1,3 +1,6 @@
+import { Velocity } from '../components/Velocity';
+import { InkCloud } from '../components/InkCloud';
+import { Puddle } from '../components/Puddle';
 import { System } from '../core/System';
 import { Transform } from '../components/Transform';
 import { Renderable } from '../components/Renderable';
@@ -293,7 +296,7 @@ export class RenderSystem extends System {
                 const pData = entity.getComponent(Projectile);
                 let isPlayerBullet = false;
                 if (pData && pData.ownerId === player?.id) {
-                    this.ctx.globalAlpha = (this.ctx.globalAlpha || 1.0) * 0.9; // 玩家弹幕半透明 改回 0.9，不再过度削弱
+                    this.ctx.globalAlpha = (this.ctx.globalAlpha || 1.0) * 0.72; // 玩家弹幕半透明 改回 0.9，不再过度削弱
                     isPlayerBullet = true;
                 }
 
@@ -483,7 +486,7 @@ export class RenderSystem extends System {
                     this.ctx.restore();
                     
                     if (entity.tags.has('player')) {
-                        drawDoodlePlayerEffects(this.ctx,renderable.radius,entity.getComponent(PlayerStats),entity.getComponent(Skill),this.artTime);
+                        drawDoodlePlayerEffects(this.ctx,renderable.radius,entity.getComponent(PlayerStats),entity.getComponent(Skill),this.artTime,entity.getComponent(Weapon),entity.getComponent(Velocity));
                     }
 
                     this.ctx.restore(); // MUST restore the outer save from line 101 before continue!
@@ -532,6 +535,22 @@ export class RenderSystem extends System {
                     }
                     
                     const wData = entity.getComponent(WaterMark);
+                    const isPaintPool = !!(wData || entity.getComponent(InkCloud) || entity.getComponent(Puddle));
+                    // Stable world-position phase keeps each stain distinct without frame-to-frame jitter.
+                    const tracePool = (ctx: CanvasRenderingContext2D, x: number, y: number) => {
+                        const phase = transform.x * 0.137 + transform.y * 0.193;
+                        const points = 96;
+                        ctx.beginPath();
+                        for (let i = 0; i <= points; i++) {
+                            const a = (i % points) / points * Math.PI * 2;
+                            const edge = 0.87 + 0.065 * Math.sin(a * 5 + phase)
+                                + 0.04 * Math.sin(a * 11 - phase) + 0.025 * Math.sin(a * 19 + phase);
+                            const px = x + Math.cos(a) * renderable.radius * edge;
+                            const py = y + Math.sin(a) * renderable.radius * 0.58 * edge;
+                            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                        }
+                        ctx.closePath();
+                    };
                     const hasPlayerArtwork = entity.tags.has('player') && drawPlayerArtwork(
                         this.ctx, playerArt, renderable.radius, transform.rotation, doodlePose, entity.getComponent(Weapon)
                     );
@@ -548,7 +567,7 @@ export class RenderSystem extends System {
                         this.tempCtx.globalCompositeOperation = 'source-over';
                         this.tempCtx.fillStyle = renderable.color;
                         this.tempCtx.beginPath();
-                        this.tempCtx.arc(size/2, size/2, renderable.radius, 0, Math.PI * 2);
+                        tracePool(this.tempCtx, size / 2, size / 2);
                         this.tempCtx.fill();
                         
                         this.tempCtx.globalCompositeOperation = 'destination-out';
@@ -562,6 +581,10 @@ export class RenderSystem extends System {
                         this.tempCtx.fill();
                         
                         this.ctx.drawImage(this.tempCanvas, -size/2, -size/2);
+                    } else if (isPaintPool) {
+                        this.ctx.globalAlpha *= .65;
+                        tracePool(this.ctx, 0, 0);
+                        this.ctx.fill();
                     } else {
                         this.ctx.beginPath();
                         this.ctx.arc(0, 0, renderable.radius, 0, Math.PI * 2);
@@ -574,7 +597,7 @@ export class RenderSystem extends System {
                                 this.ctx.shadowBlur = 20;
                                 this.ctx.shadowColor = renderable.color;
                                 // 使用 globalCompositeOperation 叠加高亮模式 (lighter) 让重叠的火焰看起来像真实的烈火中心
-                                this.ctx.globalCompositeOperation = 'lighter';
+                                this.ctx.globalCompositeOperation = 'source-over';
                             }
                         }
 
@@ -638,7 +661,7 @@ export class RenderSystem extends System {
                             this.ctx.fillRect(renderable.radius * 0.5, -renderable.radius * 0.3, renderable.radius * 1.2, renderable.radius * 0.6);
                             this.ctx.restore();
                         }
-                        drawDoodlePlayerEffects(this.ctx,renderable.radius,entity.getComponent(PlayerStats),entity.getComponent(Skill),this.artTime);
+                        drawDoodlePlayerEffects(this.ctx,renderable.radius,entity.getComponent(PlayerStats),entity.getComponent(Skill),this.artTime,entity.getComponent(Weapon),entity.getComponent(Velocity));
                     }
                 } else if (renderable.shape === 'rect') {
                     this.ctx.save();
@@ -801,7 +824,13 @@ export class RenderSystem extends System {
                 } else if (renderable.shape === 'diamond') {
                     this.ctx.save();
                     this.ctx.rotate(rotation);
-                    const r = renderable.radius;
+                    const orb = entity.getComponent(ExperienceOrb);
+                    const r = orb ? (orb.amount >= 500 ? 7 : orb.amount >= 100 ? 6 : 5) : renderable.radius;
+                    if (orb) {
+                        this.ctx.fillStyle = orb.amount >= 500 ? '#a181ad' : orb.amount >= 100 ? '#79a6ad' : '#91b56d';
+                        this.ctx.strokeStyle = '#424a3d';
+                        this.ctx.lineWidth = .8;
+                    }
                     this.ctx.beginPath();
                     this.ctx.moveTo(0, -r);
                     this.ctx.lineTo(r, 0);
@@ -811,7 +840,7 @@ export class RenderSystem extends System {
                     this.ctx.fill();
                     
                     // Add a subtle glow for the orb
-                    this.ctx.shadowBlur = 10;
+                    this.ctx.shadowBlur = orb ? 0 : 10;
                     this.ctx.shadowColor = renderable.color;
                     this.ctx.stroke();
                     this.ctx.restore();

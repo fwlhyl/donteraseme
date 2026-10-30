@@ -33,6 +33,7 @@ export interface DoodleSample {
     reloading?: boolean;
     aim?: number;
     weaponType?: WeaponType;
+    ridingSkateboard?: boolean;
 }
 const TAU = Math.PI * 2;
 const neutral = (): DoodlePose => ({x:0,y:0,angle:0,scaleX:1,scaleY:1,attack:0,hit:0,shadowScale:1,step:0,moving:0});
@@ -77,7 +78,7 @@ export class DoodleMotion {
 
             // Actual displacement drives the phase: blocked input cannot cycle feet.
             // Separate arrival/release easing lets the stance settle without torso sway.
-            const reset = !!sample.frozen || !Number.isFinite(distance) || distance > 80;
+            const reset = !!sample.ridingSkateboard || !!sample.frozen || !Number.isFinite(distance) || distance > 80;
             const travel = reset || distance < .001 ? 0 : distance;
             const target = travel === 0 ? 0 : Math.min(1, travel / dt / 190);
             const response = target > this.moving ? 18 : 28;
@@ -175,7 +176,7 @@ export function sampleDoodleMotion(entity: Entity, dt: number, cache: WeakMap<En
     const reloadFrames = config && weapon
         ? Math.max(1, Math.floor(config.reloadTime * weapon.reloadTimeMul / (stats?.totalReloadMultiplier ?? 1))) : 1;
     const reloadProgress = weapon?.reloading ? Math.max(0, Math.min(1, 1-weapon.reloadTimer/reloadFrames)) : 0;
-    const sample={x:t?.x??0,y:t?.y??0,hp:h?.current??0,attackSerial:attackSerials.get(entity)??0,frozen:(e?.frozenFrames??0)>0,kind:player?'player':e?.type,reloadProgress,reloading:weapon?.reloading??false,aim:player?t?.rotation:undefined,weaponType:config?.type};
+    const sample={x:t?.x??0,y:t?.y??0,hp:h?.current??0,attackSerial:attackSerials.get(entity)??0,frozen:(e?.frozenFrames??0)>0,kind:player?'player':e?.type,reloadProgress,reloading:weapon?.reloading??false,aim:player?t?.rotation:undefined,weaponType:config?.type,ridingSkateboard:!!(stats && stats.getSkillLevel('move_skateboard') > 0 && stats.skateboardActive && stats.currentSpeed > .1)};
     let motion = cache.get(entity);
     if (!motion) {
         let hash=0; for (const ch of entity.id) hash=(hash*31+ch.charCodeAt(0))>>>0;
@@ -197,7 +198,7 @@ export function drawDoodleAccent(ctx: CanvasRenderingContext2D, pose: DoodlePose
     if (!pose || (pose.attack<=0 && pose.hit<=0)) return;
     ctx.save();ctx.shadowBlur=0;
     const hit=pose.hit>0;
-    ctx.strokeStyle=hit?'#ffdd90':'#fff1bd';ctx.lineWidth=1.7;ctx.lineCap='round';
+    ctx.strokeStyle=hit?'#5d554b':'#fff1bd';ctx.lineWidth=1.7;ctx.lineCap='round';
     ctx.globalAlpha *= hit?pose.hit:pose.attack;
     ctx.rotate(hit?-.6:heading);
     const r=size*(hit?.47:.52);

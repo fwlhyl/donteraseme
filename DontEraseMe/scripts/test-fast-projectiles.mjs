@@ -55,6 +55,13 @@ assert.equal(m.WEAPONS[8].speed,18,'instant beam untouched');
  f.collision.update(1/60);assert.equal(e.getComponent(m.Health).current,990,'inactive projectile cannot damage again');
 }
 {
+ const f=fixture(),e=f.enemy(1020,1000,15);
+ for(let i=0;i<8;i++) f.shot({type:'shotgun',speed:50,damage:7});
+ f.step();
+ assert.equal(e.getComponent(m.Health).current,944,'all shotgun pellets deal damage');
+ assert.equal(e.getComponent(m.Transform).x,1025,'shotgun pellets apply one bounded push per target');
+}
+{
  const f=fixture(),far=f.enemy(1040),near=f.enemy(1010);f.shot({speed:70});f.step();
  assert.equal(near.getComponent(m.Health).current,990,'nearest target wins over insertion order');
  assert.equal(far.getComponent(m.Health).current,1000,'nonpiercing bullet damages one target');

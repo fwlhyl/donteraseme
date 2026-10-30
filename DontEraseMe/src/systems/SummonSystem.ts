@@ -272,6 +272,7 @@ export class SummonSystem extends System {
                 }
 
                 // Shooting
+                summon.visualFireFrames = Math.max(0, summon.visualFireFrames - 1);
                 summon.fireTimer--;
                 if (summon.fireTimer <= 0) {
                     summon.fireTimer = summon.maxFireTimer;
@@ -322,6 +323,8 @@ export class SummonSystem extends System {
         const targetT = target.getComponent(Transform)!;
         const angle = Math.atan2(targetT.y - sTransform.y, targetT.x - sTransform.x);
 
+        summon.visualAim = angle;
+        summon.visualFireFrames = 8;
         const bullet = new Entity();
         bullet.tags.add('player_bullet');
         bullet.tags.add(`summon_bullet_${summon.type}`);

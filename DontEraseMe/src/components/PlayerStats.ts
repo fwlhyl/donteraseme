@@ -112,6 +112,10 @@ export class PlayerStats extends Component {
     public moveSameDirFrames: number = 0; // 镜像位移 (move_mirror)
     public lastMoveDir: { x: number, y: number } = { x: 0, y: 0 };
     
+    public mirrorMovementLocked: boolean = false;
+    public mirrorLandingFrames: number = 0; // One collision pass of contact-only protection.
+    public skateboardIdleFrames: number = 0;
+    public skateboardActive: boolean = false;
     public skateboardFrames: number = 0; // 颜料滑板 (move_skateboard)
     public staticFrames: number = 0; // 静止蓄能 (move_static_charge)
     

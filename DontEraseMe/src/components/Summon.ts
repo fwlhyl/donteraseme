@@ -3,6 +3,8 @@ import { Component } from '../core/Component';
 export type SummonType = 'stickman' | 'palette' | 'scythe' | 'drone';
 
 export class Summon extends Component {
+    public visualAim = 0;
+    public visualFireFrames = 0;
     constructor(
         public type: SummonType,
         public ownerId: string,

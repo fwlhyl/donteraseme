@@ -54,7 +54,7 @@ export class DamageTextSystem extends System {
                 existing.x = (existing.x + x) / 2; // 位置取中点
                 existing.y = Math.min(existing.y, y); // 保持在较高的位置
                 existing.life = existing.maxLife; // 刷新生命周期
-                existing.scale = Math.min(2.0, existing.scale + 0.1); // 每次合并变大一点点，最高2倍
+                existing.scale = Math.min(1.2, existing.scale + 0.03); // 每次合并变大一点点，最高2倍
                 return;
             }
         }
@@ -68,9 +68,9 @@ export class DamageTextSystem extends System {
             x: x + (Math.random() * 20 - 10),
             y: y + (Math.random() * 10 - 5),
             text: text,
-            color: color,
-            life: 0.8,
-            maxLife: 0.8,
+            color: isSuperCrit ? '#ce8c80' : isCrit ? '#c5ad75' : customText !== undefined ? color : '#bcb8a8',
+            life: 0.6,
+            maxLife: 0.6,
             velocityY: -40,
             damageValue: damage,
             isCrit: isCrit,
@@ -108,7 +108,7 @@ export class DamageTextSystem extends System {
             
             this.ctx.fillStyle = t.color;
             
-            let baseSize = t.isSuperCrit ? 28 : (t.isCrit ? 24 : 18);
+            let baseSize = t.isSuperCrit ? 22 : (t.isCrit ? 18 : 14);
             const currentSize = baseSize * t.scale;
             
             this.ctx.font = `bold ${currentSize}px Arial`;
