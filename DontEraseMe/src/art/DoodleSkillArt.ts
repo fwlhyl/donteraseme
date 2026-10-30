@@ -328,8 +328,9 @@ function drawSkillBullet(ctx: CanvasRenderingContext2D, entity: Entity, r: Rende
     if (clone) {
         const v=entity.getComponent(Velocity);ctx.rotate(v?Math.atan2(v.y,v.x):t.rotation);
         ctx.strokeStyle='#f4ecdc';ctx.lineWidth=4;
+        const alpha = ctx.globalAlpha;
         for(let i=2;i>=0;i--) {
-            ctx.globalAlpha=i===0?1:.25;ctx.beginPath();ctx.moveTo(10-i*7,0);
+            ctx.globalAlpha=alpha*(i===0?1:.25);ctx.beginPath();ctx.moveTo(10-i*7,0);
             ctx.lineTo(-4-i*7,-5);ctx.lineTo(-8-i*7,3);ctx.closePath();ctx.stroke();
             ctx.strokeStyle='#4d465f';ctx.lineWidth=1.5;ctx.stroke();ctx.strokeStyle='#f4ecdc';ctx.lineWidth=4;
         }

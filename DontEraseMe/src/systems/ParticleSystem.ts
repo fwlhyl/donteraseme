@@ -1,4 +1,5 @@
 import { SkillVisual } from '../components/SkillVisual';
+import { EnemyBehavior } from '../components/EnemyBehavior';
 import { System } from '../core/System';
 import { Transform } from '../components/Transform';
 import { Velocity } from '../components/Velocity';
@@ -19,6 +20,15 @@ export class ParticleSystem extends System {
             const renderable = entity.getComponent(Renderable);
 
             if (particle && entity.hasComponent(SkillVisual)) {
+                const visual = entity.getComponent(SkillVisual)!;
+                if (visual.kind === 'thumbtack' && visual.target) {
+                    const targetTransform = visual.target.getComponent(Transform);
+                    if (!visual.target.active || !targetTransform || !(visual.target.getComponent(EnemyBehavior)?.frozenFrames)) {
+                        entitiesToRemove.push(entity);
+                        continue;
+                    }
+                    if (transform) { transform.x = targetTransform.x; transform.y = targetTransform.y; }
+                }
                 particle.life--;
                 if (particle.life <= 0) entitiesToRemove.push(entity);
                 continue;

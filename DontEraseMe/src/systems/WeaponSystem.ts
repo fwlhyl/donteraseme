@@ -829,6 +829,15 @@ export class WeaponSystem extends System {
         if (!this.canAttack(owner)) return;
         const config = weapon.config;
         if (!config) return;
+        // InputSystem runs before firing; convert the stored speed on the first shot too.
+        if (stats?.skateboardActive && owner.tags.has('player')) {
+            const level = stats.getSkillLevel('move_skateboard');
+            const maxBonus = level === 1 ? .30 : level === 2 ? .50 : 1;
+            const bonus = stats.skateboardFrames / 180 * maxBonus;
+            stats.skateboardDamageBonus = level === 3 ? bonus * 2 : bonus;
+            stats.skateboardActive = false;
+            stats.skateboardIdleFrames = 0;
+        }
         
         let ownerColor = ownerColorArg;
         let frenzySpeedBonus = 0;
@@ -1436,6 +1445,11 @@ export class WeaponSystem extends System {
                 // 将自身周围小范围内的所有敌人钉住 2/3/4 秒
                 const radius = thumbtackLevel === 1 ? 150 : (thumbtackLevel === 2 ? 250 : 400);
                 const duration = thumbtackLevel === 1 ? 120 : (thumbtackLevel === 2 ? 180 : 240); // 2/3/4 seconds
+                const existingPins = new Map<Entity, Entity>();
+                for (const candidate of this.entities) {
+                    const visual = candidate.getComponent(SkillVisual);
+                    if (candidate.active && visual?.kind === 'thumbtack' && visual.target) existingPins.set(visual.target, candidate);
+                }
                 for (const e of this.entities) {
                     if (!e.active || !e.hasComponent(EnemyBehavior) || e.tags.has('ink_dummy')) continue;
                     const et = e.getComponent(Transform);
@@ -1443,7 +1457,18 @@ export class WeaponSystem extends System {
                         const dist = Math.hypot(et.x - transform.x, et.y - transform.y);
                         if (dist <= radius) {
                             const eb = e.getComponent(EnemyBehavior);
-                            if (eb) { eb.frozenFrames = duration; this.addEntityCallback?.(skillVfx(et.x,et.y,'thumbtack',22,'#d6b07a',duration)); }
+                            if (eb) {
+                                eb.frozenFrames = duration;
+                                const existing = existingPins.get(e);
+                                if (existing) {
+                                    const particle = existing.getComponent(Particle);
+                                    if (particle) { particle.life = duration; particle.maxLife = duration; }
+                                } else if (this.addEntityCallback) {
+                                    const pin = skillVfx(et.x,et.y,'thumbtack',22,'#d6b07a',duration);
+                                    pin.getComponent(SkillVisual)!.target = e;
+                                    this.addEntityCallback(pin);
+                                }
+                            }
                         }
                     }
                 }

@@ -62,6 +62,16 @@ assert.equal(m.WEAPONS[8].speed,18,'instant beam untouched');
  assert.equal(e.getComponent(m.Transform).x,1025,'shotgun pellets apply one bounded push per target');
 }
 {
+ const f=fixture(),clone=new m.Entity();
+ clone.addComponent(new m.Transform(1000,1000));
+ clone.addComponent(new m.Velocity(1,0));
+ clone.addComponent(new m.Renderable('#888',4));
+ clone.addComponent(new m.Projectile('clone_bullet',5,f.player.id,90));
+ f.add(clone);
+ for(let i=0;i<90;i++) f.move.update(1/60);
+ assert.equal(clone.active,false,'missed clone expires');
+}
+{
  const f=fixture(),far=f.enemy(1040),near=f.enemy(1010);f.shot({speed:70});f.step();
  assert.equal(near.getComponent(m.Health).current,990,'nearest target wins over insertion order');
  assert.equal(far.getComponent(m.Health).current,1000,'nonpiercing bullet damages one target');

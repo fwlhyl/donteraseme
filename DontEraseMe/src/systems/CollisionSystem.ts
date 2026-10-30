@@ -1224,7 +1224,8 @@ export class CollisionSystem extends System {
                                         const cloneBullet = new Entity();
                                         cloneBullet.addComponent(new Transform(eTransform.x, eTransform.y));
                                         cloneBullet.addComponent(new Renderable(pRender.color, 4, 0, 0, 'circle'));
-                                        const cProj = new Projectile('clone_bullet', pData.damage * 0.5, player.id, 0);
+                                        // A missed clone must expire instead of living indefinitely.
+                                        const cProj = new Projectile('clone_bullet', pData.damage * 0.5, player.id, 90);
                                         cProj.isCrit = pData.isCrit;
                                         cloneBullet.addComponent(cProj);
                                         

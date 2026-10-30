@@ -377,17 +377,6 @@ export class SkillSystem extends System {
         if (landingControl) { landingControl.dashFrames = 0; landingControl.recoilFrames = 0; }
         emitGameSound('dash', { x: transform.x, y: transform.y });
         
-        // 由于我们在处理事件时可能已经离开了主循环更新，
-        // 或者 Transform 未被完全应用到渲染中，我们可以再通过事件发射一个粒子特效来强调传送
-        if (this.trailCtx) {
-            this.trailCtx.save();
-            this.trailCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            this.trailCtx.beginPath();
-            this.trailCtx.arc(startX, startY, 30, 0, Math.PI * 2);
-            this.trailCtx.fill();
-            this.trailCtx.restore();
-        }
-        
         // 沿途切割敌人：因为反穿进了怪堆，如果切割宽度太窄可能导致落地被围殴，所以这里适当加宽切割判定范围（从40提升到80），甚至满级可以更宽
         const baseDamage = 50 * stats.totalDamageMultiplier * (level === 3 ? 2 : 1);
         const cutWidth = level === 3 ? 120 : 80;
@@ -450,29 +439,6 @@ export class SkillSystem extends System {
         }
 
         
-        // 留下一道视觉特效线 (加粗，并且使用不同颜色或复合特效让玩家清楚是向后穿了)
-        if (this.trailCtx) {
-            this.trailCtx.save();
-            // 底色粗线
-            this.trailCtx.strokeStyle = 'rgba(255, 100, 255, 0.4)';
-            this.trailCtx.lineWidth = cutWidth * 2;
-            this.trailCtx.lineCap = 'round';
-            this.trailCtx.beginPath();
-            this.trailCtx.moveTo(startX, startY);
-            this.trailCtx.lineTo(endX, endY);
-            this.trailCtx.stroke();
-            
-            // 核心白线
-            this.trailCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-            this.trailCtx.lineWidth = 15;
-            this.trailCtx.beginPath();
-            this.trailCtx.moveTo(startX, startY);
-            this.trailCtx.lineTo(endX, endY);
-            this.trailCtx.stroke();
-            
-            this.trailCtx.restore();
-        }
-
         // Emit particles at start and end
         const p1 = ParticleFactory.createExplosion(startX, startY, '#ffffff', 15);
         const p2 = ParticleFactory.createExplosion(endX, endY, '#ffffff', 15);
