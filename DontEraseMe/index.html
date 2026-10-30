@@ -15,7 +15,7 @@
     </style>
 </head>
 <body>
-    <button id="pause-btn" type="button" aria-label="暂停与设置" title="暂停与设置" style="display: none;"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-width="3"/></svg></button>
+    <button id="pause-btn" type="button" aria-label="暂停与设置" title="暂停与设置" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-width="3"/></svg></button>
 
     <div id="pause-menu" class="overlay" style="display: none;">
         <p class="eyebrow">HOLD THE LINE</p>
@@ -92,45 +92,25 @@
 
     <!-- 无尽模式选择界面 -->
     <div id="selection-screen" class="overlay" style="display: none;">
-        <p class="eyebrow">BEFORE THE ERASURE / 出击档案</p>
-        <h2 id="selection-mode-label" class="title" style="font-size: 40px; margin-bottom: 8px; animation: none; background: white; -webkit-text-fill-color: white;">创造模式 · 出击准备</h2>
-        <p id="selection-mode-description" style="color: #bbb; margin: 0 0 12px;">从空白画布开始，战斗并创造你的作品。</p>
-        <div id="profile-coins" style="color: #ffd700; font-size: 22px; font-weight: bold; margin: -8px 0 22px;">局外金币：0</div>
-        <p id="shared-progression-hint" style="color: #bfe5da; font-size: 14px; margin: -12px 0 18px;">创造 / 守卫共用金币、角色和武器，解锁一次，两种模式通用。</p>
-        
-        <div class="selection-container" style="display: flex; gap: 40px; max-width: 1200px; width: 100%; margin-bottom: 30px;">
-            <!-- 角色选择区 -->
-            <div style="flex: 1;">
-                <h3 style="color: #0f766e; border-bottom: 2px solid #0f766e; padding-bottom: 10px;">选择角色</h3>
-                <div id="character-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; max-height: 400px; overflow-y: auto; padding-right: 10px;">
-                    <!-- JS动态填充 -->
-                </div>
+        <h2 id="selection-mode-label" class="sr-only">创造模式 · 出击准备</h2>
+        <p id="selection-mode-description" hidden></p>
+        <div id="profile-coins">金币：0</div>
+        <p id="shared-progression-hint" hidden></p>
+        <div class="selection-container">
+            <div class="selection-column selection-characters">
+                <h3 class="sr-only">选择角色</h3>
+                <div id="character-list" aria-label="选择角色"></div>
+                <div id="char-detail" class="selection-detail"></div>
             </div>
-            
-            <!-- 武器选择区 -->
-            <div style="flex: 1;">
-                <h3 style="color: #e91e63; border-bottom: 2px solid #e91e63; padding-bottom: 10px;">选择初始画笔 (武器)</h3>
-                <div id="weapon-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; max-height: 400px; overflow-y: auto; padding-right: 10px;">
-                    <!-- JS动态填充 -->
-                </div>
+            <div class="selection-column selection-weapons">
+                <h3 class="sr-only">选择武器</h3>
+                <div id="weapon-list" aria-label="选择武器"></div>
+                <div id="weap-detail" class="selection-detail"></div>
             </div>
         </div>
-
-        <!-- 当前选中详情展示区 -->
-        <div id="selection-details" style="background: #222; border: 1px solid #444; padding: 20px; border-radius: 8px; width: 100%; max-width: 1200px; min-height: 100px; display: flex; gap: 20px; margin-bottom: 20px;">
-            <div id="char-detail" style="flex: 1; border-right: 1px solid #444; padding-right: 20px;">
-                <h4 style="margin-top: 0; color: #0f766e;">未选择角色</h4>
-                <p style="color: #aaa; font-size: 14px;">请从上方选择一个角色</p>
-            </div>
-            <div id="weap-detail" style="flex: 1;">
-                <h4 style="margin-top: 0; color: #e91e63;">未选择武器</h4>
-                <p style="color: #aaa; font-size: 14px;">请从上方选择初始画笔</p>
-            </div>
-        </div>
-
-        <div class="selection-actions" style="display: flex; gap: 20px; margin-bottom: 40px;">
-            <button id="back-to-menu-btn" class="btn" style="font-size: 20px; padding: 10px 30px;">返回主界面</button>
-            <button id="start-run-btn" class="btn" style="font-size: 24px; padding: 10px 50px; background: #0f766e; border-color: #0f766e;" disabled>进入创造模式</button>
+        <div class="selection-actions">
+            <button id="back-to-menu-btn" type="button">返回主界面</button>
+            <button id="start-run-btn" type="button" disabled>开始游戏</button>
         </div>
     </div>
     
@@ -173,11 +153,13 @@
 
     <!-- Level Up UI -->
     <div id="level-up-screen" class="overlay" style="display: none; background: rgba(0,0,0,0.85); flex-direction: column; justify-content: center; align-items: center; z-index: 100;">
-        <p class="eyebrow">A MARK OF DEFIANCE / 深刻一笔</p>
-        <h2 class="title">力量觉醒</h2>
-        <p>选择一项强化，继续抵抗擦除。</p>
-        <div id="level-up-cards" style="display: flex; flex-wrap: nowrap; gap: 20px; max-width: 1200px; width: 90%; justify-content: center; padding: 0 20px; box-sizing: border-box;">
-            <!-- Cards injected by JS -->
+        <div class="upgrade-panel">
+            <h2 class="title sr-only">力量觉醒</h2>
+            <div id="level-up-cards"><!-- Cards injected by JS --></div>
+            <div class="upgrade-actions">
+                <button id="level-up-skip" type="button">跳过</button>
+                <button id="level-up-confirm" type="button" disabled>选择</button>
+            </div>
         </div>
     </div>
 

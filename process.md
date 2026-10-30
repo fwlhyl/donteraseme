@@ -1,13 +1,13 @@
 # Dont Erase Me — 项目进度与交接
 
-更新：2026-10-29。供在其他电脑或其他 Codex 会话中快速接续。**用户最新指令优先，项目代码是实际行为的依据**；本文与其他文档可能滞后，不应当作不可更改的设计规范。先检查 `git status` 和现有代码，保留用户的未提交修改。
+更新：2026-10-30。供在其他电脑或其他 Codex 会话中快速接续。**用户最新指令优先，项目代码是实际行为的依据**；本文与其他文档可能滞后，不应当作不可更改的设计规范。先检查 `git status` 和现有代码，保留用户的未提交修改。
 
 ## 项目与运行
 
 - 仓库根目录：`E:\xingkong\donteraseme`；游戏项目目录：`DontEraseMe/`。其他电脑上的根目录可能不同。
 - 游戏使用 TypeScript、Vite 和 Canvas；支持 Electron。进入 `DontEraseMe` 后执行 `npm install`、`npm run dev`，浏览器打开 Vite 输出的本地地址；生产构建执行 `npm run build`。
 - 仓库曾在 Windows 使用 `main` 和 GitHub 远端。不要把本文中记录的本地或远程提交状态当成实时状态，以 `git status -sb`、`git remote -v` 为准。
-- 近期更新以前的远程 `main` 为 `7e1bd03 Add Brush to Life vehicles and progress handoff`；提交和推送后的状态以 Git 实际状态为准。
+- 10 月 30 日已从远程快进拉取 `61e90b1 Improve combat clarity and guard unlock flow`，包含下方对局体验和守卫解锁优化；其后的提交和推送状态以 Git 实际状态为准。
 
 ## 用户确认的美术方向
 
@@ -18,6 +18,9 @@
 
 ## 当前功能与近期改动
 
+- **暂停按钮**：只在需要的对局中显示；主界面、人物武器选择和结算界面隐藏。已修复从暂停菜单“退出当前对局”回主界面后按钮残留的问题；覆盖退出、重新选角及再开局流程。
+- **技能选择界面**：按用户草图采用浅色纸面，上方为空的技能图圆圈、下方为技能介绍，右下角为“跳过”“选择”；点技能只选中，必须再点“选择”才生效，跳过不升级。普通升级和 Boss 觉醒都使用该交互；同帧多次升级/觉醒排队，全部处理完才恢复，换局清理旧队列和定时器。用户明确不希望左上角添加多余标题或说明，页面不显示这些文字。图片资源尚未设计。
+- **人物和武器选择界面**：按用户草图仅显示右上金币、左侧 8 个角色圆形位（两列）、右侧 12 个武器圆形位（三列）、两块介绍和右下“返回主界面”“开始游戏”按钮；图片暂时为空，未解锁项有锁。每次从主菜单进入默认选收藏家和初始武器，购买解锁后保留该次选择；解锁、金币及角色武器进度仍共用。守卫模式在点击开始后进入独立画作选择步骤，保留选画/导入/删除流程，不往选角页面加入额外内容。
 - **接地阴影**：人物、常规敌人和 Boss 按显示体型绘制不同大小阴影；飞行敌人更淡，避免旧阴影重复；载具保持自己的阴影。主要实现：`src/art/ActorShadow.ts`、`src/systems/RenderSystem.ts`。
 - **蓝色占点**：用户要求暂时停用但不要删除。`src/core/Game.ts` 注释了 `ObjectiveSystem` 的导入和注册，原逻辑仍在 `src/systems/ObjectiveSystem.ts`。此前点位未检查不规则可移动边界；如果以后恢复，还需让整个范围落在可移动区内，并让椭圆的显示与占领判定一致。
 - **画笔成真**：原用户界面名“神笔马良”已改名，内部 ID 仍为 `magic_pen`，事件等内部标识保留兼容。它是一项普通升级技能，未选择时功能和充能 HUD 隐藏。选中后从零开始，每个敌人击杀计 1，满 100 击杀可按 G 画一次；成功具现才消费充能，取消不消费。目前充能上限为一次，不累计多次使用。
@@ -36,6 +39,8 @@
 
 ## 已验证与仍需注意
 
+- 10 月 30 日界面调整后，`npm run build` 通过；隔离浏览器测试 `scripts/test-pause-settings.mjs`、`test-skill-selection.mjs`、`test-loadout-layout.mjs`、`test-guard-unlock.mjs`、`test-shared-progression.mjs` 覆盖暂停及退出、技能确认/跳过和排队、默认选择/解锁购买、守卫解锁选画及共用进度。浏览器测试需要 Vite、Playwright 和浏览器，具体路径因机器而异。
+- **尚未实现的局长构想**：用户希望 Boss 在第 3、7、12、15 分钟登场，第 15 分钟最终 Boss 登场，击败后才算通关，15 分钟本身不结束对局；用户明确要求先构想、暂不实现。当前 `WaveSystem.ts` 仍是 5、10、15、20 分钟刷 Boss，守卫目前仍有下述 20 分钟结算限制；后续只有用户要求实现时再改，且以实际代码为准。
 - 最近一次相关修改的 `npm run build` 通过。隔离浏览器测试覆盖载具瞄准限位与弹道一致、自动攻击设置下鼠标控制、碰撞伤害/击退/冷却/盾牌/Boss、轰炸机接触免疫与弹体伤害、随机载具取消重开与新局、动作与弹体逻辑。测试为 `scripts/test-magic-vehicle-aim.mjs`、`test-magic-vehicle-collision.mjs`、`test-magic-random-choice.mjs`、`test-magic-vehicle-motion.mjs`；这些脚本需要 Vite 运行与 Playwright/Edge，环境不一定已安装依赖。`scripts/test-combat-hud.mjs` 验证技能 HUD 显隐与进度。
 - 本轮构建、`test-projectile-art.mjs`、`test-combat-clarity.mjs`、`test-vortex-field.mjs` 和画画模式 12 种武器的作品回放验证通过；隔离浏览器验证了统一暂停设置、准星交互和画画保存解锁守卫。弹体在深浅背景下检查过，但密集动态战场尚未全面实机验收。`test-enemy-art-integration.mjs` 仍假设守卫模式默认解锁，需适配新流程；`test-doodle-motion.mjs` 引用了当前不存在的 `PAPER_COLLECTOR_PARTS` 导出，现有版本下未通过。
 - 守卫画作存储待优化：`ArtworkStore.saveDrawingArtwork` 目前绕过自定义画作的 12 幅上限，连续保存不同画作可能持续占用存储空间；`DefenseArtwork` 的解码图片缓存也没有淘汰上限，可能随画作数量增长而占用内存。后续处理时需兼顾已保存画作、默认作品及解锁状态，避免破坏用户数据或改变现有解锁行为。

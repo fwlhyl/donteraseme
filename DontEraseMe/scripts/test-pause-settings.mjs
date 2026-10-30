@@ -9,8 +9,15 @@ page.on('pageerror', error => errors.push(error.message));
 try {
     await page.goto(process.env.GAME_TEST_URL || 'http://127.0.0.1:5173');
     await page.waitForFunction(() => !!window.gameInstance);
+    assert.equal(await page.locator('#pause-btn').isVisible(), false, 'pause button hidden on main menu');
+    await page.locator('#create-mode-btn').click();
+    assert.equal(await page.locator('#selection-screen').isVisible(), true);
+    assert.equal(await page.locator('#pause-btn').isVisible(), false, 'pause button hidden on selection screen');
+    await page.locator('#back-to-menu-btn').click();
+    assert.equal(await page.locator('#pause-btn').isVisible(), false, 'pause button hidden after returning to main menu');
     await page.evaluate(() => window.gameInstance.startGame('endless'));
     await page.waitForFunction(() => window.gameInstance.isRunning);
+    assert.equal(await page.locator('#pause-btn').isVisible(), true, 'pause button visible in combat');
     const overlay = page.locator('.sketch-esc-overlay');
     await page.keyboard.press('Escape');
     await overlay.waitFor({ state: 'visible' });
@@ -56,6 +63,20 @@ try {
     assert(!/评级|RATING/i.test(details.scoreText));
     await overlay.locator('button').filter({ hasText: '继续 / Esc' }).click();
     assert.equal(await page.evaluate(() => window.gameInstance.isRunning), true);
+    await page.keyboard.press('Escape');
+    await overlay.waitFor({ state: 'visible' });
+    await overlay.locator('button').filter({ hasText: '退出当前对局' }).click();
+    assert.equal(await page.locator('#main-menu').isVisible(), true, 'exit returns to main menu');
+    assert.equal(await page.locator('#pause-btn').isVisible(), false, 'exit hides pause button without refresh');
+    await page.locator('#create-mode-btn').click();
+    assert.equal(await page.locator('#pause-btn').isVisible(), false, 'pause stays hidden on selection after exit');
+    await page.evaluate(() => window.gameInstance.startGame('endless'));
+    await page.waitForFunction(() => window.gameInstance.isRunning);
+    assert.equal(await page.locator('#pause-btn').isVisible(), true, 'pause button returns in a new combat run');
+    await page.evaluate(() => window.gameInstance.gameOver(0, false));
+    assert.equal(await page.locator('#pause-btn').isVisible(), false, 'pause button hidden after combat');
+    await page.evaluate(() => window.gameInstance.showSelectionScreen('endless'));
+    assert.equal(await page.locator('#pause-btn').isVisible(), false, 'pause button stays hidden when selecting again');
     assert.deepEqual(errors, []);
     console.log('Pause settings passed: Escape and button share controls, pause/resume, settings, faint display/full export, no rating or blocked rating quest.');
 } finally { await browser.close(); }

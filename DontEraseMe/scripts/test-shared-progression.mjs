@@ -16,11 +16,16 @@ try {
     await page.waitForFunction(() => Boolean(window.gameInstance));
     const ids = await page.evaluate(async () => {
         const { PlayerProfile } = await import('/src/core/PlayerProfile.ts');
+        const { ArtworkStore } = await import('/src/core/ArtworkStore.ts');
         const { CHARACTERS } = await import('/src/config/EndlessConfig.ts');
         const { WEAPONS } = await import('/src/components/Weapon.ts');
         PlayerProfile.save({ ...PlayerProfile.load(), coins: 5000 });
+        await ArtworkStore.saveDrawingArtwork({version:1,id:'progression-test',name:'测试画作',width:100,height:100,createdAt:1,strokes:[{color:'#222222',width:2,points:[{x:10,y:10},{x:90,y:90}]}]});
+        await window.gameInstance.artworkPicker.loadLibrary();
+        window.dispatchEvent(new Event('guard-unlock-changed'));
         return { characters: CHARACTERS.map(character => character.id), weapons: WEAPONS.map(weapon => weapon.id) };
     });
+    await page.waitForFunction(() => document.querySelector('#defense-mode-btn').getAttribute('aria-disabled') === 'false');
     const profile = () => page.evaluate(storageKey => JSON.parse(localStorage.getItem(storageKey)), key);
     const changeMode = async mode => {
         await page.locator('#back-to-menu-btn').click();
@@ -67,7 +72,11 @@ try {
     // amount is injected to keep this check short and deterministic.
     const settle = async (mode, coins, expected) => {
         await page.locator('#start-run-btn').click();
-        if (mode === 'defense') await page.locator('#skip-defense-intro').click();
+        if (mode === 'defense') {
+            await page.waitForFunction(() => !!window.gameInstance.artworkPicker.selected);
+            await page.locator('#defense-art-start').click();
+            await page.locator('#skip-defense-intro').click();
+        }
         await page.waitForFunction(() => window.gameInstance.state === 1);
         await page.evaluate(async amount => {
             const { Score } = await import('/src/components/Score.ts');

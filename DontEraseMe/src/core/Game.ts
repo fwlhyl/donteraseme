@@ -138,6 +138,9 @@ export class Game {
     private readonly artworkPicker: DefenseArtworkPicker;
     private guardUnlocked = false;
     private runGeneration = 0;
+    private skillChoiceQueue: Array<{ kind: 'level'; entityId: string } | { kind: 'boss'; phase: number }> = [];
+    private skillChoiceOpen = false;
+    private skillChoiceEpoch = 0;
     private frameUrls = new Map<number, string>();
     private frameLoadGeneration = 0;
     private savingFrame = false;
@@ -171,10 +174,25 @@ export class Game {
         this.levelUpScreen = document.getElementById('level-up-screen')!;
         this.defenseHud = document.getElementById('defense-hud')!;
         mountDefenseHud(this.defenseHud);
-        const artworkHost = document.createElement('section');
-        artworkHost.id = 'defense-artwork-section';
-        this.selectionScreen.insertBefore(artworkHost, this.selectionScreen.querySelector('.selection-container'));
+        const artworkOverlay = document.createElement('div');
+        artworkOverlay.id = 'defense-artwork-overlay';
+        artworkOverlay.className = 'overlay';
+        artworkOverlay.style.display = 'none';
+        artworkOverlay.innerHTML = '<section id="defense-artwork-section"></section><div class="selection-actions"><button id="defense-art-back" class="btn" type="button">返回</button><button id="defense-art-start" class="btn btn-primary" type="button">开始守卫</button></div>';
+        document.body.appendChild(artworkOverlay);
+        const artworkHost = artworkOverlay.querySelector<HTMLElement>('#defense-artwork-section')!;
         this.artworkPicker = new DefenseArtworkPicker(artworkHost);
+        artworkOverlay.querySelector<HTMLButtonElement>('#defense-art-back')!.onclick = () => {
+            artworkOverlay.style.display = 'none';
+            this.artworkPicker.show(false);
+            this.selectionScreen.style.display = 'flex';
+        };
+        artworkOverlay.querySelector<HTMLButtonElement>('#defense-art-start')!.onclick = () => {
+            if (!this.artworkPicker.selected) return;
+            artworkOverlay.style.display = 'none';
+            this.artworkPicker.show(false);
+            this.startGame('defense');
+        };
 
         if (!this.gameCanvas || !this.trailCanvas || !this.paintingCanvas || !this.minimapCanvas) {
             throw new Error('Canvas elements not found');
@@ -239,11 +257,18 @@ export class Game {
         document.getElementById('gallery-save-confirm')?.addEventListener('click', () => { void this.saveToGallery(); });
 
         const startRunBtn = document.getElementById('start-run-btn');
-        if (startRunBtn) startRunBtn.addEventListener('click', () => this.startGame(this.pendingMode));
+        if (startRunBtn) startRunBtn.addEventListener('click', () => {
+            if (this.pendingMode === 'defense') {
+                this.selectionScreen.style.display = 'none';
+                this.artworkPicker.show(true);
+                document.getElementById('defense-artwork-overlay')!.style.display = 'flex';
+            } else this.startGame(this.pendingMode);
+        });
 
         const backToMenuBtn = document.getElementById('back-to-menu-btn');
         if (backToMenuBtn) backToMenuBtn.addEventListener('click', () => {
             this.state = GameState.MENU;
+            document.getElementById('pause-btn')!.hidden = true;
             this.selectionScreen.style.display = 'none';
             this.mainMenu.style.display = 'flex';
             this.paintingCanvas.style.display = 'none';
@@ -338,6 +363,7 @@ export class Game {
                 this.artReplay.close(false);
                 this.artRecording.clear();
                 this.state = GameState.MENU;
+                document.getElementById('pause-btn')!.hidden = true;
                 if (this.mainMenu) this.mainMenu.style.display = 'flex';
                 if (this.gameOverMenu) this.gameOverMenu.style.display = 'none';
                 if (this.gameUI) this.gameUI.style.display = 'none';
@@ -460,11 +486,13 @@ export class Game {
         window.addEventListener('exit-run', () => {
             if (this.state !== GameState.PLAYING && this.state !== GameState.STUDIO) return;
             if (this.currentMode === 'drawing') { this.finishDrawing(); return; }
+            this.clearSkillChoices();
             this.settleCurrentRunCoins();
             this.stop();
             this.artReplay.close(false);
             this.artRecording.clear();
             this.state = GameState.MENU;
+            document.getElementById('pause-btn')!.hidden = true;
             if (this.mainMenu) this.mainMenu.style.display = 'flex';
             if (this.gameUI) this.gameUI.style.display = 'none';
             if (this.minimapCanvas) this.minimapCanvas.style.display = 'none';
@@ -692,16 +720,94 @@ export class Game {
         }
     }
 
+    /** Selection is provisional until the player confirms; both upgrade screens
+     * use the same explicit skip/confirm controls. */
+    private prepareSkillChoice(onClose: () => void): { select: (card: HTMLButtonElement, apply: () => void) => void; close: () => void } {
+        const confirm = document.getElementById('level-up-confirm') as HTMLButtonElement;
+        const skip = document.getElementById('level-up-skip') as HTMLButtonElement;
+        confirm.textContent = getLang() === 'zh' ? '选择' : 'Confirm';
+        skip.textContent = getLang() === 'zh' ? '跳过' : 'Skip';
+        let selected: (() => void) | null = null;
+        let closed = false;
+        const epoch = this.skillChoiceEpoch;
+        confirm.disabled = true;
+        const close = () => {
+            if (closed || epoch !== this.skillChoiceEpoch) return;
+            closed = true;
+            confirm.disabled = true;
+            confirm.onclick = null;
+            skip.onclick = null;
+            onClose();
+        };
+        confirm.onclick = () => {
+            if (closed || epoch !== this.skillChoiceEpoch || !selected) return;
+            const apply = selected;
+            selected = null;
+            apply();
+            close();
+        };
+        skip.onclick = close;
+        return {
+            close,
+            select: (card, apply) => {
+                if (closed || epoch !== this.skillChoiceEpoch) return;
+                this.levelUpScreen.querySelectorAll<HTMLButtonElement>('.upgrade-card').forEach(item => {
+                    const active = item === card;
+                    item.classList.toggle('is-selected', active);
+                    item.setAttribute('aria-pressed', String(active));
+                });
+                selected = apply;
+                confirm.disabled = false;
+            }
+        };
+    }
+
+    private clearSkillChoices(): void {
+        this.skillChoiceEpoch++;
+        this.skillChoiceQueue = [];
+        this.skillChoiceOpen = false;
+        this.levelUpScreen.style.display = 'none';
+        const title = this.levelUpScreen.querySelector<HTMLElement>('.title');
+        if (title) title.textContent = getLang() === 'zh' ? '力量觉醒' : 'Power Awakening';
+    }
+
+    private enqueueSkillChoice(request: { kind: 'level'; entityId: string } | { kind: 'boss'; phase: number }): void {
+        this.skillChoiceQueue.push(request);
+        if (!this.skillChoiceOpen) this.showNextSkillChoice();
+    }
+
+    private showNextSkillChoice(): void {
+        const request = this.skillChoiceQueue.shift();
+        if (!request) {
+            this.skillChoiceOpen = false;
+            window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));
+            return;
+        }
+        this.skillChoiceOpen = true;
+        if (request.kind === 'level') this.showLevelUpChoice(request.entityId);
+        else this.showBossAwakeningChoice(request.phase);
+    }
+
     public showLevelUpScreen(entityId: string): void {
         if (this.currentMode === 'drawing') return;
+        this.enqueueSkillChoice({ kind: 'level', entityId });
+    }
+
+    private showLevelUpChoice(entityId: string): void {
         const player = this.entities.get(entityId);
-        if (!player) return;
+        if (!player) { this.showNextSkillChoice(); return; }
         const stats = player.getComponent(PlayerStats);
-        if (!stats) return;
+        if (!stats) { this.showNextSkillChoice(); return; }
+        const title = this.levelUpScreen.querySelector<HTMLElement>('.title');
+        if (title) title.textContent = getLang() === 'zh' ? '力量觉醒' : 'Power Awakening';
 
         // Pause the game
         window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: true } }));
         this.levelUpScreen.style.display = 'flex';
+        const choice = this.prepareSkillChoice(() => {
+            this.levelUpScreen.style.display = 'none';
+            this.showNextSkillChoice();
+        });
 
         // Select 4 random skills that can be upgraded or learned
         const availableSkills = SKILLS.filter(skill => {
@@ -740,10 +846,7 @@ export class Game {
                 el.innerText = getLang() === 'zh' ? '所有技能已升至满级！' : 'All skills are fully upgraded!';
                 container.appendChild(el);
                 
-                setTimeout(() => {
-                    this.levelUpScreen.style.display = 'none';
-                    window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));
-                }, 1500);
+                setTimeout(choice.close, 1500);
                 return;
             }
 
@@ -755,16 +858,19 @@ export class Game {
                 const card = document.createElement('button');
                 card.type = 'button';
                 card.className = 'card upgrade-card';
+                card.setAttribute('aria-pressed', 'false');
 
                 card.innerHTML = `
-                    <span class="upgrade-seal" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
+                    <span class="upgrade-portrait" aria-hidden="true"></span>
+                    <span class="upgrade-card-info">
                     <span class="upgrade-category">${t(skill.category)}</span>
                     <span class="upgrade-title">${t(skill.name)}</span>
                     <span class="upgrade-tier">${currentLevel === 0 ? t('新技能') : `${t('升级至 Lv.')}${nextLevel}`}</span>
                     <span class="upgrade-description">${t(levelConfig.description)}</span>
+                    </span>
                 `;
 
-                card.onclick = () => {
+                card.onclick = () => choice.select(card, () => {
                     // Get old values
                     const oldLevelConfig = currentLevel > 0 ? skill.levels.find(l => l.level === currentLevel) : null;
 
@@ -825,10 +931,7 @@ export class Game {
                         }
                     }
 
-                    // Hide UI and resume
-                    this.levelUpScreen.style.display = 'none';
-                    window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));
-                };
+                });
 
                 container.appendChild(card);
             });
@@ -836,11 +939,15 @@ export class Game {
     }
 
     public showBossAwakeningScreen(bossPhase: number = 1): void {
+        this.enqueueSkillChoice({ kind: 'boss', phase: bossPhase });
+    }
+
+    private showBossAwakeningChoice(bossPhase: number): void {
         const player = Array.from(this.entities.values()).find(e => e.hasComponent(PlayerStats));
-        if (!player) return;
+        if (!player) { this.showNextSkillChoice(); return; }
         const stats = player.getComponent(PlayerStats);
         const weaponComp = player.getComponent(Weapon);
-        if (!stats || !weaponComp) return;
+        if (!stats || !weaponComp) { this.showNextSkillChoice(); return; }
 
         // Pause the game
         window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: true } }));
@@ -848,7 +955,7 @@ export class Game {
         // Ensure UI elements exist (we can reuse the level-up screen or create a specialized one)
         this.levelUpScreen.style.display = 'flex';
         const container = document.getElementById('level-up-cards');
-        if (!container) return;
+        if (!container) { this.showNextSkillChoice(); return; }
         container.innerHTML = '';
 
         // Add a specialized title if possible, or just reuse the container
@@ -900,8 +1007,9 @@ export class Game {
         const closeScreen = () => {
             this.levelUpScreen.style.display = 'none';
             if (titleEl) titleEl.innerText = oldTitle; // Restore old title
-            window.dispatchEvent(new CustomEvent('game-pause', { detail: { paused: false } }));
+            this.showNextSkillChoice();
         };
+        const choice = this.prepareSkillChoice(closeScreen);
 
         if (selectedSkills.length === 0) {
             // No awakenings available, give massive gold and health
@@ -916,7 +1024,7 @@ export class Game {
             const hp = player.getComponent(Health);
             if (hp) hp.current = hp.max;
 
-            setTimeout(closeScreen, 2000);
+            setTimeout(choice.close, 2000);
             return;
         }
 
@@ -928,19 +1036,21 @@ export class Game {
             const card = document.createElement('button');
             card.type = 'button';
             card.className = 'card upgrade-card awakening-card';
+            card.setAttribute('aria-pressed', 'false');
 
             card.innerHTML = `
-                <span class="upgrade-seal" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
+                <span class="upgrade-portrait" aria-hidden="true"></span>
+                <span class="upgrade-card-info">
                 <span class="upgrade-category">${t(skill.category)}</span>
                 <span class="upgrade-title">${t(skill.name)}</span>
                 <span class="upgrade-tier">${currentLevel === 0 ? t('觉醒降临') : `${t('觉醒提升 Lv.')}${nextLevel}`}</span>
                 <span class="upgrade-description">${t(levelConfig.description)}</span>
+                </span>
             `;
 
-            card.onclick = () => {
+            card.onclick = () => choice.select(card, () => {
                 stats.acquiredSkills[skill.id] = nextLevel;
-                closeScreen();
-            };
+            });
 
             container.appendChild(card);
         });
@@ -948,14 +1058,20 @@ export class Game {
 
     public showSelectionScreen(mode?: SelectablePlayMode): void {
         if (this.state === GameState.GALLERY) return;
+        document.getElementById('pause-btn')!.hidden = true;
         this.setCombatFieldNotesVisible(false);
-        if (mode) this.pendingMode = mode;
+        if (mode) {
+            this.pendingMode = mode;
+            this.selectedCharacterId = 'collector';
+            this.selectedWeaponId = 0;
+        }
         this.state = GameState.SELECTION;
         this.mainMenu.style.display = 'none';
         this.selectionScreen.style.display = 'flex';
 
         const isDefense = this.pendingMode === 'defense';
-        this.artworkPicker.show(isDefense);
+        this.artworkPicker.show(false);
+        document.getElementById('defense-artwork-overlay')!.style.display = 'none';
         const modeLabel = document.getElementById('selection-mode-label');
         const modeDescription = document.getElementById('selection-mode-description');
         if (modeLabel) modeLabel.textContent = isDefense ? '守卫模式 · 出击准备' : '创造模式 · 出击准备';
@@ -982,13 +1098,10 @@ export class Game {
                 const unlocked = profile.unlockedCharacterIds.includes(char.id);
                 const el = document.createElement('button');
                 el.type = 'button';
-                el.className = `card char-card ${this.selectedCharacterId === char.id ? 'active' : ''} ${unlocked ? '' : 'locked'}`;
+                el.className = `selection-orb char-card ${this.selectedCharacterId === char.id ? 'active' : ''} ${unlocked ? '' : 'locked'}`;
                 el.setAttribute('aria-pressed', String(this.selectedCharacterId === char.id));
-                el.innerHTML = `
-                    <p class="card-title">${t(char.name)}</p>
-                    <p class="card-desc">${t(char.description)}</p>
-                    <p class="unlock-status ${unlocked ? 'is-unlocked' : 'is-locked'}">${unlocked ? this.profileText('unlocked') : this.profileText('locked', char.unlockPrice)}</p>
-                `;
+                el.setAttribute('aria-label', `${t(char.name)} · ${unlocked ? this.profileText('unlocked') : this.profileText('locked', char.unlockPrice)}`);
+                el.innerHTML = unlocked ? '' : '<svg class="selection-lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v10H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
                 el.onclick = () => {
                     this.selectedCharacterId = char.id;
                     if (unlocked) PlayerProfile.selectCharacter(char.id);
@@ -1007,13 +1120,10 @@ export class Game {
                 const price = getWeaponUnlockPrice(weap.id);
                 const el = document.createElement('button');
                 el.type = 'button';
-                el.className = `card weap-card ${this.selectedWeaponId === weap.id ? 'active' : ''} ${unlocked ? '' : 'locked'}`;
+                el.className = `selection-orb weap-card ${this.selectedWeaponId === weap.id ? 'active' : ''} ${unlocked ? '' : 'locked'}`;
                 el.setAttribute('aria-pressed', String(this.selectedWeaponId === weap.id));
-                el.innerHTML = `
-                    <p class="card-title">${t(weap.name)}</p>
-                    <p class="card-desc">${getLang() === 'zh' ? '射速' : 'Rate'}: ${Math.round(1000 / weap.fireRate)} | ${getLang() === 'zh' ? '伤害' : 'Dmg'}: ${weap.damage}</p>
-                    <p class="unlock-status ${unlocked ? 'is-unlocked' : 'is-locked'}">${unlocked ? this.profileText('unlocked') : this.profileText('locked', price)}</p>
-                `;
+                el.setAttribute('aria-label', `${t(weap.name)} · ${unlocked ? this.profileText('unlocked') : this.profileText('locked', price)}`);
+                el.innerHTML = unlocked ? '' : '<svg class="selection-lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v10H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
                 el.onclick = () => {
                     this.selectedWeaponId = weap.id;
                     this.updateSelectionUI();
@@ -1062,7 +1172,7 @@ export class Game {
                 <p class="detail-description">${t(selectedChar.description)}</p>
                 <p class="detail-stat">${hpLbl}: ${selectedChar.baseHp} | ${spdLbl}: ${selectedChar.baseSpeed}</p>
                 <p class="detail-skill">${skillLbl}: [${t(selectedChar.uniqueSkillName)}] ${t(selectedChar.uniqueSkillDesc)}</p>
-                ${unlocked ? `<p class="unlock-status is-unlocked">${this.profileText('unlocked')}</p>` : `<button id="unlock-character-btn" class="btn unlock-action" ${profile.coins < selectedChar.unlockPrice ? 'disabled' : ''}>${this.profileText('unlock', selectedChar.unlockPrice)}</button>`}
+                ${unlocked ? '' : `<button id="unlock-character-btn" class="btn unlock-action" ${profile.coins < selectedChar.unlockPrice ? 'disabled' : ''}>${this.profileText('unlock', selectedChar.unlockPrice)}</button>`}
             `;
 
             const unlockBtn = document.getElementById('unlock-character-btn') as HTMLButtonElement | null;
@@ -1088,7 +1198,7 @@ export class Game {
                 <p class="detail-description">${typeStr}</p>
                 <p class="detail-stat">${dmgLbl}: ${selectedWeap.damage} | ${rateLbl}: ${Math.round(1000 / selectedWeap.fireRate)}</p>
                 <p class="detail-stat">${magLbl}: ${selectedWeap.magSize} | ${rldLbl}: ${(selectedWeap.reloadTime / 60).toFixed(1)}${secLbl}</p>
-                ${unlocked ? `<p class="unlock-status is-unlocked">${this.profileText('unlocked')}</p>` : `<button id="unlock-weapon-btn" class="btn unlock-action" ${profile.coins < price ? 'disabled' : ''}>${this.profileText('unlock', price)}</button>`}
+                ${unlocked ? '' : `<button id="unlock-weapon-btn" class="btn unlock-action" ${profile.coins < price ? 'disabled' : ''}>${this.profileText('unlock', price)}</button>`}
             `;
 
             const unlockBtn = document.getElementById('unlock-weapon-btn') as HTMLButtonElement | null;
@@ -1102,7 +1212,7 @@ export class Game {
             const selectedWeaponUnlocked = !!selectedWeap && profile.unlockedWeaponIds.includes(selectedWeap.id);
             startBtn.disabled = !selectedUnlocked || !selectedWeaponUnlocked;
             const isDefense = this.pendingMode === 'defense';
-            startBtn.textContent = isDefense ? '进入守卫模式' : '进入创造模式';
+            startBtn.textContent = getLang() === 'zh' ? '开始游戏' : 'Start Game';
             startBtn.dataset.mode = isDefense ? 'defense' : 'endless';
         }
     }
@@ -1111,7 +1221,7 @@ export class Game {
         const el = document.getElementById('profile-coins');
         if (!el) return;
         el.textContent = getLang() === 'zh'
-            ? `局外金币：${profile.coins}`
+            ? `金币：${profile.coins}`
             : `Wallet: ${profile.coins} Coins`;
     }
 
@@ -1248,7 +1358,7 @@ export class Game {
         
         // Show Pause Button
         const pauseBtn = document.getElementById('pause-btn');
-        if (pauseBtn) pauseBtn.style.display = this.currentMode === 'drawing' ? 'none' : 'block';
+        if (pauseBtn) pauseBtn.hidden = this.currentMode === 'drawing';
         this.clearInput();
 
         if (!this.isRunning) {
@@ -1258,6 +1368,7 @@ export class Game {
     
     public gameOver(score: number = 0, victory: boolean = false): void {
         if (this.state !== GameState.PLAYING && this.state !== GameState.STUDIO) return;
+        this.clearSkillChoices();
         this.state = GameState.GAMEOVER;
         this.stop();
         this.clearInput();
@@ -1310,7 +1421,7 @@ export class Game {
         
         // Hide Pause Button
         const pauseBtn = document.getElementById('pause-btn');
-        if (pauseBtn) pauseBtn.style.display = 'none';
+        if (pauseBtn) pauseBtn.hidden = true;
         
         // 游戏结束结算，将地面画作透明度还原为1.0
         if (this.trailCanvas) this.trailCanvas.style.opacity = '1.0';
@@ -1504,6 +1615,7 @@ export class Game {
 
     private reset(): void {
         this.runGeneration++;
+        this.clearSkillChoices();
         this.defenseIntro.close();
         this.stop();
         this.artReplay.close(false);

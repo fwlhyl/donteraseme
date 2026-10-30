@@ -79,17 +79,29 @@ kbd { font: 10px/1.2 var(--ui); color: var(--text); padding: 3px 5px; border: 1p
 #main-menu .menu-settings:focus-visible { outline:2px solid #282824; outline-offset:2px; }
 
 /* Preparation / loadout. Selected, locked and focus states are not color-only. */
-#selection-screen { justify-content: flex-start; padding: 36px clamp(24px, 5vw, 80px) 20px !important; }
-#selection-screen > * { flex-shrink:0; }
-#selection-screen > .eyebrow { margin-bottom: 8px; }
-#selection-screen .title { font-size: clamp(28px, 3vw, 38px) !important; }
-#selection-mode-description { font-size: 13px; margin-bottom: 10px !important; }
-#profile-coins { color: var(--text) !important; font: 600 14px/1.5 var(--ui) !important; padding: 5px 15px; margin: 0 0 10px !important; border-bottom: 2px solid var(--accent); }
-#shared-progression-hint { color: var(--muted) !important; font-size: 11px !important; margin: 0 0 18px !important; }
-.selection-container { gap: 26px !important; max-width: 1200px; width: 100%; margin-bottom: 24px !important; }
-.selection-container > div { min-width: 0; }
-#selection-screen h3 { color: var(--text) !important; border-bottom: 1px solid var(--line) !important; font: 400 18px/1.5 var(--display); letter-spacing: .09em; margin: 0 0 14px; }
-#character-list, #weapon-list { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important; gap: 8px !important; padding: 4px 7px 8px 2px !important; max-height: 310px !important; }
+#selection-screen { justify-content: flex-start; align-items: stretch; gap: 0; padding: clamp(18px, 3vh, 30px) clamp(22px, 5vw, 70px) !important; color: #292a25; background: #f4f2e9 !important; }
+#selection-screen::before, #selection-screen::after { content: none; }
+#profile-coins { width: min(1100px, 100%); margin: 0 auto 10px; text-align: right; color: #292a25; font: 600 16px/1.5 var(--ui); }
+.selection-container { display: grid; grid-template-columns: 1fr 1fr; gap: 0; width: min(1100px, 100%); margin: 0 auto; }
+.selection-column { min-width: 0; display: flex; flex-direction: column; padding: 0 clamp(14px, 3vw, 40px); }
+.selection-characters { border-right: 1px solid #292a25; }
+#character-list, #weapon-list { display: grid; grid-template-rows: repeat(4, minmax(52px, 1fr)); gap: clamp(8px, 1.4vh, 14px) 12px; justify-items: center; align-items: center; margin-bottom: 18px; }
+#character-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#weapon-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#selection-screen .selection-orb { display: grid; place-items: center; width: clamp(52px, 7vh, 68px); height: clamp(52px, 7vh, 68px); padding: 0; border: 2px solid #75756b; border-radius: 50%; background: #faf9f3; color: #66675e; cursor: pointer; }
+#selection-screen .selection-orb:hover { border-color: #292a25; background: #efede4; }
+#selection-screen .selection-orb.active { border: 3px solid #b74736; box-shadow: 0 0 0 2px #f4f2e9, 0 0 0 3px #b74736; }
+#selection-screen .selection-orb:focus-visible { outline: 2px solid #b74736; outline-offset: 4px; }
+#selection-screen .selection-orb svg { width: 24px; height: 24px; }
+.selection-detail { flex: 1; min-height: 154px; border: 1px solid #838379; background: #faf9f3; color: #292a25; padding: 14px 18px; overflow-wrap: anywhere; }
+#selection-screen .detail-title, #selection-screen .selection-detail h4 { color: #292a25 !important; font: 600 18px/1.4 var(--display); margin: 0 0 8px; }
+#selection-screen .detail-description, #selection-screen .selection-detail p, #selection-screen .detail-stat, #selection-screen .detail-skill { color: #51534a !important; font: 13px/1.55 var(--ui) !important; margin: 5px 0; }
+#selection-screen .unlock-action { margin-top: 8px; padding: 7px 12px; border: 1px solid #393a34 !important; background: #292a25 !important; color: #f4f2e9 !important; }
+.selection-actions { display: flex; justify-content: flex-end; gap: 12px; width: min(1100px, 100%); margin: 18px auto 0; padding: 0 clamp(14px, 3vw, 40px); }
+.selection-actions button { min-width: 120px; padding: 10px 18px; border: 1px solid #393a34; background: transparent; color: #292a25; font-weight: 600; cursor: pointer; }
+.selection-actions #start-run-btn { background: #292a25 !important; color: #f4f2e9 !important; box-shadow: none !important; }
+.selection-actions button:hover:not(:disabled) { filter: brightness(.92); }
+.selection-actions button:focus-visible { outline: 2px solid #b74736; outline-offset: 3px; }
 .card { position: relative; padding: 16px !important; border: 1px solid var(--line) !important; border-radius: 0 !important; background: var(--etch), #292a24 !important; color: var(--text); box-shadow: none !important; cursor: pointer; transition: border-color .12s, background-color .12s; }
 .card:hover { border-color: var(--text) !important; background-color: #34352d !important; }
 .card.active { border-color: var(--text) !important; background-color: #34332b !important; box-shadow:inset 0 -3px var(--accent) !important; }
@@ -101,15 +113,6 @@ kbd { font: 10px/1.2 var(--ui); color: var(--text); padding: 3px 5px; border: 1p
 .unlock-status { margin-top: 9px; font-size: 10px; color: var(--muted); }
 .unlock-status.is-unlocked { color: var(--text); }
 .unlock-status.is-locked { color: var(--muted); }
-#selection-details { border: 1px solid var(--line) !important; border-radius: 0 !important; background: var(--etch), #20231f !important; padding: 17px 20px !important; min-height: 0 !important; }
-#char-detail { border-right-color: var(--line) !important; }
-.detail-title, #char-detail h4, #weap-detail h4 { color: var(--text) !important; font: 400 20px var(--display); margin: 0 0 8px; }
-.detail-description, #char-detail p, #weap-detail p { color: var(--muted) !important; font-size: 12px !important; line-height: 1.65; margin: 5px 0; }
-.detail-stat { color: var(--text); font-size: 12px; margin-top: 7px; }
-.detail-skill { color: #b6ae95; font-size: 12px; margin-top: 8px; }
-.unlock-action { margin-top: 10px; font-size: 12px; padding: 7px 12px; }
-.selection-actions { margin: 0 0 18px !important; }
-.selection-actions .btn { font-size: 14px !important; padding: 10px 24px !important; }
 
 /* In-run essentials; dedicated modules own the compact HUD internals. */
 #ui { position: absolute; z-index: 110; display: flex; flex-direction: column; pointer-events: none; }
@@ -145,19 +148,32 @@ kbd { font: 10px/1.2 var(--ui); color: var(--text); padding: 3px 5px; border: 1p
 .sketch-dialog .btn { font-size: 13px; }
 .sketch-dialog button + button { margin-top: 8px; }
 
-/* Upgrades: etched tablets, rank conveyed by text and marks, never rainbow. */
-#level-up-screen > .eyebrow { margin-bottom: 12px; }
-#level-up-screen > p:not(.eyebrow) { margin: 0 0 30px; font-size: 13px; }
-#level-up-cards { gap: 16px !important; width: min(1100px, 94vw) !important; padding: 5px !important; }
-#level-up-cards .card { display:flex; flex-direction:column; flex:1 1 0; min-width:0; max-width:330px; min-height: 260px; padding: 24px 22px !important; text-align: left; align-items: flex-start; justify-content: flex-start; background:var(--etch), #2b2c26 !important; border-top:2px solid var(--text) !important; }
-.upgrade-category { color: var(--muted); font: 10px/1.5 var(--ui); letter-spacing: .12em; border-bottom: 1px solid var(--line); padding-bottom: 13px; width: 100%; }
-.upgrade-title { font: 600 25px/1.4 var(--display); color: var(--text); margin-top: 22px; }
-.upgrade-seal { font:600 12px/1 var(--ui); color:var(--text); margin-bottom:16px; padding:5px 6px; border:1px solid var(--line); }
-.upgrade-tier { font: 600 11px/1.5 var(--ui); color: var(--text); border-bottom:2px solid var(--accent); padding-bottom:4px; margin-top: 10px; letter-spacing: .12em; }
-.upgrade-description { font: 13px/1.8 var(--ui); color: #b5ae9b; margin-top: 20px; }
-.awakening-card { border-top: 3px double var(--accent) !important; }
-.awakening-card .upgrade-title { color: var(--text); }
-.upgrade-empty { color: var(--muted); font-size: 14px; }
+/* Skill selection: a paper sheet with empty portrait circles and ink frames. */
+#level-up-screen { background: #20211de8 !important; padding: 22px !important; }
+#level-up-screen::before, #level-up-screen::after { content: none; }
+.upgrade-panel { width: min(1120px, 100%); max-height: calc(100dvh - 44px); overflow: auto; padding: clamp(20px, 3vw, 38px); border: 2px solid #292a25; background: #f4f2e9; color: #292a25; box-shadow: 6px 7px 0 #12130f42; }
+#level-up-screen .upgrade-panel .title { margin: 0 0 3px; color: #292a25 !important; font-size: clamp(24px, 2.5vw, 34px); -webkit-text-fill-color: #292a25 !important; }
+#level-up-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: stretch; padding: 4px; }
+#level-up-cards .upgrade-card { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 6px 0 0 !important; border: 1px solid transparent !important; background: transparent !important; color: #292a25; box-shadow: none !important; cursor: pointer; text-align: left; }
+#level-up-cards .upgrade-card:hover { background: transparent !important; }
+#level-up-cards .upgrade-card:focus-visible { outline: 2px solid #b74736; outline-offset: 4px; }
+.upgrade-portrait { display: block; flex: none; width: clamp(58px, 7vw, 82px); height: clamp(58px, 7vw, 82px); margin: 0 auto 16px; border: 2px solid #696a60; border-radius: 50%; background: #f8f7f0; }
+.upgrade-card-info { display: flex; flex-direction: column; align-items: flex-start; width: 100%; min-height: 190px; flex: 1; padding: 15px; border: 1px solid #838379; background: #faf9f3; }
+#level-up-cards .upgrade-card:hover .upgrade-card-info { border-color: #292a25; background: #f0eee4; }
+#level-up-cards .upgrade-card.is-selected .upgrade-card-info { border: 2px solid #292a25; padding: 14px; box-shadow: inset 0 -3px #b74736; background: #f0eee4; }
+#level-up-cards .upgrade-card.is-selected .upgrade-portrait { border-color: #b74736; box-shadow: 0 0 0 2px #f4f2e9, 0 0 0 3px #b74736; }
+.upgrade-category { color: #77766b; font: 10px/1.4 var(--ui); letter-spacing: .06em; }
+.upgrade-title, .awakening-card .upgrade-title { color: #292a25; font: 600 17px/1.35 var(--display); margin-top: 8px; }
+.upgrade-tier { color: #a14737; font: 600 11px/1.4 var(--ui); margin-top: 8px; }
+.upgrade-description { color: #51534a; font: 13px/1.55 var(--ui); margin-top: 10px; overflow-wrap: anywhere; }
+.upgrade-empty { color: #66675e; font-size: 14px; grid-column: 1 / -1; padding: 30px 0; }
+.upgrade-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.upgrade-actions button { min-width: 94px; padding: 9px 20px; border: 1px solid #393a34; background: transparent; color: #292a25; cursor: pointer; font-weight: 600; }
+.upgrade-actions button:hover:not(:disabled) { background: #e2dfd5; }
+.upgrade-actions #level-up-confirm { background: #292a25; color: #f4f2e9; }
+.upgrade-actions #level-up-confirm:hover:not(:disabled) { background: #45463d; }
+.upgrade-actions button:focus-visible { outline: 2px solid #b74736; outline-offset: 3px; }
+.upgrade-actions button:disabled { opacity: .38; }
 
 /* Magic pen board — the functional drawing surface is intentionally distinct. */
 .sketch-board-overlay { position:fixed; inset:0; z-index:16000; display:flex; justify-content:center; align-items:center; padding:24px; overflow:auto; background:#20211df0 !important; }
@@ -200,13 +216,9 @@ kbd { font: 10px/1.2 var(--ui); color: var(--text); padding: 3px 5px; border: 1p
   #pause-menu, #settings-modal { justify-content: flex-start; }
 }
 @media (max-height: 820px) and (min-width: 761px) {
-  #selection-screen { padding-top:24px !important; }
-  #character-list, #weapon-list { max-height:220px !important; }
+  #selection-screen { padding-top:18px !important; }
 }
-@media (max-width: 900px) {
-  #level-up-cards { flex-wrap: wrap !important; }
-  #level-up-cards .card { flex: 1 1 230px !important; min-height: 220px; }
-}
+@media (max-width: 900px) { #level-up-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) {
   .overlay { padding: 30px 22px; }
   .overlay::before { inset: 10px; }
@@ -215,14 +227,15 @@ kbd { font: 10px/1.2 var(--ui); color: var(--text); padding: 3px 5px; border: 1p
   .menu-footer > div { gap:10px; }
   .menu-footer .btn { gap:5px; }
   .menu-footer .btn + .btn { padding-left:10px; }
-  #selection-screen { padding: 28px 22px !important; }
-  #selection-screen .selection-container, #selection-details { flex-direction: column !important; }
-  #character-list, #weapon-list { max-height: 250px !important; }
-  #char-detail { border-right: 0 !important; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
-  #shared-progression-hint { max-width: 95%; text-align: center; }
-  #level-up-screen { justify-content: flex-start !important; }
-  #level-up-cards { flex-wrap: wrap !important; }
-  #level-up-cards .card { min-height: 170px; }
+  #selection-screen { padding: 18px 10px !important; }
+  .selection-column { padding: 0 8px; }
+  #character-list, #weapon-list { gap: 9px 2px; }
+  #selection-screen .selection-orb { width: clamp(38px, 10vw, 52px); height: clamp(38px, 10vw, 52px); }
+  #selection-screen .selection-orb svg { width: 19px; height: 19px; }
+  .selection-detail { padding: 10px; min-height: 175px; }
+  .selection-actions { padding: 0 8px; }
+  #level-up-screen { justify-content: center !important; }
+  .upgrade-card-info { min-height: 150px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .overlay *, .sketch-dialog *, .sketch-board-panel * { animation: none !important; transition: none !important; }

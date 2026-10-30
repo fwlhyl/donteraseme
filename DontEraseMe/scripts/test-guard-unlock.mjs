@@ -42,6 +42,8 @@ try {
     await page.waitForFunction(() => window.gameInstance.artworkPicker.selected?.name === '我的守卫作品');
     assert.equal(await page.locator('.defense-art-card').count(), 1);
     await page.click('#start-run-btn');
+    await page.waitForSelector('#defense-artwork-overlay:visible');
+    await page.click('#defense-art-start');
     await page.waitForSelector('#defense-intro:visible');
     await page.click('#skip-defense-intro');
     await page.waitForFunction(() => window.gameInstance.defensePainting.active);
